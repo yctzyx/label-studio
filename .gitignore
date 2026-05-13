@@ -84,3 +84,6 @@ docker-compose.override.yml
 CLAUDE.local.md
 web/libs/editor/tests/coverage
 .cache
+
+# Local sibling / linked frontend checkout (not part of this repo)
+pidata-platform-frontend/
