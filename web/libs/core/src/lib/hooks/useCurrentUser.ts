@@ -7,8 +7,15 @@ import { useCallback } from "react";
 const currentUserAtom = atomWithQuery(() => ({
   queryKey: ["current-user"],
   async queryFn() {
-    const api = getApiInstance();
-    return await api.invoke<APIUser>("me");
+    try {
+      const api = getApiInstance();
+      const user = await api.invoke<APIUser>("me");
+      console.log("[LS-embed] whoami success", { id: user?.id, email: user?.email });
+      return user;
+    } catch (err) {
+      console.error("[LS-embed] whoami failed", err);
+      throw err;
+    }
   },
 }));
 

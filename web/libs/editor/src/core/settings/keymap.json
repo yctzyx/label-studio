@@ -2,36 +2,36 @@
   "audio:back": {
     "key": "ctrl+b",
     "mac": "command+b",
-    "description": "Back for one second"
+    "description": "回退一秒"
   },
   "audio:playpause": {
     "key": "ctrl+p",
     "mac": "command+p",
-    "description": "Play/pause"
+    "description": "播放/暂停"
   },
   "audio:step-backward": {
     "key": "alt+a",
-    "description": "Go one step back"
+    "description": "向后一步"
   },
   "audio:step-forward": {
     "key": "alt+d",
-    "description": "Go one step forward"
+    "description": "向前一步"
   },
   "ts:grow-left": {
     "key": "left",
-    "description": "Increase region to the left"
+    "description": "向左扩展选区"
   },
   "ts:grow-right": {
     "key": "right",
-    "description": "Increase region to the right"
+    "description": "向右扩展选区"
   },
   "ts:shrink-left": {
     "key": "alt+left",
-    "description": "Decrease region on the left"
+    "description": "向左收缩选区"
   },
   "ts:shrink-right": {
     "key": "alt+right",
-    "description": "Decrease region on the right"
+    "description": "向右收缩选区"
   },
   "ts:grow-left-large": {
     "key": "shift+left"
@@ -48,281 +48,281 @@
   "annotation:submit": {
     "key": "ctrl+enter",
     "mac": "command+enter",
-    "description": "Submit annotation"
+    "description": "提交标注"
   },
   "annotation:skip": {
     "key": "ctrl+space",
     "mac": "alt+enter",
-    "description": "Skip task"
+    "description": "跳过任务"
   },
   "annotation:undo": {
     "key": "ctrl+z",
     "mac": "command+z",
-    "description": "Undo"
+    "description": "撤销"
   },
   "annotation:redo": {
     "key": "ctrl+shift+z",
     "mac": "command+shift+z",
-    "description": "Redo"
+    "description": "重做"
   },
   "polygon:undo": {
     "key": "ctrl+z",
     "mac": "command+z",
-    "description": "Undo"
+    "description": "撤销"
   },
   "polygon:redo": {
     "key": "ctrl+shift+z",
     "mac": "command+shift+z",
-    "description": "Redo"
+    "description": "重做"
   },
 
   "region:delete-all": {
     "key": "ctrl+backspace",
     "mac": "command+backspace",
-    "description": "Delete all regions"
+    "description": "删除全部选区"
   },
   "region:focus": {
     "key": "enter",
-    "description": "Focus first focusable region"
+    "description": "聚焦第一个可聚焦选区"
   },
   "region:relation": {
     "key": "alt+r",
-    "description": "Create relation between regions"
+    "description": "在选区之间创建关系"
   },
   "region:visibility": {
     "key": "alt+h",
-    "description": "Toggle selected region visibility"
+    "description": "切换当前选区的可见性"
   },
   "region:visibility-all": {
     "key": "ctrl+h",
     "mac": "command+h",
-    "description": "Toggle all regions visibility"
+    "description": "切换全部选区的可见性"
   },
   "region:lock": {
     "key": "alt+l",
-    "description": "Lock selected region"
+    "description": "锁定当前选区"
   },
   "region:meta": {
     "key": "alt+m",
-    "description": "Edit selected region meta"
+    "description": "编辑当前选区元信息"
   },
   "region:unselect": {
     "key": "u",
-    "description": "Unselect region"
+    "description": "取消选中选区"
   },
   "region:exit": {
     "key": "escape",
-    "description": "Exit relation mode, unselect region"
+    "description": "退出关系模式 / 取消选中"
   },
   "region:delete": {
     "key": "backspace",
-    "description": "Delete selected region"
+    "description": "删除当前选区"
   },
   "region:cycle": {
     "key": "alt+.",
-    "description": "Cycle through regions"
+    "description": "在选区间循环切换"
   },
   "region:duplicate": {
     "key": "ctrl+d",
     "mac": "command+d",
-    "description": "Duplicate selected region"
+    "description": "复制当前选区"
   },
   "segment:delete": {
     "key": "delete",
-    "description": "Delete selected region"
+    "description": "删除当前选区"
   },
   "media:playpause": {
     "key": "ctrl+alt+space",
     "mac": "command+alt+space",
-    "description": "Play/pause"
+    "description": "播放/暂停"
   },
   "media:step-backward": {
     "key": "alt+left",
-    "description": "Go one step back"
+    "description": "向后一步"
   },
   "media:step-forward": {
     "key": "alt+right",
-    "description": "Go one step forward"
+    "description": "向前一步"
   },
   "video:keyframe-backward": {
     "key": "ctrl+alt+left",
     "mac": "command+alt+left",
-    "description": "Go to previous keyframe"
+    "description": "上一关键帧"
   },
   "video:keyframe-forward": {
     "key": "ctrl+alt+right",
     "mac": "command+alt+right",
-    "description": "Go to next keyframe"
+    "description": "下一关键帧"
   },
   "video:backward": {
     "key": "alt+left",
-    "description": "Go back"
+    "description": "后退"
   },
   "video:rewind": {
     "key": "shift+ctrl+alt+left",
     "mac": "shift+command+alt+left",
-    "description": "Go to first frame"
+    "description": "跳转到第一帧"
   },
   "video:forward": {
     "key": "shift+alt+right",
-    "description": "Go forward"
+    "description": "前进"
   },
   "video:fastforward": {
     "key": "shift+ctrl+alt+right",
     "mac": "shift+command+alt+right",
-    "description": "Go to last frame"
+    "description": "跳转到最后一帧"
   },
   "video:hop-backward": {
     "key": "shift+alt+left",
-    "description": "Hop Backward"
+    "description": "向后跳跃"
   },
   "video:hop-forward": {
     "key": "shift+alt+right",
-    "description": "Hop Forward"
+    "description": "向前跳跃"
   },
   "repeater:next-page": {
     "key": "alt+right",
-    "description": "Next Page"
+    "description": "下一页"
   },
   "repeater:previous-page": {
     "key": "alt+left",
-    "description": "Previous Page"
+    "description": "上一页"
   },
   "image:prev": {
     "key": "ctrl+left",
     "mac": "command+left",
-    "description": "Previous Image"
+    "description": "上一张图片"
   },
   "image:next": {
     "key": "ctrl+right",
     "mac": "command+right",
-    "description": "Next Image"
+    "description": "下一张图片"
   },
 
   "tool:zoom-in": {
     "key": "ctrl+plus",
     "mac": "command+plus",
-    "description": "Zoom in on the image"
+    "description": "放大图像"
   },
 
   "tool:pan-image": {
     "key": "H",
-    "description": "Pan around the image"
+    "description": "在图像中平移"
   },
 
   "tool:zoom-to-fit": {
     "key": "shift+1",
-    "description": "Zoom to fit the full image in view"
+    "description": "缩放至适合视图"
   },
 
   "tool:zoom-to-actual": {
     "key": "shift+2",
-    "description": "Zoom to actual image size (100%)"
+    "description": "缩放至原始尺寸（100%）"
   },
 
   "tool:zoom-out": {
     "key": "ctrl+minus",
     "mac": "command+minus",
-    "description": "Zoom out of the image"
+    "description": "缩小图像"
   },
 
   "tool:ellipse": {
     "key": "O",
-    "description": "Select the ellipse tool"
+    "description": "选择椭圆工具"
   },
 
   "tool:eraser": {
     "key": "E",
-    "description": "Select the eraser tool"
+    "description": "选择橡皮擦工具"
   },
 
   "tool:auto-detect": {
     "key": "M",
-    "description": "Use the auto-detect tool to automatically suggest regions"
+    "description": "使用自动检测工具，自动建议选区"
   },
 
   "tool:rect-3point": {
     "key": "shift+R",
-    "description": "Draw a rotated rectangle using 3-point selection"
+    "description": "使用三点法绘制旋转矩形"
   },
 
   "tool:key-point": {
     "key": "K",
-    "description": "Select the key point annotation tool"
+    "description": "选择关键点工具"
   },
 
   "tool:magic-wand": {
     "key": "W",
-    "description": "Select the magic wand tool for smart region selection"
+    "description": "选择魔棒工具进行智能选区"
   },
 
   "tool:polygon": {
     "key": "P",
-    "description": "Select the polygon annotation tool"
+    "description": "选择多边形工具"
   },
 
   "tool:vector": {
     "key": "P",
-    "description": "Select the vector annotation tool"
+    "description": "选择矢量工具"
   },
 
   "tool:rect": {
     "key": "R",
-    "description": "Select the rectangle annotation tool"
+    "description": "选择矩形工具"
   },
 
   "tool:rotate-left": {
     "key": "alt+left",
-    "description": "Rotate the image 90° to the left"
+    "description": "图像逆时针旋转 90°"
   },
 
   "tool:rotate-right": {
     "key": "alt+right",
-    "description": "Rotate the image 90° to the right"
+    "description": "图像顺时针旋转 90°"
   },
 
   "tool:move": {
     "key": "V",
-    "description": "Select the move tool to reposition annotations"
+    "description": "选择移动工具，重新定位标注"
   },
 
   "tool:brush": {
     "key": "B",
-    "description": "Select the brush tool"
+    "description": "选择画笔工具"
   },
 
   "tool:decrease-tool": {
     "key": "[",
-    "description": "Decrease tool size"
+    "description": "缩小工具尺寸"
   },
 
   "tool:increase-tool": {
     "key": "]",
-    "description": "Increase tool size"
+    "description": "放大工具尺寸"
   },
   "phrases:next-phrase": {
     "key": "ctrl+down",
     "mac": "command+down",
-    "description": "Move to next phrase"
+    "description": "切换到下一句"
   },
   "phrases:previous-phrase": {
     "key": "ctrl+up",
     "mac": "command+up",
-    "description": "Move to previous phrase"
+    "description": "切换到上一句"
   },
   "phrases:next-region": {
     "key": "ctrl+left",
     "mac": "command+left",
-    "description": "Select next region in current phrase"
+    "description": "选择当前句中的下一个选区"
   },
   "phrases:previous-region": {
     "key": "ctrl+right",
     "mac": "command+right",
-    "description": "Select previous region in current phrase"
+    "description": "选择当前句中的上一个选区"
   },
   "phrases:select_all_annotate": {
     "key": "ctrl+shift+a",
     "mac": "command+shift+a",
-    "description": "Select all and annotate current phrase"
+    "description": "选中并标注当前句"
   }
 }

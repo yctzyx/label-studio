@@ -346,14 +346,26 @@ const AnnotationStoreModel = types
     }
 
     function findNonInteractivePredictionResults() {
-      return self.predictions.reduce((results, prediction) => {
-        return [
-          ...results,
-          ...prediction._initialAnnotationObj
-            .filter((result) => result.interactive_mode === false)
-            .map((r) => ({ ...r })),
-        ];
-      }, []);
+      try {
+        const predictions = self.predictions;
+        if (!predictions || !predictions.length) return [];
+
+        return predictions.reduce((results, prediction) => {
+          const initialObj = prediction._initialAnnotationObj;
+          if (!initialObj || !Array.isArray(initialObj)) return results;
+
+          return [
+            ...results,
+            ...initialObj
+              .filter((result) => result.interactive_mode === false)
+              .map((r) => ({ ...r })),
+          ];
+        }, []);
+      } catch (e) {
+        // MST may throw "creation of observable instance must be done on the initializing phase"
+        // when accessing predictions from async callbacks (e.g. Preview/settings)
+        return [];
+      }
     }
 
     function createItem(options) {
@@ -518,7 +530,10 @@ const AnnotationStoreModel = types
 
     function addAnnotationFromPrediction(entity) {
       // immutable work, because we'll change ids soon
-      const s = entity._initialAnnotationObj.map((r) => ({ ...r }));
+      const initialObj = entity._initialAnnotationObj;
+      if (!initialObj || !Array.isArray(initialObj)) return;
+
+      const s = initialObj.map((r) => ({ ...r }));
       const c = self.addAnnotation({ userGenerate: true, result: s });
 
       const ids = {};

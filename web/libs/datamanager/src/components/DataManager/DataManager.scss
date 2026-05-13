@@ -1,6 +1,8 @@
 .tabs-dm-content {
   --filters-sidebar-width: 620px;
 
+  flex: 1 1 0%;
+  min-height: 0;
   height: 100%;
   width: 100%;
   display: flex;
@@ -8,10 +10,22 @@
   &__tab {
     display: flex;
     flex-direction: column;
+    flex: 1 1 0%;
+    min-width: 0;
+    min-height: 0;
     width: 100%;
 
     &_shrink {
       width: calc(100% - var(--filters-sidebar-width));
+    }
+
+    /* Positive min-height so AutoSizer always gets usable height even when ancestor flex chain is loose */
+    .data-view-dm {
+      flex: 1 1 0%;
+      min-height: clamp(260px, 42vh, 720px);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
     }
   }
 }

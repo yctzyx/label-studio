@@ -1,4 +1,6 @@
+import { runInAction } from "mobx";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Spinner } from "../../../components";
 import { cn } from "../../../utils/bem";
 import "./Config.scss";
@@ -19,6 +21,7 @@ const loadDependencies = async () => {
 };
 
 export const Preview = ({ config, data, error, loading, project }) => {
+  const { t } = useTranslation();
   // @see comment about dependencies above
   loadDependencies();
 
@@ -84,11 +87,19 @@ export const Preview = ({ config, data, error, loading, project }) => {
           LS.settings.bottomSidePanel = true;
 
           const initAnnotation = () => {
-            const as = LS.annotationStore;
-            const c = as.createAnnotation();
+            runInAction(() => {
+              try {
+                const as = LS.annotationStore;
+                const c = as.createAnnotation();
 
-            as.selectAnnotation(c.id);
-            setStoreReady(true);
+                as.selectAnnotation(c.id);
+                setStoreReady(true);
+              } catch (e) {
+                // MST may throw when createAnnotation runs from async callback (e.g. Settings preview)
+                console.warn("Preview initAnnotation:", e);
+                setStoreReady(true);
+              }
+            });
           };
 
           // and even then we need to wait a little even after the store is initialized
@@ -141,7 +152,7 @@ export const Preview = ({ config, data, error, loading, project }) => {
 
   return (
     <div className={configClass.elem("preview")}>
-      <h3>Preview</h3>
+      <h3>{t("Preview")}</h3>
       {error && (
         <div className={configClass.elem("preview-error")}>
           <h2>

@@ -6,6 +6,9 @@ import sys
 
 if __name__ == '__main__':
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings.label_studio')
+    from label_studio.core.mysql_schema_compat import apply_mysql_rename_column_patch
+
+    apply_mysql_rename_column_patch()
     # os.environ.setdefault('DEBUG', 'True')
     try:
         from django.conf import settings

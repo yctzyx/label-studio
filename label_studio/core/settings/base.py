@@ -15,9 +15,17 @@ import os
 import re
 from datetime import timedelta
 
+import environ
 from django.core.exceptions import ImproperlyConfigured
 
 from label_studio.core.utils.params import get_bool_env, get_env, get_env_list, has_env
+
+# 从项目根目录加载 .env（支持 NACOS_*, LABEL_STUDIO_* 等）
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+_ENV_FILE = os.path.join(_PROJECT_ROOT, '.env')
+if os.path.exists(_ENV_FILE):
+    environ.Env.read_env(_ENV_FILE)
+    # 开发时可用 LOG_LEVEL=DEBUG 查看详细日志
 
 formatter = 'standard'
 JSON_LOG = get_bool_env('JSON_LOG', False)
@@ -111,8 +119,12 @@ if HOSTNAME:
             if FORCE_SCRIPT_NAME:
                 logger.info('=> Django URL prefix is set to: %s', FORCE_SCRIPT_NAME)
 
-FRONTEND_HMR = get_bool_env('FRONTEND_HMR', False)
+FRONTEND_HMR = get_bool_env('FRONTEND_HMR', True)
 FRONTEND_HOSTNAME = get_env('FRONTEND_HOSTNAME', 'http://localhost:8010' if FRONTEND_HMR else HOSTNAME)
+
+# When using /embed/ entry (e.g. 无界), API requests use this hostname so they go through gateway.
+# Set to your gateway URL (e.g. https://main-platform.com/label-studio). If empty, falls back to HOSTNAME.
+EMBED_GATEWAY_HOSTNAME = get_env('EMBED_GATEWAY_HOSTNAME', '')
 
 DOMAIN_FROM_REQUEST = get_bool_env('DOMAIN_FROM_REQUEST', False)
 
@@ -122,6 +134,18 @@ if DOMAIN_FROM_REQUEST:
         raise ImproperlyConfigured('LABEL_STUDIO_HOST must be a subpath if DOMAIN_FROM_REQUEST is True')
 
 INTERNAL_PORT = '8080'
+
+# Nacos service registration (for microservice / gateway integration)
+# Override via environment: LABEL_STUDIO_NACOS_* or NACOS_*
+# Set NACOS_SERVER_ADDR='' to disable registration
+NACOS_SERVER_ADDR = get_env('NACOS_SERVER_ADDR', '192.168.1.76:8848')
+NACOS_ENABLED = bool((NACOS_SERVER_ADDR or '').strip())
+NACOS_USERNAME = get_env('NACOS_USERNAME', 'nacos')
+NACOS_PASSWORD = get_env('NACOS_PASSWORD', 'nacos')
+NACOS_SERVICE_NAME = get_env('NACOS_SERVICE_NAME', 'label-studio')
+NACOS_GROUP_NAME = get_env('NACOS_GROUP_NAME', 'dev')
+NACOS_NAMESPACE_ID = get_env('NACOS_NAMESPACE_ID', '1822db80-4da8-4112-be68-6817f515e394')
+NACOS_IP = get_env('NACOS_IP', '')  # Leave empty to auto-detect instance IP
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = get_bool_env('DEBUG', True)
@@ -176,6 +200,13 @@ DATABASES_ALL = {
         'NAME': get_env('MYSQL_NAME', 'labelstudio'),
         'HOST': get_env('MYSQL_HOST', 'localhost'),
         'PORT': int(get_env('MYSQL_PORT', '3306')),
+        'CONN_MAX_AGE': int(get_env('MYSQL_CONN_MAX_AGE', '60')),
+        'CONN_HEALTH_CHECKS': get_bool_env('MYSQL_CONN_HEALTH_CHECKS', True),
+        # Strict mode; charset aligned with typical JDBC useUnicode/UTF-8 setups
+        'OPTIONS': {
+            'init_command': "SET sql_mode='STRICT_TRANS_TABLES', NAMES utf8mb4",
+            'charset': 'utf8mb4',
+        },
     },
     DJANGO_DB_SQLITE: {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -186,9 +217,86 @@ DATABASES_ALL = {
     },
 }
 DATABASES_ALL['default'] = DATABASES_ALL[DJANGO_DB_POSTGRESQL]
-DATABASES = {'default': DATABASES_ALL.get(get_env('DJANGO_DB', 'default'))}
+
+
+def merge_parent_platform_database(databases):
+    """
+    当设置 PARENT_PLATFORM_MYSQL_NAME 时，增加别名 `parent_platform`，用于只读查询
+    父平台表 data_database / md_data_set（与 Label Studio 主库分离时使用）。
+    未设置时，上述表需位于 Django `default` 指向的同一 MySQL 库中。
+    """
+    merged = dict(databases)
+    name = get_env('PARENT_PLATFORM_MYSQL_NAME', '').strip()
+    if not name:
+        return merged
+    merged['parent_platform'] = {
+        'ENGINE': 'django.db.backends.mysql',
+        'USER': get_env('PARENT_PLATFORM_MYSQL_USER', get_env('MYSQL_USER', 'root')),
+        'PASSWORD': get_env('PARENT_PLATFORM_MYSQL_PASSWORD', get_env('MYSQL_PASSWORD', '')),
+        'NAME': name,
+        'HOST': get_env('PARENT_PLATFORM_MYSQL_HOST', get_env('MYSQL_HOST', 'localhost')),
+        'PORT': int(get_env('PARENT_PLATFORM_MYSQL_PORT', get_env('MYSQL_PORT', '3306'))),
+        'OPTIONS': {
+            'init_command': "SET sql_mode='STRICT_TRANS_TABLES', NAMES utf8mb4",
+            'charset': 'utf8mb4',
+        },
+    }
+    return merged
+
+
+def merge_parent_integration_databases(databases):
+    """
+    在父平台数据集库（parent_platform）之外，可额外配置目录同步专用库（pub_directory）。
+    未配置 PUB_DIRECTORY_MYSQL_NAME 时，不新增该别名。
+    """
+    merged = merge_parent_platform_database(databases)
+    pub_name = get_env('PUB_DIRECTORY_MYSQL_NAME', '').strip()
+    if not pub_name:
+        return merged
+    merged['pub_directory'] = {
+        'ENGINE': get_env('PUB_DIRECTORY_MYSQL_ENGINE', 'core.db.backends.mysql57'),
+        'USER': get_env(
+            'PUB_DIRECTORY_MYSQL_USER',
+            get_env('PARENT_PLATFORM_MYSQL_USER', get_env('MYSQL_USER', 'root')),
+        ),
+        'PASSWORD': get_env(
+            'PUB_DIRECTORY_MYSQL_PASSWORD',
+            get_env('PARENT_PLATFORM_MYSQL_PASSWORD', get_env('MYSQL_PASSWORD', '')),
+        ),
+        'NAME': pub_name,
+        'HOST': get_env(
+            'PUB_DIRECTORY_MYSQL_HOST',
+            get_env('PARENT_PLATFORM_MYSQL_HOST', get_env('MYSQL_HOST', 'localhost')),
+        ),
+        'PORT': int(get_env('PUB_DIRECTORY_MYSQL_PORT', get_env('PARENT_PLATFORM_MYSQL_PORT', get_env('MYSQL_PORT', '3306')))),
+        'OPTIONS': {
+            'init_command': "SET sql_mode='STRICT_TRANS_TABLES', NAMES utf8mb4",
+            'charset': 'utf8mb4',
+        },
+    }
+    return merged
+
+
+DATABASES = merge_parent_integration_databases({'default': DATABASES_ALL.get(get_env('DJANGO_DB', 'default'))})
+
+# pub_org / pub_user / pub_user_org 读取时使用的数据库别名（manage.py sync_pub_directory）。
+# 默认逻辑：
+# - 若配置了 PUB_DIRECTORY_MYSQL_NAME，则默认读别名 pub_directory
+# - 否则默认读 default（本库）
+PUB_DIRECTORY_DB = (
+    get_env('PUB_DIRECTORY_DB', 'pub_directory' if get_env('PUB_DIRECTORY_MYSQL_NAME', '').strip() else 'default')
+    or 'default'
+).strip()
+PUB_DIRECTORY_SYNC_ENABLED = get_bool_env('PUB_DIRECTORY_SYNC_ENABLED', True)
+PUB_DIRECTORY_SYNC_INTERVAL_SECONDS = max(10, int(get_env('PUB_DIRECTORY_SYNC_INTERVAL_SECONDS', '60')))
+PUB_DIRECTORY_SYNC_PRUNE_MEMBERSHIPS = get_bool_env('PUB_DIRECTORY_SYNC_PRUNE_MEMBERSHIPS', False)
+
+DATABASE_ROUTERS = ['parent_integration.db_router.ParentPlatformRouter']
 
 DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
+
+# 父平台对象存储（S3 兼容）：data_database.config_json 未配置 s3_endpoint 时的兜底 Base URL
+PARENT_PLATFORM_S3_DEFAULT_ENDPOINT = get_env('PARENT_PLATFORM_S3_DEFAULT_ENDPOINT', '').strip()
 
 if get_bool_env('GOOGLE_LOGGING_ENABLED', False):
     logging.info('Google Cloud Logging handler is enabled.')
@@ -214,6 +322,7 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
+    'core',  # 必须在 staticfiles 之前，以便自定义 runserver（含 Nacos 注册）被加载
     'django.contrib.staticfiles',
     'django.contrib.humanize',
     'drf_spectacular',
@@ -228,7 +337,6 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'drf_generators',
     'fsm',  # MUST be before apps that register FSM transitions (projects, tasks)
-    'core',
     'users',
     'organizations',
     'data_import',
@@ -244,9 +352,17 @@ INSTALLED_APPS = [
     'ml_model_providers',
     'jwt_auth',
     'session_policy',
+    'custom_auth',
+    'parent_integration',
 ]
 
+# 当请求经网关转发且网关已添加 CORS 头时，设为 True 可完全禁用 LS 的 CORS。
+# 若设为 False，LS 会加 CORS；经网关的请求会由 StripCorsWhenProxied 中间件移除 LS 的 CORS 头，避免与网关重复。
+CORS_DISABLED = get_bool_env('CORS_DISABLED', False)
+
 MIDDLEWARE = [
+    'core.middleware.RewriteGatewayPath',  # 网关 path /api/label-studio/xxx 重写为 /api/xxx
+    'core.middleware.StripCorsWhenProxied',  # 最先加载，process_response 最后执行，用于在经网关时移除 LS 的 CORS 头
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -264,13 +380,27 @@ MIDDLEWARE = [
     'core.current_request.ThreadLocalMiddleware',
     'jwt_auth.middleware.JWTAuthenticationMiddleware',
 ]
+if CORS_DISABLED:
+    MIDDLEWARE = [m for m in MIDDLEWARE if m != 'corsheaders.middleware.CorsMiddleware']
+
+# 主平台 Bearer Token 认证（无界/网关）：Authorization: Bearer <主平台token> 时由此认证并映射到 LS 用户
+MAIN_PLATFORM_AUTH_ENABLED = get_bool_env('MAIN_PLATFORM_AUTH_ENABLED', False)
+MAIN_PLATFORM_AUTH_USER_URL = get_env('MAIN_PLATFORM_AUTH_USER_URL', '')
+MAIN_PLATFORM_AUTH_TIMEOUT = int(get_env('MAIN_PLATFORM_AUTH_TIMEOUT', '5'))
+
+_REST_DEFAULT_AUTH_CLASSES = (
+    'custom_auth.auth.GatewayJwtUserAuth',  # 网关注入 jwt-user 头（Base64 用户信息）时优先使用
+    'jwt_auth.auth.TokenAuthenticationPhaseout',
+    'rest_framework.authentication.SessionAuthentication',
+)
+if MAIN_PLATFORM_AUTH_ENABLED and (MAIN_PLATFORM_AUTH_USER_URL or '').strip():
+    _REST_DEFAULT_AUTH_CLASSES = (
+        'custom_auth.auth.MainPlatformBearerAuth',
+    ) + _REST_DEFAULT_AUTH_CLASSES
 
 REST_FRAMEWORK = {
     'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'jwt_auth.auth.TokenAuthenticationPhaseout',
-        'rest_framework.authentication.SessionAuthentication',
-    ),
+    'DEFAULT_AUTHENTICATION_CLASSES': _REST_DEFAULT_AUTH_CLASSES,
     'DEFAULT_PERMISSION_CLASSES': [
         'core.api_permissions.HasObjectPermission',
         'rest_framework.permissions.IsAuthenticated',

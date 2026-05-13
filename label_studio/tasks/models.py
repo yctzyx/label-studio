@@ -595,7 +595,15 @@ class AnnotationManager(models.Manager):
         return AnnotationQuerySetWithFSM(self.model, using=self._db)
 
     def for_user(self, user):
-        return self.get_queryset().filter(project__organization=user.active_organization)
+        from projects.access import apply_project_team_visibility
+        from projects.models import Project
+
+        qs = self.get_queryset().filter(project__organization=user.active_organization)
+        visible_projects = apply_project_team_visibility(
+            Project.objects.filter(organization=user.active_organization),
+            user,
+        )
+        return qs.filter(project_id__in=visible_projects.values('id'))
 
     def with_state(self):
         """Return queryset with FSM state annotated."""
@@ -719,7 +727,6 @@ class Annotation(AnnotationMixin, FsmHistoryStateModel):
     bulk_created = models.BooleanField(
         _('bulk created'),
         default=False,
-        db_default=False,
         null=True,
         help_text='Annotation was created in bulk mode',
     )
@@ -1466,6 +1473,59 @@ def update_ml_backend(sender, instance, **kwargs):
         if annotation_count % project.min_annotations_to_start_training == 0:
             for ml_backend in project.ml_backends.all():
                 ml_backend.train()
+
+
+@receiver(post_save, sender=Annotation)
+def advance_task_workflow_after_annotation_saved(sender, instance, created, **kwargs):
+    """Backend safety net: advance workflow stage right after the annotation row is committed.
+
+    Frontend also POSTs /tasks/:id/workflow/submit-annotation/ for the same effect, but the
+    signal guarantees progression even if the frontend call is dropped (network error, refresh,
+    legacy SDK). Runs after the transaction commits so we never operate on rolled-back data.
+    """
+    if not created or instance.was_cancelled:
+        return
+
+    task = instance.task
+    if task is None:
+        return
+
+    try:
+        wf = task.workflow
+    except Exception:
+        return
+
+    if wf is None or wf.stage != 'annotate':
+        return
+
+    user = instance.completed_by
+    if user is None or wf.current_assignee_id != user.id:
+        return
+
+    project = getattr(task, 'project', None)
+    if project is None or not getattr(project, 'task_workflow_enabled', False):
+        return
+
+    task_id = task.id
+    user_obj = user
+
+    def _run():
+        try:
+            from projects.workflow_services import submit_annotation_after_labeling
+
+            submit_annotation_after_labeling(task_id, user_obj)
+        except Exception as exc:
+            logger.warning(
+                'Task workflow auto-advance failed for task=%s annotation=%s: %s',
+                task_id,
+                instance.id,
+                exc,
+            )
+
+    try:
+        transaction.on_commit(_run)
+    except Exception:
+        _run()
 
 
 def update_task_stats(task, stats=('is_labeled',), save=True):

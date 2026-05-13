@@ -1,4 +1,5 @@
 import { useCallback, useContext, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useAPI } from "../../../providers/ApiProvider";
 import { Select } from "../../../components/Form";
 import { ProjectContext } from "../../../providers/ProjectProvider";
@@ -9,6 +10,7 @@ export const ModelVersionSelector = ({
   apiName = "projectModelVersions",
   ...props
 }) => {
+  const { t } = useTranslation();
   const api = useAPI();
   const { project } = useContext(ProjectContext);
   const [loading, setLoading] = useState(true);
@@ -39,7 +41,7 @@ export const ModelVersionSelector = ({
         const label = `${item.title} (${item.readable_state})`;
 
         return {
-          group: "Models",
+          group: t("Models"),
           value: item.title,
           label,
         };
@@ -50,10 +52,14 @@ export const ModelVersionSelector = ({
 
     if (modelVersions?.static?.length > 0) {
       const staticModels = modelVersions.static.map((item) => {
-        const label = `${item.model_version} (${item.count} predictions)`;
+        const label = t("prediction_version_count_label", {
+          version: item.model_version,
+          count: item.count,
+          defaultValue: "{{version}} ({{count}} predictions)",
+        });
 
         return {
-          group: "Predictions",
+          group: t("Predictions"),
           value: item.model_version,
           label,
         };
@@ -63,11 +69,11 @@ export const ModelVersionSelector = ({
     }
 
     if (!modelVersions?.static?.length && !modelVersions?.live?.length) {
-      setPlaceholder("No model or predictions available");
+      setPlaceholder(t("No model or predictions available"));
     }
 
     setLoading(false);
-  }, [project?.id, apiName]);
+  }, [project?.id, apiName, t]);
 
   useEffect(() => {
     fetchMLVersions();
@@ -75,7 +81,7 @@ export const ModelVersionSelector = ({
 
   return (
     <div>
-      <label>Select which predictions or which model you want to use:</label>
+      <label>{t("Select which predictions or which model you want to use:")}</label>
       <div style={{ display: "flex", alignItems: "center", width: 400 }}>
         <div style={{ flex: 1, paddingRight: 16 }}>
           <Select
@@ -84,7 +90,7 @@ export const ModelVersionSelector = ({
             value={version}
             onChange={setVersion}
             options={[...models, ...versions]}
-            placeholder={placeholder || "Please select model or predictions"}
+            placeholder={placeholder || t("Please select model or predictions")}
             isInProgress={loading}
             {...props}
           />

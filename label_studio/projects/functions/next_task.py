@@ -431,6 +431,45 @@ def get_task_from_qs_with_sampling(
     return next_task, queue_info
 
 
+def _restrict_prepared_tasks_for_workflow(prepared_tasks: QuerySet, project: Project, user: User) -> QuerySet:
+    """For workflow-enabled projects, restrict the "next task" pool to the user's own active tasks.
+
+    The current assignee can act in any of ``annotate / review / accept`` stages — the request
+    handler / SDK decides which controls to expose for that stage. Tasks at ``done`` are never
+    served. Project managers / creators / org owners / superusers are not restricted so they can
+    still operate on the full pool from DataManager.
+
+    This is the safety net for the "next task" pipeline, which takes its input from
+    ``Task.prepared.only_filtered(...)`` and therefore bypasses the user-scoped filtering
+    applied by ``Task.objects.for_user``.
+    """
+    if not getattr(project, 'task_workflow_enabled', False):
+        return prepared_tasks
+
+    if getattr(user, 'is_superuser', False):
+        return prepared_tasks
+
+    active_org = getattr(user, 'active_organization', None)
+    if active_org is not None and getattr(active_org, 'created_by_id', None) == user.id:
+        return prepared_tasks
+
+    if getattr(project, 'created_by_id', None) == user.id:
+        return prepared_tasks
+
+    try:
+        from projects.access import user_can_manage_project
+
+        if user_can_manage_project(user, project):
+            return prepared_tasks
+    except Exception:
+        pass
+
+    return prepared_tasks.filter(
+        workflow__current_assignee_id=user.id,
+        workflow__stage__in=('annotate', 'review', 'accept'),
+    )
+
+
 def get_next_task(
     user: User,
     prepared_tasks: QuerySet,
@@ -439,6 +478,8 @@ def get_next_task(
     assigned_flag: Union[bool, None] = None,
 ) -> Tuple[Union[Task, None], str]:
     logger.debug(f'get_next_task called. user: {user}, project: {project}, dm_queue: {dm_queue}')
+
+    prepared_tasks = _restrict_prepared_tasks_for_workflow(prepared_tasks, project, user)
 
     with conditional_atomic(predicate=db_is_not_sqlite):
         next_task = None

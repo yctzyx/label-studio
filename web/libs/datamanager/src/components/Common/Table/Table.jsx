@@ -271,6 +271,11 @@ export const Table = observer(
         // Both QuickView and Regular mode: Index 0 is header (sticky), Index 1+ are data rows
         const dataIndex = index - 1;
         const row = data[dataIndex];
+
+        if (!row) {
+          return null;
+        }
+
         const isEven = dataIndex % 2 === 0;
 
         if (isQuickView) {
@@ -326,7 +331,10 @@ export const Table = observer(
 
     const isItemLoaded = useCallback(
       (index) => {
-        return props.isItemLoaded(data, index);
+        // Index 0 is the sticky header row (see stickyItems={[0]}); InfiniteLoader indices align with VariableSizeList.
+        if (index === 0) return true;
+        const taskIndex = index - 1;
+        return props.isItemLoaded(data, taskIndex);
       },
       [props, data],
     );
@@ -354,10 +362,9 @@ export const Table = observer(
 
     const itemKey = useCallback(
       (index) => {
-        if (index > data.length - 1) {
-          return index;
-        }
-        return data[index]?.key ?? index;
+        if (index === 0) return "dm-table-header";
+        const row = data[index - 1];
+        return row?.id ?? `dm-row-${index}`;
       },
       [data],
     );
@@ -366,9 +373,12 @@ export const Table = observer(
       const listComponent = listRef.current?._listRef;
 
       if (listComponent) {
-        listComponent.scrollToItem(data.indexOf(focusedItem), "center");
+        const taskIndex = data.indexOf(focusedItem);
+        if (taskIndex >= 0) {
+          listComponent.scrollToItem(taskIndex + 1, "center");
+        }
       }
-    }, [data]);
+    }, [data, focusedItem]);
     const tableWrapper = useRef();
 
     const handleScroll = useCallback(

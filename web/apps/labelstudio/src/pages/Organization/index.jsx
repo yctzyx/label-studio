@@ -20,7 +20,7 @@ if (ALLOW_ORGANIZATION_WEBHOOKS) {
 }
 
 export const OrganizationPage = {
-  title: "Organization",
+  title: "组织",
   path: "/organization",
   exact: true,
   layout: MenuLayout,

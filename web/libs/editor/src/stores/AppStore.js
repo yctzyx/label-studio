@@ -31,7 +31,7 @@ import { isActive, FF_FIT_720_LAZY_LOAD_ANNOTATIONS } from "@humansignal/core/li
 import { CommentStore } from "./Comment/CommentStore";
 import { CustomButton } from "./CustomButton";
 
-const hotkeys = Hotkey("AppStore", "Global Hotkeys");
+const hotkeys = Hotkey("AppStore", "全局快捷键");
 
 export default types
   .model("AppStore", {
@@ -1108,3 +1108,4 @@ export default types
       },
     };
   });
+

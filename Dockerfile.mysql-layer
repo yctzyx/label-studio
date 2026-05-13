@@ -1,0 +1,34 @@
+# 在「已有 Label Studio 镜像」上补装 Django MySQL 后端所需的 mysqlclient，避免全流程重建。
+#
+# Alpine 基底（与本仓库 Dockerfile 的最终 python:*-alpine 一致）。
+#
+#   docker build -f Dockerfile.mysql-layer \
+#     --build-arg BASE_IMAGE=你本地已有镜像名:标签 \
+#     -t label-studio:custom .
+#
+# 例：镜像已在本地：
+#   docker build -f Dockerfile.mysql-layer \
+#     --build-arg BASE_IMAGE=label-studio:custom \
+#     -t label-studio:custom-mysql .
+#
+ARG BASE_IMAGE=label-studio:custom
+
+FROM ${BASE_IMAGE}
+
+USER root
+
+# mariadb-connector-c：运行时 libmariadb
+# mariadb-dev + 编译工具：在无预编译轮子时源码构建 mysqlclient
+RUN apk add --no-cache mariadb-connector-c \
+    && apk add --no-cache --virtual .mysqlclient-build-deps \
+        mariadb-dev \
+        musl-dev \
+        gcc \
+        zlib-dev \
+        pkgconf \
+        python3-dev \
+    && /label-studio/.venv/bin/pip install --no-cache-dir 'mysqlclient>=2.2.8,<3.0.0' \
+    && apk del .mysqlclient-build-deps \
+    && chown -R 1001:0 /label-studio/.venv
+
+USER 1001

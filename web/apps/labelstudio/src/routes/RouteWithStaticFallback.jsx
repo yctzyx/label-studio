@@ -41,6 +41,7 @@ export const RouteWithStaticFallback = ({ children, render, route, component, st
     }
 
     const Static = () => {
+      console.log("[LS-embed] RouteWithStaticFallback: no route matched, rendering StaticContent");
       if (menubar?.contextIsSet(null) === false) menubar?.setContext(null);
       return staticComponent ?? <StaticContent id="main-content" />;
     };

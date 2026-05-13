@@ -21,7 +21,8 @@ export const Inner = () => {
   const [sample, setSample] = useState(null);
   const api = useAPI();
 
-  const { uploading, uploadDisabled, finishUpload, fileIds, pageProps, uploadSample } = useImportPage(project);
+  const { uploading, uploadDisabled, hasImportData, finishUpload, fileIds, pageProps, uploadSample } =
+    useImportPage(project);
 
   const backToDM = useCallback(() => {
     const path = location.pathname.replace(ImportModal.path, "");
@@ -89,7 +90,7 @@ export const Inner = () => {
             size="small"
             onClick={onFinish}
             waiting={waiting || uploading}
-            disabled={uploadDisabled}
+            disabled={uploadDisabled || !hasImportData}
             aria-label="Finish import"
           >
             Import

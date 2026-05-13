@@ -33,6 +33,7 @@ from drf_spectacular.views import (
 
 urlpatterns = [
     re_path(r'^$', views.main, name='main'),
+    re_path(r'^embed(?:/.*)?$', views.embed, name='embed'),
     re_path(r'^sw\.js$', views.static_file_with_host_resolver('js/sw.js', content_type='text/javascript')),
     re_path(
         r'^sw-fallback\.js$',
@@ -59,6 +60,7 @@ urlpatterns = [
         views.static_file_with_host_resolver('fonts/roboto/roboto.css', content_type='text/css'),
     ),
     re_path(r'^static/(?P<path>.*)$', serve, kwargs={'document_root': settings.STATIC_ROOT, 'show_indexes': True}),
+    re_path(r'^', include('parent_integration.urls')),
     re_path(r'^', include('organizations.urls')),
     re_path(r'^', include('projects.urls')),
     re_path(r'^', include('data_import.urls')),

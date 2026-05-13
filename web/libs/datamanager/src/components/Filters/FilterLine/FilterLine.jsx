@@ -12,8 +12,8 @@ const Conjunction = observer(({ index, view }) => {
   return (
     <FilterDropdown
       items={[
-        { value: "and", label: "And" },
-        { value: "or", label: "Or" },
+        { value: "and", label: "且" },
+        { value: "or", label: "或" },
       ]}
       disabled={index > 1}
       value={view.conjunction}
@@ -33,7 +33,7 @@ export const FilterLine = observer(({ filter, availableFilters, index, view, sid
         {/* Main filter row */}
         <div className={cn("filterLine").elem("column").mix("conjunction")}>
           {index === 0 ? (
-            <span style={{ fontSize: 12, paddingRight: 5 }}>Where</span>
+            <span style={{ fontSize: 12, paddingRight: 5 }}>条件</span>
           ) : (
             <Conjunction index={index} view={view} />
           )}
@@ -41,7 +41,7 @@ export const FilterLine = observer(({ filter, availableFilters, index, view, sid
 
         <div className={cn("filterLine").elem("column").mix("field")}>
           <FilterDropdown
-            placeholder="Column"
+            placeholder="字段"
             defaultValue={filter.filter.id}
             items={availableFilters}
             dropdownClassName={dropdownClassName}
@@ -104,7 +104,7 @@ export const FilterLine = observer(({ filter, availableFilters, index, view, sid
           <>
             {/* Column 1: Conjunction */}
             <div className={cn("filterLine").elem("column").mix("conjunction")}>
-              <span style={{ fontSize: 12, paddingRight: 5 }}>and</span>
+              <span style={{ fontSize: 12, paddingRight: 5 }}>且</span>
             </div>
 
             {/* Column 2: Field */}
@@ -151,7 +151,7 @@ export const FilterLine = observer(({ filter, availableFilters, index, view, sid
     <div className={cn("filterLine").mod({ hasChild: !!childFilter })}>
       <div className={cn("filterLine").elem("column").mix("conjunction")}>
         {index === 0 ? (
-          <span style={{ fontSize: 12, paddingRight: 5 }}>Where</span>
+          <span style={{ fontSize: 12, paddingRight: 5 }}>条件</span>
         ) : (
           <Conjunction index={index} view={view} />
         )}
@@ -159,7 +159,7 @@ export const FilterLine = observer(({ filter, availableFilters, index, view, sid
 
       <div className={cn("filterLine").elem("column").mix("field")}>
         <FilterDropdown
-          placeholder="Column"
+          placeholder="字段"
           defaultValue={filter.filter.id}
           items={availableFilters}
           width={80}
@@ -224,7 +224,7 @@ export const FilterLine = observer(({ filter, availableFilters, index, view, sid
           <div className={cn("filterLine").elem("remove")} />
 
           <div className={cn("filterLine").elem("column").mix("conjunction")}>
-            <span style={{ fontSize: 12, paddingRight: 5 }}>and</span>
+            <span style={{ fontSize: 12, paddingRight: 5 }}>且</span>
           </div>
 
           <div className={cn("filterLine").elem("column").mix("field child-field")}>
@@ -263,3 +263,4 @@ export const FilterLine = observer(({ filter, availableFilters, index, view, sid
     </div>
   );
 });
+

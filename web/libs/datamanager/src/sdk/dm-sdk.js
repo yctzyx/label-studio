@@ -41,7 +41,6 @@
 
 import { inject, observer } from "mobx-react";
 import { destroy } from "mobx-state-tree";
-import { unmountComponentAtNode } from "react-dom";
 import camelCase from "lodash/camelCase";
 import { instruments } from "../components/DataManager/Toolbar/instruments";
 import { APIProxy } from "../utils/api-proxy";
@@ -453,7 +452,8 @@ export class DataManager {
 
   destroy(detachCallbacks = true) {
     this.destroyLSF();
-    unmountComponentAtNode(this.root);
+    this._reactRoot?.unmount();
+    this._reactRoot = undefined;
 
     if (this.store) {
       destroy(this.store);

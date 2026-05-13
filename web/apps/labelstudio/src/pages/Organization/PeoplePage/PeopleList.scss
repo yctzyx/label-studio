@@ -1,107 +1,196 @@
+/* 与标注项目 .projects-page__studio / __sidebar 一致：白卡片、灰底由 SidebarMenu 提供 */
 .people-list {
   width: 100%;
-  min-width: 650px;
-  font-size: 16px;
+  max-width: 100%;
+  min-width: 0;
+  font-size: 13px;
+  box-sizing: border-box;
+
+  &__panel {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    background: #fff;
+    border: 1px solid #e8edf5;
+    border-radius: 12px;
+    box-shadow: 0 6px 20px rgb(20 40 90 / 5%);
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+
+  &__org-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid #f0f0f0;
+    box-sizing: border-box;
+  }
+
+  &__org-label {
+    flex-shrink: 0;
+    font-size: 12px;
+    font-weight: 500;
+    color: #8c8c8c;
+  }
+
+  &__org-select {
+    flex: 1;
+    min-width: min(100%, 200px);
+    max-width: none;
+  }
+
+  /* 与 .projects-page__search-input 对齐的触发器 */
+  &__org-select-trigger {
+    --select-trigger-height: 32px !important;
+    --select-trigger-font-size: 13px !important;
+
+    border-radius: 4px !important;
+    border: 1px solid #d9d9d9 !important;
+    color: #262626 !important;
+    background: #fff !important;
+
+    &:hover:not(.isDisabled) {
+      border-color: #b8bcc4 !important;
+    }
+
+    &.isOpen,
+    &:focus-visible {
+      outline: none !important;
+      border-color: #1677ff !important;
+      box-shadow: 0 0 0 2px rgb(22 119 255 / 15%) !important;
+    }
+  }
+
+  &__empty {
+    padding: 32px 16px;
+    text-align: center;
+    color: var(--color-neutral-content-subtler);
+    font-size: 14px;
+  }
 
   &__wrapper {
-    border-radius: 4px;
-    border: 1px solid var(--color-neutral-border);
-    background: var(--color-neutral-background);
+    min-width: 0;
+    background: #fff;
+  }
+
+  &__pagination-wrap {
+    flex-shrink: 0;
+    padding: 12px 16px 16px;
+    border-top: 1px solid #f5f5f5;
+    box-sizing: border-box;
   }
 
   &__loading {
     width: 100%;
     display: flex;
-    min-height: 250px;
+    min-height: 220px;
     justify-content: center;
     align-items: center;
   }
 
   &__users {
     width: 100%;
+    min-width: 0;
     text-align: left;
-    border-collapse: collapse;
   }
 
   &__header {
-    font-weight: 500;
     display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 12px;
+    padding: 0 16px;
+    min-height: 44px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #595959;
+    background: #fafafa;
+    border-bottom: 1px solid #f0f0f0;
+    box-sizing: border-box;
   }
 
   &__column,
   &__field {
-    z-index: 2;
-    height: 48px;
-    padding: 0 10px;
+    z-index: 1;
+    min-height: 48px;
+    padding: 10px 0;
     border: none;
-    color: var(--color-neutral-content);
+    color: #262626;
     display: flex;
     position: relative;
     align-items: center;
+    box-sizing: border-box;
 
     &.avatar {
-      width: 28px;
-      box-sizing: content-box;
+      width: 36px;
+      flex-shrink: 0;
+      padding-right: 8px;
+      justify-content: center;
     }
 
     &.name {
       flex: 1;
+      min-width: 0;
     }
 
     &.email {
-      width: 200px;
+      flex: 1.2;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     &.last-activity {
-      width: 160px;
+      width: 140px;
+      flex-shrink: 0;
+      justify-content: flex-end;
+      color: #8c8c8c;
+      font-variant-numeric: tabular-nums;
     }
   }
 
   &__field {
     &.last-activity {
-      color: var(--color-neutral-content);
+      color: #8c8c8c;
     }
   }
 
   &__column {
-    font-weight: 500;
-    background: none;
+    font-weight: 600;
+
+    &.last-activity {
+      color: #595959;
+    }
+  }
+
+  &__body {
+    min-width: 0;
   }
 
   &__user {
     cursor: pointer;
     display: flex;
+    min-width: 0;
+    gap: 12px;
+    padding: 0 16px;
+    align-items: stretch;
+    border-bottom: 1px solid #f5f5f5;
+    transition: background 0.15s ease;
 
-    &:nth-child(odd):not(&_active) {
-      background-color: var(--color-neutral-emphasis-subtle);
+    &:last-child {
+      border-bottom: none;
+    }
+
+    &:hover:not(&_active) {
+      background: #fafafa;
     }
 
     &_active {
-      position: relative;
-      background-color: var(--color-primary-surface);
-
-      &::before,
-      &::after {
-        top: 0;
-        bottom: 0;
-        left: 0;
-        content: '';
-        display: block;
-        position: absolute;
-      }
-
-      &::after {
-        z-index: 1;
-        background-color: var(--color-neutral-surface);
-        width: calc(100% + 22px);
-        box-shadow: inset 4px 0 0 var(--grape_500), 1px 0 0 1px var(--color-neutral-border) inset;
-      }
-
-      &::before {
-        z-index: 0;
-        height: 100%;
-        width: calc(100% + 22px);
-      }
+      background: #f9f0ff;
+      box-shadow: inset 3px 0 0 #531dab;
     }
   }
 }

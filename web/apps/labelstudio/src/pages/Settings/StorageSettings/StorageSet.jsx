@@ -3,6 +3,7 @@ import { ff } from "@humansignal/core";
 import { Button } from "@humansignal/ui";
 import { useAtomValue } from "jotai";
 import { forwardRef, useCallback, useContext, useImperativeHandle } from "react";
+import { useTranslation } from "react-i18next";
 import { Columns } from "../../../components";
 import { confirm, modal } from "../../../components/Modal/Modal";
 import { Spinner } from "../../../components/Spinner/Spinner";
@@ -29,6 +30,7 @@ export const StorageSet = forwardRef(
     },
     ref,
   ) => {
+    const { t } = useTranslation();
     const api = useContext(ApiContext);
     const project = useAtomValue(projectAtom);
 
@@ -36,12 +38,17 @@ export const StorageSet = forwardRef(
 
     const showStorageFormModal = useCallback(
       (storage) => {
-        const action = storage ? "Edit" : "Connect";
-        const actionTarget = target === "export" ? "Target" : "Source";
-        const title = `${action} ${actionTarget} Storage`;
+        const modalTitle =
+          storage ?
+            target === "export"
+              ? t("Edit Target Storage")
+              : t("Edit Source Storage")
+          : target === "export"
+            ? t("Connect Target Storage")
+            : t("Connect Source Storage");
 
         const modalRef = modal({
-          title,
+          title: modalTitle,
           closeOnClickOutside: false,
           style: { width: 840 },
           bare: useNewStorageScreen,
@@ -51,7 +58,7 @@ export const StorageSet = forwardRef(
           },
           body: useNewStorageScreen ? (
             <StorageProviderForm
-              title={title}
+              title={modalTitle}
               target={target}
               storage={storage}
               project={project.id}
@@ -82,7 +89,7 @@ export const StorageSet = forwardRef(
           ),
         });
       },
-      [project, fetchStorages, target, rootClass],
+      [project, fetchStorages, target, rootClass, t],
     );
 
     const onEditStorage = useCallback(
@@ -104,8 +111,8 @@ export const StorageSet = forwardRef(
     const onDeleteStorage = useCallback(
       async (storage) => {
         confirm({
-          title: "Deleting storage",
-          body: "This action cannot be undone. Are you sure?",
+          title: t("Deleting storage"),
+          body: t("This action cannot be undone. Are you sure?"),
           buttonLook: "negative",
           onOk: async () => {
             const response = await api.callApi("deleteStorage", {
@@ -120,7 +127,7 @@ export const StorageSet = forwardRef(
           },
         });
       },
-      [fetchStorages],
+      [fetchStorages, api, target, t],
     );
 
     return (
@@ -131,7 +138,7 @@ export const StorageSet = forwardRef(
             disabled={loading}
             look="outlined"
             data-testid={`add-${target === "export" ? "target" : "source"}-storage-button`}
-            aria-label={`Add ${target === "export" ? "Target" : "Source"} Storage`}
+            aria-label={target === "export" ? t("Add Target Storage") : t("Add Source Storage")}
           >
             {buttonLabel}
           </Button>

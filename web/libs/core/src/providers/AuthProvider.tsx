@@ -87,13 +87,20 @@ export const AuthProvider = memo<{ children: React.ReactNode }>(({ children }) =
   }, [checker]);
 
   const contextValue: AuthState = useMemo(() => {
-    return {
+    const state = {
       user: userQuery.isSuccess ? userQuery.data : null,
       isLoading: userQuery.isFetching || updateUserMutation.isPending,
       refetch,
       update,
       permissions: permissionHelpers,
     };
+    console.log("[LS-embed] AuthProvider state", {
+      hasUser: !!state.user,
+      isLoading: state.isLoading,
+      isSuccess: userQuery.isSuccess,
+      isError: userQuery.isError,
+    });
+    return state;
   }, [
     userQuery.isSuccess,
     userQuery.data,

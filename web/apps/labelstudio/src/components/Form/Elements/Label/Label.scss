@@ -177,6 +177,13 @@
   }
 }
 
+html:lang(zh),
+html:lang(zh-CN) {
+  .label-ls[data-required] .label-ls__text .label-ls__label span::after {
+    content: "必填";
+  }
+}
+
 label {
   font-weight: 500;
   font-size: 0.875rem;

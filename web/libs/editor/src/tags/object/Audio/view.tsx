@@ -93,7 +93,7 @@ const AudioView: FC<AudioProps> = observer(
     useSpectrogramControls(waveform);
 
     useEffect(() => {
-      const hotkeys = Hotkey("Audio", "Audio Segmentation");
+      const hotkeys = Hotkey("Audio", "音频分割");
 
       waveform.current?.load();
 
@@ -289,3 +289,4 @@ const AudioWithSettings: FC<AudioProps> = ({ item }) => {
 };
 
 export const Audio = observer(AudioWithSettings);
+

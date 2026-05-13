@@ -9,7 +9,16 @@ from rq import Retry
 logger = logging.getLogger(__name__)
 
 
-def execute_sql_job(*, migration_name: str, sql: str, apply_on_sqlite: bool = False, reverse: bool = False) -> None:
+def execute_sql_job(
+    *,
+    migration_name: str,
+    sql: str,
+    apply_on_sqlite: bool = False,
+    reverse: bool = False,
+    sql_mysql: str | None = None,
+) -> None:
+    from django.db.utils import OperationalError, ProgrammingError
+
     from core.models import AsyncMigrationStatus
 
     if not reverse:
@@ -28,8 +37,20 @@ def execute_sql_job(*, migration_name: str, sql: str, apply_on_sqlite: bool = Fa
             if connection.vendor == 'sqlite' and not apply_on_sqlite:
                 logger.info('SQLite detected; skipping SQL execution as requested')
             else:
+                to_run = sql_mysql if connection.vendor == 'mysql' and sql_mysql else sql
                 with connection.cursor() as cursor:
-                    cursor.execute(sql)
+                    try:
+                        cursor.execute(to_run)
+                    except (OperationalError, ProgrammingError) as e:
+                        if (
+                            connection.vendor == 'mysql'
+                            and sql_mysql
+                            and e.args
+                            and e.args[0] == 1061
+                        ):
+                            logger.info('MySQL duplicate index (1061), treating as ok')
+                        else:
+                            raise
             migration.status = AsyncMigrationStatus.STATUS_FINISHED
             migration.save()
         except Exception as e:
@@ -46,8 +67,21 @@ def execute_sql_job(*, migration_name: str, sql: str, apply_on_sqlite: bool = Fa
             if connection.vendor == 'sqlite' and not apply_on_sqlite:
                 logger.info('SQLite detected; skipping SQL execution as requested (reverse)')
                 return
+
+            to_run = sql_mysql if connection.vendor == 'mysql' and sql_mysql else sql
             with connection.cursor() as cursor:
-                cursor.execute(sql)
+                try:
+                    cursor.execute(to_run)
+                except (OperationalError, ProgrammingError) as e:
+                    if (
+                        connection.vendor == 'mysql'
+                        and sql_mysql
+                        and e.args
+                        and e.args[0] == 1091
+                    ):
+                        logger.info('MySQL drop index missing (1091), treating as ok')
+                    else:
+                        raise
         except Exception as e:
             logger.exception(f'Reverse migration {migration_name} failed: {e}')
             raise
@@ -60,6 +94,8 @@ def make_sql_migration(
     apply_on_sqlite: bool = False,
     execute_immediately: bool = False,
     migration_name: str | None = None,
+    sql_mysql_forwards: str | None = None,
+    sql_mysql_backwards: str | None = None,
 ) -> Tuple[Callable, Callable]:
     """Return (forwards, backwards) for migrations.RunPython.
 
@@ -82,6 +118,7 @@ def make_sql_migration(
                 sql=sql_forwards,
                 apply_on_sqlite=apply_on_sqlite,
                 reverse=False,
+                sql_mysql=sql_mysql_forwards,
                 retry=Retry(max=3, interval=[60, 300, 1800]),
             )
         else:
@@ -98,6 +135,7 @@ def make_sql_migration(
             sql=sql_backwards,
             apply_on_sqlite=apply_on_sqlite,
             reverse=True,
+            sql_mysql=sql_mysql_backwards,
             retry=Retry(max=3, interval=[60, 300, 1800]),
         )
 

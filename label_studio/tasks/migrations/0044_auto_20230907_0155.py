@@ -4,15 +4,17 @@ from django.db import migrations, models
 from django.conf import settings
 
 IS_SQLITE = settings.DJANGO_DB == settings.DJANGO_DB_SQLITE
+IS_POSTGRES = settings.DJANGO_DB == settings.DJANGO_DB_POSTGRESQL
 
-if IS_SQLITE:
-    from django.db.migrations import AddIndex
-else:
+# CONCURRENTLY is PostgreSQL-only; SQLite and MySQL use standard AddIndex.
+if IS_POSTGRES:
     from django.contrib.postgres.operations import AddIndexConcurrently as AddIndex
+else:
+    from django.db.migrations.operations.models import AddIndex
 
 
 class Migration(migrations.Migration):
-    atomic = IS_SQLITE
+    atomic = not IS_POSTGRES
 
     dependencies = [
         ('tasks', '0043_auto_20230825'),

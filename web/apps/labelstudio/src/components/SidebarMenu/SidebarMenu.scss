@@ -1,22 +1,57 @@
+/* 与标注项目页 .projects-page__studio / __sidebar 对齐：浅灰底、16px 边距、白卡片侧栏 */
 .sidebar-menu {
   flex: 1;
   display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 16px;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
   max-height: calc(100vh - var(--header-height));
+  background: #f5f7fb;
+  padding: 16px;
 
   &__navigation {
-    width: calc(var(--menu-sidebar-width));
+    width: 260px;
+    flex-shrink: 0;
     display: flex;
+    flex-direction: column;
+    min-height: 0;
+    box-sizing: border-box;
+    background: #fff;
+    border: 1px solid #e8edf5;
+    border-radius: 12px;
+    padding: 0;
+    box-shadow: 0 6px 20px rgb(20 40 90 / 5%);
     transition: border 400ms ease-out;
+    overflow: auto;
 
     & .main-menu {
-      background: var(--color-neutral-background);
+      flex: 1;
+      margin: 0;
+      background: transparent;
+      border-right: none;
+      border-radius: 0;
 
       &__item {
-        background: var(--color-neutral-background);
+        background: transparent;
+
+        &:not(.main-menu__item_active):hover {
+          background: #f0f0f0;
+        }
 
         &_active {
-          background: var(--color-primary-emphasis-subtle);
+          background: #f9f0ff;
+          color: #531dab;
           pointer-events: all;
+        }
+
+        &_active:not(.sidebar__pin) {
+          pointer-events: none;
+          background: #f9f0ff;
+          color: #531dab;
         }
       }
     }
@@ -24,7 +59,28 @@
 
   &__content {
     flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
     overflow: auto;
-    padding: 2rem;
+    padding: 0;
+    box-sizing: border-box;
+  }
+}
+
+html.ls-embed .sidebar-menu {
+  max-height: none;
+}
+
+@media (width <= 960px) {
+  .sidebar-menu {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .sidebar-menu__navigation {
+    width: 100%;
+    max-height: min(360px, 45vh);
   }
 }

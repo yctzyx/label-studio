@@ -76,12 +76,12 @@ const savePanel = (name: PanelType, panelData: PanelBBox) => {
 
 const panelView: Record<PanelType, PanelView> = {
   outliner: {
-    title: "Outliner",
+    title: "大纲",
     component: OutlinerPanel as FC<PanelProps>,
     icon: IconHamburger,
   },
   details: {
-    title: "Details",
+    title: "详情",
     component: DetailsPanel as FC<PanelProps>,
     icon: IconDetails,
   },

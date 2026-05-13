@@ -43,6 +43,11 @@ logger = logging.getLogger(__name__)
 DATETIME_FORMAT = '%Y-%m-%dT%H:%M:%S.%fZ'
 
 
+def _data_manager_use_group_concat():
+    """SQLite and MySQL use GROUP_CONCAT-style aggregates; PostgreSQL uses ArrayAgg."""
+    return settings.DJANGO_DB in (settings.DJANGO_DB_SQLITE, settings.DJANGO_DB_MYSQL)
+
+
 class _Operator(BaseModel):
     EQUAL: ClassVar[str] = 'equal'
     NOT_EQUAL: ClassVar[str] = 'not_equal'
@@ -632,34 +637,31 @@ def annotate_storage_filename(queryset: TaskQuerySet) -> TaskQuerySet:
 
 
 def annotate_annotations_results(queryset):
-    if settings.DJANGO_DB == settings.DJANGO_DB_SQLITE:
+    if _data_manager_use_group_concat():
         return queryset.annotate(
             annotations_results=Coalesce(
                 GroupConcat('annotations__result'), Value(''), output_field=models.CharField()
             )
         )
-    else:
-        return queryset.annotate(annotations_results=ArrayAgg('annotations__result', distinct=True, default=Value([])))
+    return queryset.annotate(annotations_results=ArrayAgg('annotations__result', distinct=True, default=Value([])))
 
 
 def annotate_predictions_results(queryset):
-    if settings.DJANGO_DB == settings.DJANGO_DB_SQLITE:
+    if _data_manager_use_group_concat():
         return queryset.annotate(
             predictions_results=Coalesce(
                 GroupConcat('predictions__result'), Value(''), output_field=models.CharField()
             )
         )
-    else:
-        return queryset.annotate(predictions_results=ArrayAgg('predictions__result', distinct=True, default=Value([])))
+    return queryset.annotate(predictions_results=ArrayAgg('predictions__result', distinct=True, default=Value([])))
 
 
 def annotate_annotators(queryset):
-    if settings.DJANGO_DB == settings.DJANGO_DB_SQLITE:
+    if _data_manager_use_group_concat():
         return queryset.annotate(
             annotators=Coalesce(GroupConcat('annotations__completed_by'), Value(''), output_field=models.CharField())
         )
-    else:
-        return queryset.annotate(annotators=ArrayAgg('annotations__completed_by', distinct=True, default=Value([])))
+    return queryset.annotate(annotators=ArrayAgg('annotations__completed_by', distinct=True, default=Value([])))
 
 
 def annotate_predictions_score(queryset):
@@ -690,19 +692,17 @@ def annotate_predictions_score(queryset):
 
 
 def annotate_annotations_ids(queryset):
-    if settings.DJANGO_DB == settings.DJANGO_DB_SQLITE:
+    if _data_manager_use_group_concat():
         return queryset.annotate(annotations_ids=GroupConcat('annotations__id', output_field=models.CharField()))
-    else:
-        return queryset.annotate(annotations_ids=ArrayAgg('annotations__id', default=Value([])))
+    return queryset.annotate(annotations_ids=ArrayAgg('annotations__id', default=Value([])))
 
 
 def annotate_predictions_model_versions(queryset):
-    if settings.DJANGO_DB == settings.DJANGO_DB_SQLITE:
+    if _data_manager_use_group_concat():
         return queryset.annotate(
             predictions_model_versions=GroupConcat('predictions__model_version', output_field=models.CharField())
         )
-    else:
-        return queryset.annotate(predictions_model_versions=ArrayAgg('predictions__model_version', default=Value([])))
+    return queryset.annotate(predictions_model_versions=ArrayAgg('predictions__model_version', default=Value([])))
 
 
 def annotate_avg_lead_time(queryset):
@@ -892,7 +892,36 @@ class TaskManager(models.Manager):
         return TaskQuerySet(self.model, using=self._db)
 
     def for_user(self, user):
-        return self.get_queryset().filter(project__organization=user.active_organization)
+        from projects.access import apply_project_team_visibility
+        from projects.workflow_models import ProjectTeamAllocation, ProjectTeamRole
+        from projects.models import Project
+
+        qs = self.get_queryset().filter(project__organization=user.active_organization)
+        visible_projects = apply_project_team_visibility(
+            Project.objects.filter(organization=user.active_organization),
+            user,
+        )
+        scoped = qs.filter(project_id__in=visible_projects.values('id'))
+
+        if getattr(user, 'is_superuser', False):
+            return scoped
+
+        active_org = getattr(user, 'active_organization', None)
+        if active_org is not None and getattr(active_org, 'created_by_id', None) == user.id:
+            return scoped
+
+        admin_allocation = ProjectTeamAllocation.objects.filter(
+            project_id=OuterRef('project_id'),
+            user_id=user.id,
+            role=ProjectTeamRole.ADMIN,
+        )
+        manager_task = Q(project__created_by_id=user.id) | Exists(admin_allocation)
+
+        return scoped.filter(
+            Q(project__task_workflow_enabled=False)
+            | Q(workflow__current_assignee_id=user.id)
+            | manager_task
+        ).distinct()
 
     def with_state(self):
         """Return queryset with FSM state annotated."""

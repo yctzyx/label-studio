@@ -15,23 +15,31 @@ export const VersionProvider = ({ children }) => {
     if (action.type === "fetch-version") {
       return { ...state, ...action.payload };
     }
-  });
+    return state ?? {};
+  }, {});
 
   const fetchVersion = useCallback(async () => {
-    const response = await api.callApi("version");
+    try {
+      const response = await api.callApi("version");
+      const data = response?.["label-studio-os-package"];
+      if (!data || typeof data !== "object") return;
 
-    if (response !== null) {
-      const data = response["label-studio-os-package"];
+      const version = data.version;
+      const latestVersion = data.latest_version_from_pypi;
+      const newVersion = data.current_version_is_outdated;
+      const uploadTime = data.latest_version_upload_time;
 
       dispatch({
         type: "fetch-version",
         payload: {
-          version: data.version,
-          latestVersion: data.latest_version_from_pypi,
-          newVersion: data.current_version_is_outdated,
-          updateTime: format(new Date(data.latest_version_upload_time), "MMM d"),
+          version: version ?? "",
+          latestVersion: latestVersion ?? "",
+          newVersion: newVersion ?? false,
+          updateTime: uploadTime ? format(new Date(uploadTime), "MMM d") : "",
         },
       });
+    } catch (_) {
+      // 接口失败（网络/网关异常等）时静默跳过，不报错
     }
   }, []);
 
@@ -44,7 +52,7 @@ export const VersionProvider = ({ children }) => {
 
 export const VersionNotifier = ({ showNewVersion, showCurrentVersion }) => {
   const { newVersion, updateTime, latestVersion, version } = useContext(VersionContext) ?? {};
-  const url = `https://labelstud.io/redirect/update?version=${version}`;
+  const url = `https://labelstud.io/redirect/update?version=${version ?? ""}`;
 
   return newVersion && showNewVersion ? (
     <li className={cn("version-notifier").toClassName()}>

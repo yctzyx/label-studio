@@ -117,7 +117,7 @@ export const useToast = () => {
   return context;
 };
 
-export const ToastProvider: FC<ToastProviderWithTypes> = ({ swipeDirection = "down", children, type, ...props }) => {
+export const ToastProvider: FC<ToastProviderWithTypes> = ({ swipeDirection = "up", children, type, ...props }) => {
   const [toastMessage, setToastMessage] = useState<ToastShowArgs | null>();
   const timerRef = useRef<NodeJS.Timeout>();
 

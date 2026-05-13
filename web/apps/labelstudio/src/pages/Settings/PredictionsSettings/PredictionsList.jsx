@@ -1,4 +1,5 @@
 import { useCallback, useContext } from "react";
+import { useTranslation } from "react-i18next";
 
 import { format, formatDistanceToNow, parseISO } from "date-fns";
 import { Menu } from "../../../components";
@@ -39,20 +40,21 @@ export const PredictionsList = ({ project, versions, fetchVersions }) => {
 };
 
 const VersionCard = ({ version, selected, onSelect, editable, onDelete }) => {
+  const { t } = useTranslation();
   const rootClass = cn("prediction-card");
 
   const confirmDelete = useCallback(
     (version) => {
       confirm({
-        title: "Delete Predictions",
-        body: "This action cannot be undone. Are you sure?",
+        title: t("Delete Predictions"),
+        body: t("This action cannot be undone. Are you sure?"),
         buttonLook: "destructive",
         onOk() {
           onDelete?.(version);
         },
       });
     },
-    [version, onDelete],
+    [version, onDelete, t],
   );
 
   return (
@@ -61,7 +63,7 @@ const VersionCard = ({ version, selected, onSelect, editable, onDelete }) => {
         <div className={rootClass.elem("title")}>
           {version.model_version}
           {version.model_version === "undefined" && (
-            <Tooltip title="Model version is undefined. Likely means that model_version field was missing when predictions were imported.">
+            <Tooltip title={t("Model version undefined help")}>
               <IconInfoOutline className={cn("help-icon")} width="14" height="14" />
             </Tooltip>
           )}
@@ -72,7 +74,8 @@ const VersionCard = ({ version, selected, onSelect, editable, onDelete }) => {
             &nbsp;{version.count}
           </div>
           <div className={rootClass.elem("group")}>
-            Last prediction created&nbsp;
+            {t("Last prediction created")}
+            &nbsp;
             <Tooltip title={format(parseISO(version.latest), "yyyy-MM-dd HH:mm:ss")}>
               <span>
                 {formatDistanceToNow(parseISO(version.latest), {
@@ -89,7 +92,7 @@ const VersionCard = ({ version, selected, onSelect, editable, onDelete }) => {
           content={
             <Menu size="medium" contextual>
               <Menu.Item onClick={() => confirmDelete(version)} isDangerous>
-                Delete
+                {t("Delete")}
               </Menu.Item>
             </Menu>
           }

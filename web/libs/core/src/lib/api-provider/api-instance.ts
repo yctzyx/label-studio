@@ -20,6 +20,7 @@ export function createApiInstance(config: ApiProviderConfig): APIProxy<Record<st
     gateway: config.gateway,
     endpoints: config.endpoints,
     commonHeaders: config.commonHeaders,
+    getCommonHeaders: config.getCommonHeaders,
     onRequestFinished: config.onRequestFinished,
     alwaysExpectJSON: config.alwaysExpectJSON,
     sharedParams: config.sharedParams,

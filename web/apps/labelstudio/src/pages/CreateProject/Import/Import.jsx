@@ -1,20 +1,21 @@
-import { SampleDatasetSelect } from "@humansignal/app-common/blocks/SampleDatasetSelect/SampleDatasetSelect";
 import { ff, formatFileSize } from "@humansignal/core";
-import { IconCode, IconErrorAlt, IconFileUpload, IconInfoOutline, IconTrash, IconUpload } from "@humansignal/icons";
+import { IconCode, IconErrorAlt, IconTrash, IconUpload } from "@humansignal/icons";
 import { Badge } from "@humansignal/shad/components/ui/badge";
 import { cn as scn } from "@humansignal/shad/utils";
 import { useAtomValue } from "jotai";
-import Input from "libs/datamanager/src/components/Common/Input/Input";
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useAPI } from "../../../providers/ApiProvider";
 import { cn } from "../../../utils/bem";
 import { unique } from "../../../utils/helpers";
 import { sampleDatasetAtom } from "../utils/atoms";
 import "./Import.scss";
-import { Button, CodeBlock, SimpleCard, Spinner, Tooltip, Typography } from "@humansignal/ui";
+import { Button, CodeBlock, Select, SimpleCard, Spinner, Tooltip, Typography } from "@humansignal/ui";
 import truncate from "truncate-middle";
 import samples from "./samples.json";
 import { importFiles } from "./utils";
+import { isParentDatasetImportEnabled } from "./ParentDataset/getParentPlatformApiBase";
+import { ParentDatasetPickerInline } from "./ParentDataset/ParentDatasetPickerInline";
 
 const importClass = cn("upload_page");
 const dropzoneClass = cn("dropzone");
@@ -113,9 +114,8 @@ const Upload = ({ children, sendFiles }) => {
       onDragOver={onHover}
       onDragLeave={onLeave}
       onDrop={onDrop}
-      // {...getRootProps}
     >
-      {children}
+      <div className={importClass.elem("drop-surface").mod({ drag: hovered })}>{children}</div>
     </div>
   );
 };
@@ -153,11 +153,18 @@ export const ImportPage = ({
   setCsvHandling,
   addColumns,
   openLabelingConfig,
+  parentDatasetSelection,
+  onParentDatasetSelect,
+  onParentDatasetClear,
 }) => {
   const [error, setError] = useState();
+  const [parentSyncing, setParentSyncing] = useState(false);
+  const [parentSyncMsg, setParentSyncMsg] = useState(null);
   const [newlyUploadedFiles, setNewlyUploadedFiles] = useState(new Set());
   const prevUploadedRef = useRef(new Set());
   const api = useAPI();
+  const { t, i18n } = useTranslation();
+  const isZh = i18n.language?.startsWith("zh");
   const projectConfigured = project?.label_config !== "<View></View>";
   const sampleConfig = useAtomValue(sampleDatasetAtom);
 
@@ -191,7 +198,31 @@ export const ImportPage = ({
     uploading: [],
     ids: [],
   });
-  const showList = Boolean(files.uploaded?.length || files.uploading?.length || sample);
+  /** 当前「添加数据」方式：本地上传 | 父平台 | 示例 */
+  const [dataSourceTab, setDataSourceTab] = useState("local");
+
+  const showParentRow = Boolean(parentDatasetSelection);
+  const showSampleRow = Boolean(sample);
+
+  const visibleRowCount =
+    (showParentRow ? 1 : 0) + (showSampleRow ? 1 : 0) + files.uploaded.length + files.uploading.length;
+
+  const handleParentDatasetSync = useCallback(async () => {
+    if (!project?.id) return;
+    setParentSyncing(true);
+    setParentSyncMsg(null);
+    setError(undefined);
+    try {
+      const res = await api.callApi("syncParentDataset", { params: { pk: project.id }, body: {} });
+      const raw = res?.response ?? res;
+      const created = raw?.created ?? res?.created ?? 0;
+      setParentSyncMsg(t("import.parentDataset.syncDone", { count: created }));
+    } catch (e) {
+      setError(e);
+    } finally {
+      setParentSyncing(false);
+    }
+  }, [api, project?.id, t]);
 
   const loadFilesList = useCallback(
     async (file_upload_ids) => {
@@ -215,18 +246,21 @@ export const ImportPage = ({
     [project?.id],
   );
 
-  const onError = (err) => {
-    console.error(err);
-    // @todo workaround for error about input size in a wrong html format
-    if (typeof err === "string" && err.includes("RequestDataTooBig")) {
-      const message = "Imported file is too big";
-      const extra = err.match(/"exception_value">(.*)<\/pre>/)?.[1];
+  const onError = useCallback(
+    (err) => {
+      console.error(err);
+      // @todo workaround for error about input size in a wrong html format
+      if (typeof err === "string" && err.includes("RequestDataTooBig")) {
+        const message = t("import.fileTooBig");
+        const extra = err.match(/"exception_value">(.*)<\/pre>/)?.[1];
 
-      err = { message, extra };
-    }
-    setError(err);
-    onWaiting?.(false);
-  };
+        err = { message, extra };
+      }
+      setError(err);
+      onWaiting?.(false);
+    },
+    [t, onWaiting],
+  );
   const onFinish = useCallback(
     async (res) => {
       const { could_be_tasks_list, data_columns, file_upload_ids } = res;
@@ -291,7 +325,7 @@ export const ImportPage = ({
         dontCommitToProject,
       });
     },
-    [project, onFinish],
+    [project, onFinish, onError],
   );
 
   const sendFiles = useCallback(
@@ -303,14 +337,14 @@ export const ImportPage = ({
 
       for (const f of files) {
         if (!allSupportedExtensions.includes(getFileExtension(f.name))) {
-          onError(new Error(`The filetype of file "${f.name}" is not supported.`));
+          onError(new Error(t("import.unsupportedFiletype", { name: f.name })));
           return;
         }
         fd.append(f.name, f);
       }
       return importFilesImmediately(files, fd);
     },
-    [importFilesImmediately],
+    [importFilesImmediately, t, onError],
   );
 
   const onUpload = useCallback(
@@ -319,24 +353,6 @@ export const ImportPage = ({
       e.target.value = "";
     },
     [sendFiles],
-  );
-
-  const onLoadURL = useCallback(
-    (e) => {
-      e.preventDefault();
-      setError(null);
-      const url = urlRef.current?.value;
-
-      if (!url) {
-        return;
-      }
-      urlRef.current.value = "";
-      onWaiting?.(true);
-      const body = new URLSearchParams({ url });
-
-      importFilesImmediately([{ name: url }], body);
-    },
-    [importFilesImmediately],
   );
 
   const openConfig = useCallback(
@@ -360,7 +376,27 @@ export const ImportPage = ({
     }
   }, [project?.id, loadFilesList]);
 
-  const urlRef = useRef();
+  useEffect(() => {
+    if (dataSourceTab === "parent" && !isParentDatasetImportEnabled()) {
+      setDataSourceTab("local");
+    }
+    if (dataSourceTab === "sample" && !ff.isActive(ff.FF_SAMPLE_DATASETS)) {
+      setDataSourceTab("local");
+    }
+  }, [dataSourceTab]);
+
+  const sampleOptions = useMemo(() => samples.map((s) => ({ value: s.url, label: s.title })), []);
+
+  const sourceTabs = useMemo(() => {
+    const tabs = [{ id: "local", label: t("import.tabLocal") }];
+    if (isParentDatasetImportEnabled()) {
+      tabs.push({ id: "parent", label: t("import.tabParent") });
+    }
+    if (ff.isActive(ff.FF_SAMPLE_DATASETS)) {
+      tabs.push({ id: "sample", label: t("import.tabSample") });
+    }
+    return tabs;
+  }, [t]);
 
   if (!project) return null;
   if (!show) return null;
@@ -376,291 +412,412 @@ export const ImportPage = ({
       {highlightCsvHandling && <div className={importClass.elem("csv-splash")} />}
       <input id="file-input" type="file" name="file" multiple onChange={onUpload} style={{ display: "none" }} />
 
-      <header className="flex gap-4">
-        <form
-          className={`${importClass.elem("url-form")} inline-flex items-stretch`}
-          method="POST"
-          onSubmit={onLoadURL}
-        >
-          <Input placeholder="Dataset URL" name="url" ref={urlRef} rawClassName="h-[40px]" />
-          <Button variant="primary" look="outlined" type="submit" aria-label="Add URL">
-            Add URL
-          </Button>
-        </form>
-        <span>or</span>
-        <Button
-          variant="primary"
-          look="outlined"
-          type="button"
-          onClick={() => document.getElementById("file-input").click()}
-          leading={<IconUpload />}
-          aria-label="Upload file"
-        >
-          Upload {files.uploaded.length ? "More " : ""}Files
-        </Button>
-        {ff.isActive(ff.FF_SAMPLE_DATASETS) && (
-          <SampleDatasetSelect samples={samples} sample={sample} onSampleApplied={onSampleDatasetSelect} />
-        )}
-        <div
-          className={importClass.elem("csv-handling").mod({ highlighted: highlightCsvHandling, hidden: !csvHandling })}
-        >
-          <span>Treat CSV/TSV as</span>
-          <label>
-            <input {...csvProps} value="tasks" checked={csvHandling === "tasks"} /> List of tasks
-          </label>
-          <label>
-            <input {...csvProps} value="ts" checked={csvHandling === "ts"} /> Time Series or Whole Text File
-          </label>
-        </div>
-        <div className={importClass.elem("status")}>
-          {files.uploaded.length ? `${files.uploaded.length} files uploaded` : ""}
-        </div>
-      </header>
-
       <ErrorMessage error={error} />
 
       <main>
         <Upload sendFiles={sendFiles} project={project}>
-          <div
-            className={scn("flex gap-4 w-full min-h-full", {
-              "justify-center": !showList,
-            })}
-          >
-            {!showList && (
-              <div className="flex gap-4 justify-center items-start w-full h-full">
-                <label htmlFor="file-input" className="w-full h-full">
-                  <div className={`${dropzoneClass.elem("content")} w-full`}>
-                    <IconFileUpload height="64" className={dropzoneClass.elem("icon")} />
-                    <header>
-                      Drag & drop files here
-                      <br />
-                      or click to browse
-                    </header>
+          <div className={importClass.elem("import-main-inner")}>
+            <div className={importClass.elem("hero")}>
+              <Typography variant="title" size="small" className="font-semibold text-neutral-content">
+                {t("import.heroTitle")}
+              </Typography>
+              <Typography size="small" className="text-neutral-content-subtler mt-1 max-w-[720px] leading-relaxed">
+                {t("import.heroSubtitle")}
+              </Typography>
+            </div>
 
-                    <dl>
-                      <dt>Images</dt>
-                      <dd>{supportedExtensions.image.join(", ")}</dd>
-                      <dt>Audio</dt>
-                      <dd>{supportedExtensions.audio.join(", ")}</dd>
-                      <dt>
-                        <div className="flex items-center gap-1">
-                          Video
-                          <Tooltip title="Video format support depends on your browser. Click to learn more.">
-                            <a
-                              href="https://labelstud.io/tags/video#Video-format"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center"
-                              aria-label="Learn more about video format support (opens in a new tab)"
-                            >
-                              <IconInfoOutline className="w-4 h-4 text-primary-content hover:text-primary-content-hover" />
-                            </a>
-                          </Tooltip>
-                        </div>
-                      </dt>
-                      <dd>{supportedExtensions.video.join(", ")}</dd>
-                      <dt>HTML / HyperText</dt>
-                      <dd>{supportedExtensions.html.join(", ")}</dd>
-                      <dt>Text</dt>
-                      <dd>{supportedExtensions.text.join(", ")}</dd>
-                      <dt>Structured data</dt>
-                      <dd>{supportedExtensions.structuredData.join(", ")}</dd>
-                      <dt>PDF</dt>
-                      <dd>{supportedExtensions.pdf.join(", ")}</dd>
-                    </dl>
-                    <div className="tips">
-                      <b>Important:</b>
-                      <ul className="mt-2 ml-4 list-disc font-normal">
-                        <li>
-                          We recommend{" "}
-                          <a
-                            href="https://labelstud.io/guide/storage.html"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            aria-label="Cloud Storage documentation (opens in a new tab)"
-                          >
-                            Cloud Storage
-                          </a>{" "}
-                          over direct uploads due to{" "}
-                          <a
-                            href="https://labelstud.io/guide/tasks.html#Import-data-from-the-Label-Studio-UI"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            aria-label="Upload limitations documentation (opens in a new tab)"
-                          >
-                            upload limitations
-                          </a>
-                          .
-                        </li>
-                        <li>
-                          For PDFs, use{" "}
-                          <a
-                            href="https://labelstud.io/templates/multi-page-document-annotation"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            aria-label="Multi-image labeling documentation (opens in a new tab)"
-                          >
-                            multi-image labeling
-                          </a>
-                          . JSONL or Parquet (Enterprise only) files require cloud storage.
-                        </li>
-                        <li>
-                          Check the documentation to{" "}
-                          <a target="_blank" href="https://labelstud.io/guide/predictions.html" rel="noreferrer">
-                            import preannotated data
-                          </a>
-                          .
-                        </li>
-                      </ul>
+            {csvHandling ? (
+              <div
+                className={importClass
+                  .elem("csv-banner")
+                  .mod({ highlighted: highlightCsvHandling, choose: csvHandling === "choose" })}
+              >
+                <div className="text-label-small font-medium text-neutral-content mb-2">
+                  {t("import.csvBannerTitle")}
+                </div>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                  <span className="text-body-small text-neutral-content-subtle">{t("import.treatCsvAs")}</span>
+                  <label className="text-body-small flex items-center gap-1.5 cursor-pointer">
+                    <input {...csvProps} value="tasks" checked={csvHandling === "tasks"} /> {t("import.listOfTasks")}
+                  </label>
+                  <label className="text-body-small flex items-center gap-1.5 cursor-pointer">
+                    <input {...csvProps} value="ts" checked={csvHandling === "ts"} /> {t("import.timeSeriesOrText")}
+                  </label>
+                </div>
+              </div>
+            ) : null}
+
+            <section className={importClass.elem("source-section")} aria-label={t("import.step1Label")}>
+              <Typography size="small" className="text-label-small font-medium text-neutral-content-subtle mb-2">
+                {t("import.step1Label")}
+              </Typography>
+              <div className={importClass.elem("segmented")} role="tablist" aria-orientation="horizontal">
+                {sourceTabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={dataSourceTab === tab.id}
+                    className={importClass.elem("segmented-btn").mod({ active: dataSourceTab === tab.id })}
+                    onClick={() => setDataSourceTab(tab.id)}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className={importClass.elem("source-panel")}>
+                {dataSourceTab === "local" && (
+                  <div>
+                    <Typography size="small" className="text-neutral-content-subtle mb-3 leading-relaxed">
+                      {t("import.panelLocalDesc")}
+                    </Typography>
+                    <div className={importClass.elem("drop-strip")}>
+                      <Button
+                        look="primary"
+                        type="button"
+                        className={importClass.elem("action-primary").toClassName()}
+                        leading={<IconUpload />}
+                        onClick={() => document.getElementById("file-input").click()}
+                        aria-label={t("import.uploadFileAria")}
+                      >
+                        {files.uploaded.length ? t("import.uploadMoreFiles") : t("import.panelLocalPrimary")}
+                      </Button>
+                      <Typography size="small" className="text-neutral-content-subtler">
+                        {t("import.panelLocalHint")}
+                      </Typography>
+                      <a
+                        href="https://labelstud.io/guide/tasks.html#Import-data-from-the-Label-Studio-UI"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-body-small text-primary-content hover:underline shrink-0 ml-auto"
+                      >
+                        {t("import.formatsAndLimitsLink")}
+                      </a>
                     </div>
                   </div>
-                </label>
-              </div>
-            )}
+                )}
 
-            {showList && (
-              <div className="w-full">
-                <SimpleCard
-                  title="Files"
-                  className="w-full h-full"
-                  contentClassName="overflow-y-auto h-[calc(100%-48px)]"
-                >
-                  <table className="w-full">
-                    <tbody>
-                      {sample && (
-                        <tr key={sample.url}>
-                          <td>
-                            <div className="flex items-center gap-2">
-                              {sample.title}
-                              <Badge variant="info" className="h-5 text-xs rounded-sm">
-                                Sample
-                              </Badge>
-                            </div>
-                          </td>
-                          <td>{sample.description}</td>
-                          <td>
-                            <Button size="smaller" variant="negative" onClick={() => onSampleDatasetSelect(undefined)}>
-                              <IconTrash className="w-4 h-4" />
-                            </Button>
-                          </td>
+                {dataSourceTab === "parent" && isParentDatasetImportEnabled() && (
+                  <div>
+                    <Typography size="small" className="text-neutral-content-subtle mb-3 leading-relaxed">
+                      {t("import.panelParentDesc")}
+                    </Typography>
+                    <div className={importClass.elem("parent-inline-wrap")}>
+                      <ParentDatasetPickerInline
+                        projectId={project?.id}
+                        committedSelection={parentDatasetSelection ?? null}
+                        onClearCommitted={() => onParentDatasetClear?.()}
+                        onApply={(sel) => onParentDatasetSelect?.(sel)}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {dataSourceTab === "sample" && ff.isActive(ff.FF_SAMPLE_DATASETS) && (
+                  <div>
+                    <Typography size="small" className="text-neutral-content-subtle mb-3 leading-relaxed">
+                      {t("import.panelSampleDesc")}
+                    </Typography>
+                    <div className="max-w-xl">
+                      <Select
+                        placeholder={t("import.sampleSelectPlaceholder")}
+                        options={sampleOptions}
+                        value={sample?.url ?? null}
+                        onChange={(v) => {
+                          const picked = samples.find((s) => s.url === v);
+                          onSampleDatasetSelect?.(picked);
+                        }}
+                        width="100%"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            <section className={importClass.elem("summary-section")} aria-label={t("import.summaryTitle")}>
+              <Typography className="text-label-small font-medium text-neutral-content mb-3">
+                {t("import.summaryTitle")}
+              </Typography>
+
+              <div
+                className={scn("flex flex-col gap-4 w-full flex-1 min-h-0 mt-1", {
+                  "xl:flex-row xl:items-stretch": ff.isFF(ff.FF_JSON_PREVIEW),
+                })}
+              >
+                <div className="flex-1 min-w-0 min-h-0 flex flex-col">
+                  <SimpleCard
+                    title={t("import.listCardTitle")}
+                    className={scn("w-full flex-1 flex flex-col min-h-0", importClass.elem("panel-card").toClassName())}
+                    contentClassName={scn(
+                      importClass.elem("table-scroll"),
+                      importClass.elem("list-card-body").toClassName(),
+                      "flex-1 min-h-0",
+                    )}
+                    flushContent
+                    headerClassName={importClass.elem("panel-card-heading").toClassName()}
+                  >
+                    <table className={scn("w-full", importClass.elem("data-table"))}>
+                      <thead className="sticky top-0 z-[1] text-left text-body-small">
+                        <tr>
+                          <th className="p-2 font-medium w-[120px]">{t("import.colSource")}</th>
+                          <th className="p-2 font-medium">{t("import.colName")}</th>
+                          <th className="p-2 font-medium min-w-[120px]">{t("import.colDetail")}</th>
+                          <th className="p-2 font-medium w-[100px]">{t("import.colSizeOrStatus")}</th>
+                          <th className="p-2 font-medium min-w-[140px] text-right">{t("import.colAction")}</th>
                         </tr>
-                      )}
-                      {files.uploaded.map((file) => {
-                        const truncatedFilename = truncate(
-                          file.file,
-                          FILENAME_TRUNCATE_START,
-                          FILENAME_TRUNCATE_END,
-                          "...",
-                        );
-                        return (
-                          <tr
-                            key={file.file}
-                            className={newlyUploadedFiles.has(file.id) ? importClass.elem("upload-flash") : ""}
-                          >
-                            <td className={importClass.elem("file-name")}>
-                              <Tooltip title={file.file}>
-                                <Typography variant="body" size="small" className="truncate">
-                                  {truncatedFilename}
-                                </Typography>
-                              </Tooltip>
-                            </td>
-                            <td>
-                              <span className={importClass.elem("file-status")} />
-                            </td>
-                            <td className={importClass.elem("file-size")}>
-                              <Typography
-                                variant="body"
-                                size="smaller"
-                                className="text-nowrap text-neutral-content-subtle text-right"
-                              >
-                                {file.size ? formatFileSize(file.size) : ""}
+                      </thead>
+                      <tbody>
+                        {visibleRowCount === 0 && (
+                          <tr>
+                            <td colSpan={5} className="p-6 text-center">
+                              <Typography size="small" className="text-neutral-content-subtle">
+                                {t("import.emptyTableHint")}
                               </Typography>
                             </td>
                           </tr>
-                        );
-                      })}
-                      {files.uploading.map((file, idx) => {
-                        const truncatedFilename = truncate(
-                          file.name,
-                          FILENAME_TRUNCATE_START,
-                          FILENAME_TRUNCATE_END,
-                          "...",
-                        );
-                        return (
-                          <tr key={`${idx}-${file.name}`}>
-                            <td className={importClass.elem("file-name")}>
-                              <Tooltip title={file.name}>
-                                <Typography variant="body" size="small" className="truncate">
-                                  {truncatedFilename}
-                                </Typography>
-                              </Tooltip>
+                        )}
+                        {showParentRow && parentDatasetSelection && (
+                          <tr key={`parent-ds-${parentDatasetSelection.datasetId}`}>
+                            <td className="p-2 align-middle">
+                              <Badge variant="info" className="h-5 text-xs rounded-sm whitespace-nowrap">
+                                {t("import.parentDataset.badge")}
+                              </Badge>
                             </td>
-                            <td>
-                              <span className={importClass.elem("file-status").mod({ uploading: true })} />
+                            <td className="p-2 align-middle max-w-[200px]">
+                              <Typography variant="body" size="small" className="truncate">
+                                {parentDatasetSelection.datasetName}
+                              </Typography>
                             </td>
-                            <td className={importClass.elem("file-size")}>&nbsp;</td>
+                            <td className="p-2 align-middle max-w-[280px] break-all text-body-small text-neutral-content-subtle">
+                              {parentDatasetSelection.path}
+                            </td>
+                            <td className="p-2 align-middle text-neutral-content-subtler text-body-small">
+                              {parentDatasetSelection.dataSetTypeLabel ?? parentDatasetSelection.dataSetType ?? "—"}
+                            </td>
+                            <td className="p-2 align-middle text-right">
+                              <div className={importClass.elem("parent-row-actions").toClassName()}>
+                                <Button
+                                  size="small"
+                                  look="primary"
+                                  className={scn(
+                                    importClass.elem("action-primary").toClassName(),
+                                    importClass.elem("parent-sync-btn").toClassName(),
+                                  )}
+                                  waiting={parentSyncing}
+                                  disabled={parentSyncing || !project?.id}
+                                  onClick={() => void handleParentDatasetSync()}
+                                >
+                                  {t("import.parentDataset.sync")}
+                                </Button>
+                                <Button
+                                  size="small"
+                                  variant="negative"
+                                  look="outlined"
+                                  className={importClass.elem("parent-delete-btn").toClassName()}
+                                  onClick={() => onParentDatasetClear?.()}
+                                  aria-label={t("import.clearParentSelection")}
+                                >
+                                  <IconTrash className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </td>
                           </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </SimpleCard>
-              </div>
-            )}
-
-            {ff.isFF(ff.FF_JSON_PREVIEW) && (
-              <div className="w-full h-full flex flex-col min-h-[400px]">
-                {projectConfigured ? (
-                  <SimpleCard
-                    title="Expected Input Preview"
-                    className="w-full h-full overflow-hidden flex flex-col"
-                    contentClassName="h-[calc(100%-48px)]"
-                    flushContent
-                  >
-                    {sampleConfig.data ? (
-                      <div className={importClass.elem("code-wrapper")}>
-                        <CodeBlock
-                          title="Expected Input Preview"
-                          code={sampleConfig?.data ?? ""}
-                          className="w-full h-full"
-                        />
-                      </div>
-                    ) : sampleConfig.isLoading ? (
-                      <div className="w-full flex justify-center py-12">
-                        <Spinner className="h-6 w-6" />
-                      </div>
-                    ) : sampleConfig.isError ? (
-                      <div className="w-[calc(100%-24px)] text-lg text-negative-content bg-negative-background border m-3 rounded-md border-negative-border-subtle p-4">
-                        Something went wrong, the sample data could not be loaded.
-                      </div>
+                        )}
+                        {showSampleRow && sample && (
+                          <tr key={sample.url}>
+                            <td className="p-2 align-middle">
+                              <Badge variant="info" className="h-5 text-xs rounded-sm whitespace-nowrap">
+                                {t("import.sampleBadge")}
+                              </Badge>
+                            </td>
+                            <td className="p-2 align-middle max-w-[200px]">
+                              <Typography variant="body" size="small" className="truncate">
+                                {sample.title}
+                              </Typography>
+                            </td>
+                            <td className="p-2 align-middle text-body-small text-neutral-content-subtle">
+                              {sample.description}
+                            </td>
+                            <td className="p-2 align-middle text-neutral-content-subtler text-body-small">—</td>
+                            <td className="p-2 align-middle text-right">
+                              <Button
+                                size="smaller"
+                                variant="negative"
+                                onClick={() => onSampleDatasetSelect(undefined)}
+                              >
+                                <IconTrash className="w-4 h-4" />
+                              </Button>
+                            </td>
+                          </tr>
+                        )}
+                        {files.uploaded.map((file) => {
+                          const truncatedFilename = truncate(
+                            file.file,
+                            FILENAME_TRUNCATE_START,
+                            FILENAME_TRUNCATE_END,
+                            "...",
+                          );
+                          return (
+                            <tr
+                              key={file.file}
+                              className={newlyUploadedFiles.has(file.id) ? importClass.elem("upload-flash") : ""}
+                            >
+                              <td className="p-2 align-middle">
+                                <span className="text-body-small text-neutral-content">{t("import.sourceLocal")}</span>
+                              </td>
+                              <td className={`${importClass.elem("file-name")} p-2 align-middle max-w-[240px]`}>
+                                <Tooltip title={file.file}>
+                                  <Typography variant="body" size="small" className="truncate">
+                                    {truncatedFilename}
+                                  </Typography>
+                                </Tooltip>
+                              </td>
+                              <td className="p-2 align-middle text-neutral-content-subtler text-body-small">—</td>
+                              <td className={`${importClass.elem("file-size")} p-2 align-middle`}>
+                                <div className="flex flex-col gap-1 items-start">
+                                  <span className={importClass.elem("file-status")} />
+                                  <Typography
+                                    variant="body"
+                                    size="smaller"
+                                    className="text-nowrap text-neutral-content-subtle"
+                                  >
+                                    {file.size ? formatFileSize(file.size) : ""}
+                                  </Typography>
+                                </div>
+                              </td>
+                              <td className="p-2 align-middle text-right text-neutral-content-subtler text-body-small">
+                                —
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {files.uploading.map((file, idx) => {
+                          const truncatedFilename = truncate(
+                            file.name,
+                            FILENAME_TRUNCATE_START,
+                            FILENAME_TRUNCATE_END,
+                            "...",
+                          );
+                          return (
+                            <tr key={`${idx}-${file.name}`}>
+                              <td className="p-2 align-middle">
+                                <span className="text-body-small text-neutral-content">{t("import.sourceLocal")}</span>
+                              </td>
+                              <td className={`${importClass.elem("file-name")} p-2 align-middle max-w-[240px]`}>
+                                <Tooltip title={file.name}>
+                                  <Typography variant="body" size="small" className="truncate">
+                                    {truncatedFilename}
+                                  </Typography>
+                                </Tooltip>
+                              </td>
+                              <td className="p-2 align-middle text-neutral-content-subtler text-body-small">—</td>
+                              <td className={`${importClass.elem("file-size")} p-2 align-middle`}>
+                                <span className={importClass.elem("file-status").mod({ uploading: true })} />
+                              </td>
+                              <td className="p-2 align-middle text-right text-neutral-content-subtler text-body-small">
+                                —
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    {parentSyncMsg ? (
+                      <Typography
+                        size="small"
+                        className="px-3 py-2 text-primary-content bg-primary-background/30 border-t border-neutral-border"
+                      >
+                        {parentSyncMsg}
+                      </Typography>
                     ) : null}
                   </SimpleCard>
-                ) : (
-                  <SimpleCard className="w-full h-full flex flex-col items-center justify-center text-center p-wide">
-                    <div className="flex flex-col items-center gap-tight">
-                      <div className="bg-primary-background rounded-largest p-tight flex items-center justify-center">
-                        <IconCode className="w-6 h-6 text-primary-icon" />
-                      </div>
-                      <div className="flex flex-col items-center gap-tighter">
-                        <div className="text-label-small text-neutral-content font-medium">View JSON input format</div>
-                        <div className="text-body-small text-neutral-content-subtler text-center">
-                          Setup your{" "}
-                          <Button
-                            type="button"
-                            look="string"
-                            onClick={openConfig}
-                            className="border-none bg-none p-0 m-0 text-primary-content underline"
-                          >
-                            labeling configuration
-                          </Button>{" "}
-                          first to preview the expected JSON data format
+                </div>
+
+                {ff.isFF(ff.FF_JSON_PREVIEW) && (
+                  <div className="w-full xl:w-[min(44%,520px)] shrink-0 flex flex-col min-h-[240px] xl:max-h-[min(52vh,480px)]">
+                    {projectConfigured ? (
+                      <SimpleCard
+                        title={t("import.expectedInputPreview")}
+                        className={scn(
+                          "w-full h-full overflow-hidden flex flex-col",
+                          importClass.elem("panel-card").toClassName(),
+                        )}
+                        contentClassName="h-[calc(100%-48px)]"
+                        headerClassName={importClass.elem("panel-card-heading").toClassName()}
+                        flushContent
+                      >
+                        {sampleConfig.data ? (
+                          <div className={importClass.elem("code-wrapper")}>
+                            <CodeBlock
+                              title={t("import.expectedInputPreview")}
+                              code={sampleConfig?.data ?? ""}
+                              className="w-full h-full"
+                            />
+                          </div>
+                        ) : sampleConfig.isLoading ? (
+                          <div className="w-full flex justify-center py-12">
+                            <Spinner className="h-6 w-6" />
+                          </div>
+                        ) : sampleConfig.isError ? (
+                          <div className="w-[calc(100%-24px)] text-lg text-negative-content bg-negative-background border m-3 rounded-md border-negative-border-subtle p-4">
+                            {t("import.sampleLoadError")}
+                          </div>
+                        ) : null}
+                      </SimpleCard>
+                    ) : (
+                      <SimpleCard
+                        className={scn(
+                          "w-full h-full flex flex-col items-center justify-center text-center p-wide",
+                          importClass.elem("panel-card").toClassName(),
+                        )}
+                      >
+                        <div className="flex flex-col items-center gap-tight">
+                          <div className="bg-primary-background rounded-largest p-tight flex items-center justify-center">
+                            <IconCode className="w-6 h-6 text-primary-icon" />
+                          </div>
+                          <div className="flex flex-col items-center gap-tighter">
+                            <div className="text-label-small text-neutral-content font-medium">
+                              {t("import.viewJsonFormat")}
+                            </div>
+                            <div className="text-body-small text-neutral-content-subtler text-center">
+                              {isZh ? (
+                                <>
+                                  请先配置
+                                  <Button
+                                    type="button"
+                                    look="string"
+                                    onClick={openConfig}
+                                    className="border-none bg-none p-0 m-0 text-primary-content underline"
+                                  >
+                                    {t("Labeling Interface")}
+                                  </Button>
+                                  ，再预览预期的 JSON 数据格式
+                                </>
+                              ) : (
+                                <>
+                                  Setup your{" "}
+                                  <Button
+                                    type="button"
+                                    look="string"
+                                    onClick={openConfig}
+                                    className="border-none bg-none p-0 m-0 text-primary-content underline"
+                                  >
+                                    labeling configuration
+                                  </Button>{" "}
+                                  first to preview the expected JSON data format
+                                </>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    </div>
-                  </SimpleCard>
+                      </SimpleCard>
+                    )}
+                  </div>
                 )}
               </div>
-            )}
+            </section>
           </div>
         </Upload>
       </main>

@@ -1,5 +1,11 @@
+// 若 hostname 已含 /api（如网关路径 https://gateway:9000/api/label-studio），则直接作为 API base，否则拼 /api
+const apiGateway =
+  window.APP_SETTINGS?.hostname && String(window.APP_SETTINGS.hostname).indexOf("/api") !== -1
+    ? window.APP_SETTINGS.hostname.replace(/(\/)+$/, "")
+    : `${window.APP_SETTINGS?.hostname ?? ""}/api`;
+
 export const API_CONFIG = {
-  gateway: `${window.APP_SETTINGS.hostname}/api`,
+  gateway: apiGateway,
   endpoints: {
     // Users
     users: "/users",
@@ -11,18 +17,30 @@ export const API_CONFIG = {
     updateHotkeys: "PATCH:/current-user/hotkeys/",
 
     // Organization
+    organizationsList: "/organizations",
     memberships: "/organizations/:pk/memberships",
     userMemberships: "/organizations/:pk/memberships/:userPk",
     inviteLink: "/invite",
     resetInviteLink: "POST:/invite/reset-token",
+    /** 父平台 pub_org/pub_user/pub_user_org → LS 组织与用户（仅 staff） */
+    syncPubDirectory: "POST:/parent-integration/sync-pub-directory/",
 
     // Project
     projects: "/projects",
     project: "/projects/:pk",
     updateProject: "PATCH:/projects/:pk",
+    /** 父平台数据集：按桶前缀列举 S3 对象并生成任务 */
+    syncParentDataset: "POST:/projects/:pk/parent-dataset/sync",
     createProject: "POST:/projects",
     deleteProject: "DELETE:/projects/:pk",
     projectResetCache: "POST:/projects/:pk/summary/reset",
+    /** 项目人员与流程：团队分配 */
+    projectWorkflowTeam: "/projects/:pk/workflow/team",
+    createProjectWorkflowTeam: "POST:/projects/:pk/workflow/team",
+    deleteProjectWorkflowTeam: "DELETE:/projects/:pk/workflow/team/:allocation_id",
+    projectWorkflowDistribute: "POST:/projects/:pk/workflow/distribute",
+    /** 当前用户在项目内的 workflow 任务（annotate / review / accept） */
+    projectWorkflowMyTasks: "/projects/:pk/workflow/my-tasks",
 
     // Presigning
     presignUrlForTask: "/../tasks/:taskID/presign",

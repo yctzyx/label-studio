@@ -3,6 +3,7 @@ import {
   type FC,
   forwardRef,
   type KeyboardEvent,
+  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
@@ -33,6 +34,12 @@ interface PaginationProps {
   onInit?: (pageNumber: number, pageSize: number) => void;
   onChange?: (pageNumber: number, pageSize: number) => void;
   onPageLoad?: (pageNumber: number, pageSize: number) => Promise<void>;
+  /** 自定义「每页条数」下拉文案，例如 (n) => \`${n} 条/页\` */
+  formatPageSizeOption?: (pageSize: number) => string;
+  /** 自定义页码展示，例如 (c, t) => <>第 {c} 页 / 共 {t} 页</> */
+  formatPageIndicator?: (currentPage: number, totalPages: number) => ReactNode;
+  /** 当总条数 ≥ 此值时，即使只有一页也展示分页条（便于右端切换每页条数） */
+  forceVisibleMinItems?: number;
 }
 
 const isSystemEvent = (e: KeyboardEvent<HTMLInputElement>): boolean => {
@@ -61,7 +68,17 @@ const setStoredPageSize = (name: string, pageSize: number) => {
 
 export const Pagination: FC<PaginationProps> = forwardRef(
   (
-    { allowInput = true, allowRewind = true, disabled = false, size = "medium", pageSizeOptions = [], ...props },
+    {
+      allowInput = true,
+      allowRewind = true,
+      disabled = false,
+      size = "medium",
+      pageSizeOptions = [],
+      formatPageSizeOption,
+      formatPageIndicator,
+      forceVisibleMinItems,
+      ...props
+    },
     ref,
   ) => {
     const [inputMode, setInputMode] = useState(false);
@@ -181,7 +198,13 @@ export const Pagination: FC<PaginationProps> = forwardRef(
       return () => window.removeEventListener("popstate", popStateHandler);
     }, [props.urlParamName]);
 
-    return totalPages > 1 ? (
+    const showBar =
+      totalPages > 1 ||
+      (isDefined(forceVisibleMinItems) &&
+        props.totalItems >= forceVisibleMinItems &&
+        (pageSizeOptions?.length ?? 0) > 0);
+
+    return showBar ? (
       <div className={cn("pagination-ls").mod({ disabled, size, waiting }).toClassName()} style={props.style}>
         {props.label && isDefined(pageSize) && (
           <div className={cn("pagination-ls").elem("label").toClassName()}>
@@ -232,7 +255,13 @@ export const Pagination: FC<PaginationProps> = forwardRef(
                   if (allowInput) setInputMode(true);
                 }}
               >
-                {currentPage} <span>of {totalPages}</span>
+                {formatPageIndicator ? (
+                  formatPageIndicator(currentPage, totalPages)
+                ) : (
+                  <>
+                    {currentPage} <span>of {totalPages}</span>
+                  </>
+                )}
                 <div
                   onClick={() => {
                     /*  */
@@ -262,7 +291,10 @@ export const Pagination: FC<PaginationProps> = forwardRef(
           <div className={cn("pagination-ls").elem("page-size").toClassName()}>
             <Select
               value={pageSize}
-              options={pageSizeOptions.map((v) => ({ label: `${v} per page`, value: v }))}
+              options={pageSizeOptions.map((v) => ({
+                label: formatPageSizeOption ? formatPageSizeOption(v) : `${v} per page`,
+                value: v,
+              }))}
               onChange={(val: string) => {
                 const newPageSize = Number.parseInt(val);
 

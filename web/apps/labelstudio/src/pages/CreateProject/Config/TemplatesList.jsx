@@ -1,10 +1,11 @@
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { Spinner } from "../../../components";
 import { useAPI } from "../../../providers/ApiProvider";
 import { cn } from "../../../utils/bem";
 import "./Config.scss";
 import { IconInfo } from "@humansignal/icons";
-import { Button, EnterpriseBadge } from "@humansignal/ui";
+import { Button } from "@humansignal/ui";
 
 const listClass = cn("templates-list");
 
@@ -15,40 +16,34 @@ const Arrow = () => (
   </svg>
 );
 
-const TemplatesInGroup = ({ templates, group, onSelectRecipe, isEdition }) => {
+const TemplatesInGroup = ({ templates, group, onSelectRecipe, isEdition, t }) => {
+  const isCommunityEdition = isEdition === "Community";
+
   const picked = templates
     .filter((recipe) => recipe.group === group)
+    // Hide enterprise-only templates in Community edition (e.g. PDF OCR)
+    .filter((recipe) => !(isCommunityEdition && recipe.type === "enterprise"))
     // templates without `order` go to the end of the list
     .sort((a, b) => (a.order ?? Number.POSITIVE_INFINITY) - (b.order ?? Number.POSITIVE_INFINITY));
 
-  const isCommunityEdition = isEdition === "Community";
-
   return (
     <ul>
-      {picked.map((recipe) => {
-        const isEnterpriseTemplate = recipe.type === "enterprise";
-        const isDisabled = isCommunityEdition && isEnterpriseTemplate;
-
-        return (
-          <li
-            key={recipe.title}
-            onClick={() => !isDisabled && onSelectRecipe(recipe)}
-            className={listClass.elem("template").mod({ disabled: isDisabled })}
-            title={isDisabled ? "Enterprise feature - Available in Label Studio Enterprise" : ""}
-          >
-            <img src={recipe.image} alt={""} />
-            <div className="flex flex-col items-center w-full">
-              <h3 className="flex flex-1 justify-center text-center w-full">{recipe.title}</h3>
-              {isEnterpriseTemplate && isCommunityEdition && <EnterpriseBadge className="mb-base" />}
-            </div>
-          </li>
-        );
-      })}
+      {picked.map((recipe) => (
+        <li key={recipe.title} onClick={() => onSelectRecipe(recipe)} className={listClass.elem("template")}>
+          <img src={recipe.image} alt={""} />
+          <div className="flex flex-col items-center w-full">
+            <h3 className="flex flex-1 justify-center text-center w-full">
+              {t(recipe.title, { defaultValue: recipe.title })}
+            </h3>
+          </div>
+        </li>
+      ))}
     </ul>
   );
 };
 
 export const TemplatesList = ({ selectedGroup, selectedRecipe, onCustomTemplate, onSelectGroup, onSelectRecipe }) => {
+  const { t } = useTranslation();
   const [groups, setGroups] = React.useState([]);
   const [templates, setTemplates] = React.useState();
   const api = useAPI();
@@ -82,7 +77,7 @@ export const TemplatesList = ({ selectedGroup, selectedRecipe, onCustomTemplate,
                 selected: selectedRecipe?.group === group,
               })}
             >
-              {group}
+              {t(group, { defaultValue: group })}
               <Arrow />
             </li>
           ))}
@@ -94,9 +89,9 @@ export const TemplatesList = ({ selectedGroup, selectedRecipe, onCustomTemplate,
           size="small"
           onClick={onCustomTemplate}
           className="w-full"
-          aria-label="Create custom template"
+          aria-label={t("Create custom template")}
         >
-          Custom template
+          {t("Custom template")}
         </Button>
       </aside>
       <main>
@@ -106,14 +101,15 @@ export const TemplatesList = ({ selectedGroup, selectedRecipe, onCustomTemplate,
           group={selected}
           onSelectRecipe={onSelectRecipe}
           isEdition={isEdition}
+          t={t}
         />
       </main>
       <footer className="flex items-center justify-center gap-1">
         <IconInfo className={listClass.elem("info-icon")} width="20" height="20" />
         <span>
-          See the documentation to{" "}
+          {t("See the documentation to")}{" "}
           <a href="https://labelstud.io/guide" target="_blank" rel="noreferrer">
-            contribute a template
+            {t("contribute a template")}
           </a>
           .
         </span>

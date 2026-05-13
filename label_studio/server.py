@@ -32,6 +32,9 @@ DEFAULT_USERNAME = 'default_user@localhost'
 def _setup_env():
     sys.path.insert(0, LS_PATH)
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'label_studio.core.settings.label_studio')
+    from label_studio.core.mysql_schema_compat import apply_mysql_rename_column_patch
+
+    apply_mysql_rename_column_patch()
     get_wsgi_application()
 
 
@@ -435,6 +438,19 @@ def main():
         from django.conf import settings
 
         settings.INTERNAL_PORT = str(internal_port)
+
+        # Register with Nacos if configured (NACOS_SERVER_ADDR set)
+        try:
+            from label_studio.core.nacos_registry import (
+                _get_instance_ip,
+                register_and_schedule_deregister,
+            )
+
+            # Use concrete IP for Nacos so gateway can reach this instance
+            register_ip = internal_host if internal_host and internal_host != '0.0.0.0' else _get_instance_ip()
+            register_and_schedule_deregister(register_ip, internal_port)
+        except Exception as e:
+            logger.warning('Nacos registration skipped or failed: %s', e)
 
         # browser
         url = ('http://localhost:' + str(internal_port)) if not host else host

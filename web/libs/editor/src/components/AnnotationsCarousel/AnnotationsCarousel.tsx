@@ -194,7 +194,7 @@ export const AnnotationsCarousel = observer(({ store, annotationStore }: Annotat
           <div className={cn("annotations-carousel").elem("carousel-controls").toClassName()}>
             <Button
               disabled={isLeftDisabled}
-              aria-label="Carousel left"
+              aria-label="向左滚动"
               size="small"
               variant="neutral"
               onClick={scrollLeft}
@@ -203,7 +203,7 @@ export const AnnotationsCarousel = observer(({ store, annotationStore }: Annotat
             </Button>
             <Button
               disabled={isRightDisabled}
-              aria-label="Carousel right"
+              aria-label="向右滚动"
               size="small"
               variant="neutral"
               onClick={scrollRight}

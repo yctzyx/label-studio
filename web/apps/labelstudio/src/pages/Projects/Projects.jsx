@@ -9,6 +9,7 @@ import { useContextProps } from "../../providers/RoutesProvider";
 import { cn } from "../../utils/bem";
 import { CreateProject } from "../CreateProject/CreateProject";
 import { DataManagerPage } from "../DataManager/DataManager";
+import { ProjectTeamWorkflowPage } from "../ProjectTeamWorkflow/ProjectTeamWorkflowPage";
 import { SettingsPage } from "../Settings";
 import { EmptyProjectsList, ProjectsList } from "./ProjectsList";
 import { useAbortController, useUpdatePageTitle } from "@humansignal/core";
@@ -18,6 +19,14 @@ const getCurrentPage = () => {
   const pageNumberFromURL = new URLSearchParams(location.search).get("page");
 
   return pageNumberFromURL ? Number.parseInt(pageNumberFromURL) : 1;
+};
+
+/** 项目卡片列表每页条数：未写入 localStorage 时默认 6（与父平台数据集分页密度一致） */
+const getProjectsListPageSize = () => {
+  const raw = localStorage.getItem("pages:projects-list");
+  if (raw == null || raw === "") return 6;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n > 0 ? n : 6;
 };
 
 export const ProjectsPage = () => {
@@ -30,7 +39,7 @@ export const ProjectsPage = () => {
   const setContextProps = useContextProps();
 
   useUpdatePageTitle("Projects");
-  const defaultPageSize = Number.parseInt(localStorage.getItem("pages:projects-list") ?? 30);
+  const defaultPageSize = getProjectsListPageSize();
 
   const [modal, setModal] = React.useState(false);
 
@@ -53,6 +62,7 @@ export const ProjectsPage = () => {
       "is_published",
       "assignment_settings",
       "state",
+      "template_group",
     ].join(",");
 
     const data = await api.callApi("projects", {
@@ -79,6 +89,10 @@ export const ProjectsPage = () => {
             "total_predictions_number",
             "ground_truth_number",
             "finished_task_number",
+            "can_manage_team",
+            "task_workflow_enabled",
+            "workflow_stage_counts",
+            "template_group",
           ].join(","),
           page_size: pageSize,
         },
@@ -130,6 +144,7 @@ export const ProjectsPage = () => {
               totalItems={totalItems}
               loadNextPage={loadNextPage}
               pageSize={defaultPageSize}
+              onCreateProject={openModal}
             />
           ) : (
             <EmptyProjectsList openModal={openModal} />
@@ -157,6 +172,7 @@ ProjectsPage.routes = ({ store }) => [
     pages: {
       DataManagerPage,
       SettingsPage,
+      ProjectTeamWorkflowPage,
     },
   },
 ];

@@ -35,6 +35,63 @@ def enforce_csrf_checks(func):
         return func
 
 
+# CORS headers to strip when request came through gateway (to avoid duplicate with gateway's CORS)
+_CORS_HEADER_NAMES = (
+    "Access-Control-Allow-Origin",
+    "Access-Control-Allow-Credentials",
+    "Access-Control-Allow-Methods",
+    "Access-Control-Allow-Headers",
+    "Access-Control-Max-Age",
+    "Access-Control-Expose-Headers",
+)
+
+
+# 网关 path 前缀：网关转发 /api/label-studio/xxx 时，LS 需将 path 重写为 /api/xxx 才能匹配路由
+GATEWAY_PATH_PREFIX = "/api/label-studio"
+
+
+class RewriteGatewayPath(MiddlewareMixin):
+    """
+    当请求 path 以 /api/label-studio/ 开头时，重写以匹配 LS 的 URL 路由。
+    - /api/label-studio/static/xxx -> /static/xxx（静态资源）
+    - /api/label-studio/current-user/xxx 等 -> /api/xxx（API 路由）
+    """
+
+    def process_request(self, request):
+        path = getattr(request, "path_info", None) or getattr(request, "path", "")
+        if not path.startswith(GATEWAY_PATH_PREFIX + "/"):
+            return None
+        rest = path[len(GATEWAY_PATH_PREFIX) + 1 :]
+        if rest.startswith("static/"):
+            new_path = "/" + rest
+        elif rest.startswith("data/upload/"):
+            new_path = "/" + rest
+        elif rest.startswith("api/"):
+            new_path = "/" + rest
+        else:
+            new_path = "/api/" + rest
+        request.path_info = new_path
+        request.path = new_path
+        return None
+
+
+class StripCorsWhenProxied(MiddlewareMixin):
+    """
+    当请求经网关/代理转发（存在 X-Forwarded-Host）时，移除 LS 添加的 CORS 头，
+    避免与网关的 CORS 头重复导致浏览器报错 "multiple values"。
+    直连 LS 的请求（如 embed）保留 CORS 头。
+    """
+
+    def process_response(self, request, response):
+        if not getattr(request, "META", None):
+            return response
+        if request.META.get("HTTP_X_FORWARDED_HOST") or request.META.get("HTTP_X_FORWARDED_FOR"):
+            for name in _CORS_HEADER_NAMES:
+                if response.has_header(name):
+                    del response[name]
+        return response
+
+
 class DisableCSRF(MiddlewareMixin):
     # disable csrf for api requests
     def process_view(self, request, callback, *args, **kwargs):

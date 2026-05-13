@@ -40,6 +40,8 @@ export class APIProxy<T extends {}> {
 
   commonHeaders: Record<string, string> = {};
 
+  getCommonHeaders?: () => Record<string, string>;
+
   mockDelay = 0;
 
   mockDisabled = false;
@@ -56,6 +58,7 @@ export class APIProxy<T extends {}> {
 
   constructor(options: APIProxyOptions<T>) {
     this.commonHeaders = options.commonHeaders ?? {};
+    this.getCommonHeaders = options.getCommonHeaders;
     this.gateway = this.resolveGateway(options.gateway);
     this.requestMode = this.detectMode();
     this.mockDelay = options.mockDelay ?? 0;
@@ -174,6 +177,7 @@ export class APIProxy<T extends {}> {
         const initialheaders = Object.assign(
           this.getDefaultHeaders(requestMethod as RequestMethod),
           this.commonHeaders ?? {},
+          this.getCommonHeaders?.() ?? {},
           methodSettings.headers ?? {},
           headers ?? {},
         );

@@ -1,4 +1,5 @@
 import { format } from "date-fns";
+import { useTranslation } from "react-i18next";
 import styles from "./MembershipInfo.module.scss";
 import { useQuery } from "@tanstack/react-query";
 import { getApiInstance } from "@humansignal/core";
@@ -10,7 +11,22 @@ function formatDate(date?: string) {
   return format(new Date(date ?? ""), "dd MMM yyyy, KK:mm a");
 }
 
+function membershipRoleLabel(t: (key: string) => string, code?: string) {
+  if (!code) return "";
+  const map: Record<string, string> = {
+    OW: t("membership.role.OW"),
+    DI: t("membership.role.DI"),
+    AD: t("membership.role.AD"),
+    MA: t("membership.role.MA"),
+    AN: t("membership.role.AN"),
+    RE: t("membership.role.RE"),
+    NO: t("membership.role.NO"),
+  };
+  return map[code] ?? code;
+}
+
 export const MembershipInfo = () => {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const dateJoined = useMemo(() => {
     if (!user?.date_joined) return null;
@@ -36,36 +52,12 @@ export const MembershipInfo = () => {
 
       const annotationCount = response?.annotations_count;
       const contributions = response?.contributed_projects_count;
-      let role = "Owner";
-
-      switch (response.role) {
-        case "OW":
-          role = "Owner";
-          break;
-        case "DI":
-          role = "Deactivated";
-          break;
-        case "AD":
-          role = "Administrator";
-          break;
-        case "MA":
-          role = "Manager";
-          break;
-        case "AN":
-          role = "Annotator";
-          break;
-        case "RE":
-          role = "Reviewer";
-          break;
-        case "NO":
-          role = "Pending";
-          break;
-      }
+      const roleCode = response.role;
 
       return {
         annotationCount,
         contributions,
-        role,
+        roleCode,
       };
     },
   });
@@ -101,22 +93,22 @@ export const MembershipInfo = () => {
   return (
     <div className={styles.membershipInfo} id="membership-info">
       <div className="flex gap-2 w-full justify-between">
-        <div>User ID</div>
+        <div>{t("User ID")}</div>
         <div>{user?.id}</div>
       </div>
 
       <div className="flex gap-2 w-full justify-between">
-        <div>Registration date</div>
+        <div>{t("Registration date")}</div>
         <div>{dateJoined}</div>
       </div>
 
       <div className="flex gap-2 w-full justify-between">
-        <div>Annotations Submitted</div>
+        <div>{t("Annotations Submitted")}</div>
         <div>{membership.data?.annotationCount}</div>
       </div>
 
       <div className="flex gap-2 w-full justify-between">
-        <div>Projects contributed to</div>
+        <div>{t("Projects contributed to")}</div>
         <div>{membership.data?.contributions}</div>
       </div>
 
@@ -124,33 +116,33 @@ export const MembershipInfo = () => {
 
       {user?.active_organization_meta && (
         <div className="flex gap-2 w-full justify-between">
-          <div>Organization</div>
+          <div>{t("Organization")}</div>
           <div>{user.active_organization_meta.title}</div>
         </div>
       )}
 
-      {membership.data?.role && (
+      {membership.data?.roleCode && (
         <div className="flex gap-2 w-full justify-between">
-          <div>My role</div>
-          <div>{membership.data.role}</div>
+          <div>{t("My role")}</div>
+          <div>{membershipRoleLabel(t, membership.data.roleCode)}</div>
         </div>
       )}
 
       <div className="flex gap-2 w-full justify-between">
-        <div>Organization ID</div>
+        <div>{t("Organization ID")}</div>
         <div>{user?.active_organization}</div>
       </div>
 
       {user?.active_organization_meta && (
         <div className="flex gap-2 w-full justify-between">
-          <div>Owner</div>
+          <div>{t("Organization owner")}</div>
           <div>{user.active_organization_meta.email}</div>
         </div>
       )}
 
       {organization.data?.createdAt && (
         <div className="flex gap-2 w-full justify-between">
-          <div>Created</div>
+          <div>{t("Created")}</div>
           <div>{organization.data?.createdAt}</div>
         </div>
       )}

@@ -257,7 +257,7 @@ export const TabStore = types
     createDefaultView: flow(function* () {
       self.views.push({
         id: 0,
-        title: "Default",
+        title: "默认",
         hiddenColumns: self.defaultHidden,
       });
 

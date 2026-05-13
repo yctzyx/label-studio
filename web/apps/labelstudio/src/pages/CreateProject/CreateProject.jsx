@@ -1,11 +1,10 @@
-import { EnterpriseBadge, Select, Typography } from "@humansignal/ui";
 import React from "react";
+import { useTranslation } from "react-i18next";
 import { useHistory } from "react-router";
 import { ToggleItems } from "../../components";
 import { Button } from "@humansignal/ui";
 import { Modal } from "../../components/Modal/Modal";
 import { Space } from "../../components/Space/Space";
-import { HeidiTips } from "../../components/HeidiTips/HeidiTips";
 import { useAPI } from "../../providers/ApiProvider";
 import { cn } from "../../utils/bem";
 import { ConfigPage } from "./Config/Config";
@@ -14,11 +13,11 @@ import { ImportPage } from "./Import/Import";
 import { useImportPage } from "./Import/useImportPage";
 import { useDraftProject } from "./utils/useDraftProject";
 import { Input, TextArea } from "../../components/Form";
-import { FF_LSDV_E_297, isFF } from "../../utils/feature-flags";
-import { createURL } from "../../components/HeidiTips/utils";
 
-const ProjectName = ({ name, setName, onSaveName, onSubmit, error, description, setDescription, show = true }) =>
-  !show ? null : (
+const ProjectName = ({ name, setName, onSaveName, onSubmit, error, description, setDescription, show = true }) => {
+  const { t } = useTranslation();
+  if (!show) return null;
+  return (
     <form
       className={cn("project-name")}
       onSubmit={(e) => {
@@ -28,7 +27,7 @@ const ProjectName = ({ name, setName, onSaveName, onSubmit, error, description, 
     >
       <div className="w-full flex flex-col gap-2">
         <label className="w-full" htmlFor="project_name">
-          Project Name
+          {t("Project Name")}
         </label>
         <Input
           name="name"
@@ -40,52 +39,26 @@ const ProjectName = ({ name, setName, onSaveName, onSubmit, error, description, 
         />
         {error && <span className="-mt-1 text-negative-content">{error}</span>}
       </div>
-      <div className="w-full flex flex-col gap-2">
+      <div className="project-name__description-field w-full min-w-0 flex flex-col gap-2">
         <label className="w-full" htmlFor="project_description">
-          Description
+          {t("Description")}
         </label>
         <TextArea
           name="description"
           id="project_description"
-          placeholder="Optional description of your project"
-          rows="4"
-          style={{ minHeight: 100 }}
+          placeholder={t("Optional description of your project")}
+          rows={16}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           className="project-description w-full"
         />
       </div>
-      {isFF(FF_LSDV_E_297) && (
-        <div className="w-full flex flex-col gap-2">
-          <label>
-            Workspace
-            <EnterpriseBadge className="ml-2" />
-          </label>
-          <Select placeholder="Select an option" disabled options={[]} triggerClassName="!flex-1" />
-          <Typography size="small" className="mt-tight mb-wider">
-            Simplify project management by organizing projects into workspaces.{" "}
-            <a
-              href={createURL(
-                "https://docs.humansignal.com/guide/manage_projects#Create-workspaces-to-organize-projects",
-                {
-                  experiment: "project_creation_dropdown",
-                  treatment: "simplify_project_management",
-                },
-              )}
-              target="_blank"
-              rel="noreferrer"
-              className="underline hover:no-underline"
-            >
-              Learn more
-            </a>
-          </Typography>
-          <HeidiTips collection="projectCreation" />
-        </div>
-      )}
     </form>
   );
+};
 
 export const CreateProject = ({ onClose }) => {
+  const { t } = useTranslation();
   const [step, _setStep] = React.useState("name"); // name | import | config
   const [waiting, setWaitingStatus] = React.useState(false);
 
@@ -112,15 +85,21 @@ export const CreateProject = ({ onClose }) => {
     setError(null);
   }, [name]);
 
-  const { columns, uploading, uploadDisabled, finishUpload, pageProps, uploadSample } = useImportPage(project, sample);
+  const { columns, uploading, uploadDisabled, hasImportData, finishUpload, pageProps, uploadSample } = useImportPage(
+    project,
+    sample,
+  );
 
   const rootClass = cn("create-project");
   const tabClass = rootClass.elem("tab");
-  const steps = {
-    name: <span className={tabClass.mod({ disabled: !!error })}>Project Name</span>,
-    import: <span className={tabClass.mod({ disabled: uploadDisabled })}>Data Import</span>,
-    config: "Labeling Setup",
-  };
+  const steps = React.useMemo(
+    () => ({
+      name: <span className={tabClass.mod({ disabled: !!error })}>{t("Project Name")}</span>,
+      import: <span className={tabClass.mod({ disabled: uploadDisabled })}>{t("Data Import")}</span>,
+      config: t("Labeling Setup"),
+    }),
+    [t, error, uploadDisabled, tabClass],
+  );
 
   // name intentionally skipped from deps:
   // this should trigger only once when we got project loaded
@@ -200,27 +179,29 @@ export const CreateProject = ({ onClose }) => {
     <Modal onHide={onDelete} closeOnClickOutside={false} allowToInterceptEscape fullscreen visible bare>
       <div className={rootClass}>
         <Modal.Header>
-          <h1>Create Project</h1>
-          <ToggleItems items={steps} active={step} onSelect={setStep} />
+          <h1>{t("Create Project")}</h1>
+          <ToggleItems className={rootClass.elem("steps").toClassName()} items={steps} active={step} onSelect={setStep} />
 
           <Space>
             <Button
               variant="negative"
               look="outlined"
+              className={rootClass.elem("header-btn").mod({ cancel: true }).toClassName()}
               onClick={onDelete}
               waiting={waiting}
-              aria-label="Cancel project creation"
+              aria-label={t("Cancel project creation")}
             >
-              Cancel
+              {t("Cancel")}
             </Button>
             <Button
               look="primary"
+              className={rootClass.elem("header-btn").mod({ save: true }).toClassName()}
               onClick={onCreate}
               waiting={waiting || uploading}
               waitingClickable={false}
-              disabled={!project || uploadDisabled || error}
+              disabled={!project || uploadDisabled || error || !hasImportData}
             >
-              Save
+              {t("Save")}
             </Button>
           </Space>
         </Modal.Header>
@@ -246,6 +227,15 @@ export const CreateProject = ({ onClose }) => {
           project={project}
           onUpdate={(config) => {
             updateProject({ ...project, label_config: config });
+          }}
+          onTemplateGroupChange={(group) => {
+            if (!project) return;
+            updateProject({ ...project, template_group: group });
+            void api.callApi("updateProject", {
+              params: { pk: project.id },
+              body: { template_group: group },
+              errorFilter: () => true,
+            });
           }}
           show={step === "config"}
           columns={columns}

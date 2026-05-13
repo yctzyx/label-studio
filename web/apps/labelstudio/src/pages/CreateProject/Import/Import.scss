@@ -1,3 +1,17 @@
+// Align with CreateProject / 父平台工作台（参见 CreateProject.scss）
+$pidata-page-bg: #f5f7fb;
+$pidata-card-bg: #fff;
+$pidata-border: #e8edf5;
+$pidata-border-strong: #dbe5f4;
+$pidata-muted: #667085;
+$pidata-heading: #1f2937;
+$pidata-heading-soft: #344054;
+$pidata-primary: #2f6bff;
+$pidata-primary-active: #1d4ed8;
+$pidata-track-bg: #f3f6fb;
+$pidata-row-hover: #f9fafb;
+$pidata-table-head: #fafbfd;
+
 // Custom scrollbar styling mixin
 @mixin custom-scrollbar {
   scrollbar-color: var(--color-neutral-border-bold) transparent;
@@ -41,7 +55,7 @@
     background: var(--color-negative-background);
     border-radius: var(--corner-radius-small);
     padding: var(--spacing-base);
-    margin: 0 var(--spacing-wider) var(--spacing-wide);
+    margin: var(--spacing-tight) var(--spacing-wider) 0;
     display: flex;
     gap: var(--spacing-tight);
   }
@@ -102,15 +116,251 @@
     @include custom-scrollbar;
 
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
-    background: linear-gradient(var(--color-neutral-background) 30%, rgb(255 255 255 / 0%)), linear-gradient(rgb(0 0 0 / 10%), var(--color-neutral-background) 100%);
-    background-repeat: no-repeat;
-    background-color: var(--color-neutral-background);
-    background-size: 100% 20px, 100% 5px;
-    background-attachment: local, scroll;
+    background-color: $pidata-page-bg;
   }
 
-  table {
+  &__import-main-inner {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 24px 20px 28px;
+    max-width: 1080px;
+    margin: 0 auto;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  &__hero {
+    padding-bottom: 14px;
+    border-bottom: 1px solid $pidata-border;
+
+    .font-semibold,
+    .text-neutral-content {
+      color: $pidata-heading;
+    }
+
+    .text-neutral-content-subtler {
+      color: $pidata-muted !important;
+    }
+  }
+
+  &__csv-banner {
+    border: 1px solid $pidata-border;
+    border-radius: 12px;
+    padding: 14px 18px;
+    background: $pidata-card-bg;
+    box-shadow: 0 4px 16px rgb(20 40 90 / 4%);
+
+    &_highlighted {
+      box-shadow: 0 0 0 2px rgb(47 107 255 / 22%);
+    }
+
+    &_choose {
+      border-color: rgb(47 107 255 / 35%);
+    }
+  }
+
+  &__source-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  &__segmented {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 999px;
+    border: 1px solid $pidata-border-strong;
+    box-shadow: inset 0 1px 1px rgb(16 24 40 / 4%);
+    background: $pidata-track-bg;
+    width: fit-content;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  &__segmented-btn {
+    border: none;
+    background: transparent;
+    color: $pidata-muted;
+    padding: 7px 14px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+
+    &:hover {
+      color: $pidata-heading-soft;
+    }
+
+    &_active {
+      background: $pidata-card-bg;
+      color: $pidata-primary-active;
+      box-shadow: 0 2px 8px rgb(45 93 240 / 18%);
+      font-weight: 600;
+    }
+  }
+
+  &__source-panel {
+    margin-top: 12px;
+    padding: 18px 20px;
+    border: 1px solid $pidata-border;
+    border-radius: 12px;
+    background: $pidata-card-bg;
+    box-shadow: 0 8px 24px rgb(20 40 90 / 6%);
+  }
+
+  &__drop-strip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--spacing-tight) var(--spacing-base);
+    padding: 16px;
+    border: 1px dashed #cfd8ea;
+    border-radius: 10px;
+    background: #fafbfd;
+    margin-top: 4px;
+  }
+
+  &__parent-inline-wrap {
+    margin-top: var(--spacing-tight);
+    padding: var(--spacing-wide);
+    border-radius: 10px;
+    border: 1px solid $pidata-border;
+    background: $pidata-row-hover;
+  }
+
+  &__parent-pick-card {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--spacing-base);
+    padding: var(--spacing-base);
+    border-radius: 10px;
+    border: 1px solid rgb(47 107 255 / 18%);
+    background: rgb(239 246 255 / 45%);
+  }
+
+  &__summary-section {
+    margin-top: var(--spacing-tight);
+  }
+
+  &__list-card-body {
+    box-sizing: border-box;
+    padding-bottom: 18px !important;
+  }
+
+  /* 与创建工作台卡片一致（参见 CreateProject form.project-name） */
+  &__panel-card {
+    border-radius: 12px !important;
+    border-color: $pidata-border !important;
+    background: $pidata-card-bg !important;
+    box-shadow: 0 8px 24px rgb(20 40 90 / 6%) !important;
+    overflow: hidden;
+  }
+
+  &__panel-card-heading {
+    padding: 14px 16px 11px !important;
+    margin: 0 !important;
+    border-bottom: 1px solid $pidata-border !important;
+    background: $pidata-table-head !important;
+    gap: 2px !important;
+
+    /* SimpleCard CardTitle defaults to text-2xl — tighten for list headers */
+    & > div {
+      font-size: 14px !important;
+      font-weight: 600 !important;
+      line-height: 1.35 !important;
+      letter-spacing: 0 !important;
+      color: $pidata-heading-soft !important;
+    }
+  }
+
+  /* 与工作台主导航「保存」按钮一致（CreateProject header save） */
+  &__action-primary {
+    --background-color: #{$pidata-primary};
+    --border-color: #{$pidata-primary};
+    --text-color: #fff;
+    --background-color-hover: #2566f5;
+    --background-color-active: #{$pidata-primary-active};
+    border-radius: 8px !important;
+    min-height: 34px;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+    font-weight: 500 !important;
+    box-shadow: 0 4px 12px rgb(47 107 255 / 28%);
+  }
+
+  /* 数据清单：父平台数据集行 — 同步 / 删除 同高、间距加大 */
+  &__parent-row-actions {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  &__parent-sync-btn {
+    min-height: 36px !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  &__parent-delete-btn {
+    box-sizing: border-box;
+    min-width: 36px !important;
+    width: 36px !important;
+    max-width: 36px !important;
+    min-height: 36px !important;
+    height: 36px !important;
+    padding: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+
+    & > em,
+    & > span {
+      padding: 0 !important;
+      margin: 0 !important;
+      min-width: 0 !important;
+    }
+  }
+
+  &__table-wrap {
+    border-radius: var(--corner-radius-small);
+    border: 1px solid var(--color-neutral-border);
+    background: var(--color-neutral-surface);
+    overflow: hidden;
+  }
+
+  &__table-scroll {
+    max-height: min(52vh, 480px);
+    overflow-y: auto;
+    @include custom-scrollbar;
+  }
+
+  &__drop-surface {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+
+    &_drag {
+      outline: 2px dashed rgb(47 107 255 / 40%);
+      outline-offset: -2px;
+      border-radius: var(--corner-radius-small);
+      background: rgb(239 246 255 / 60%);
+    }
+  }
+
+  table:not(.upload_page__data-table) {
     table-layout: fixed;
     
     tr {
@@ -128,6 +378,59 @@
 
     td {
       padding: var(--spacing-tight) var(--spacing-tight);
+    }
+  }
+
+  table.upload_page__data-table {
+    table-layout: auto;
+
+    thead {
+      background: $pidata-table-head;
+
+      th {
+        color: $pidata-heading-soft;
+        font-weight: 600;
+        font-size: 12px;
+        padding-top: 10px;
+        padding-bottom: 10px;
+      }
+
+      tr {
+        border-bottom: 1px solid $pidata-border;
+      }
+    }
+
+    tbody tr {
+      border-bottom: 1px solid $pidata-border;
+      background: $pidata-card-bg;
+      transition: background 0.12s ease;
+
+      &:hover {
+        background: $pidata-row-hover;
+      }
+
+      &:last-child {
+        border-bottom: none;
+      }
+    }
+
+    tbody td {
+      color: #475467;
+    }
+
+    tr:nth-child(odd) {
+      background: transparent;
+    }
+
+    td:nth-child(2),
+    th:nth-child(2) {
+      width: auto;
+      max-width: 36%;
+    }
+
+    td:nth-child(4),
+    th:nth-child(4) {
+      width: 112px;
     }
   }
 
@@ -229,14 +532,15 @@
   }
 }
 
-/* Import files via dropzone */
+/* 紧凑拖放层：仅高亮区域，无大块占位 */
 .dropzone {
-  padding: 0 32px 32px;
+  padding: 0;
   margin: 0;
-  min-height: 600px;
+  min-height: 0;
   height: 100%;
   position: relative;
   display: flex;
+  flex-direction: column;
 
   a {
     color: var(--color-primary-content);
@@ -246,95 +550,8 @@
     }
   }
 
-  &::before {
-    content: "";
-    transition: all 300ms ease-out;
-    position: absolute;
-    inset: 16px 48px 48px;
-    pointer-events: none;
-    border: 2px dashed transparent;
-    border-radius: var(--corner-radius-small);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    line-height: 32px;
-    color: var(--color-neutral-content);
-    font-weight: 500;
-    font-size: 28px;
-  }
-
   &_hovered {
-    &::before {
-      content: "Drop file(s) to upload";
-      position: absolute;
-      inset: 0 32px 32px;
-      border: 2px dashed var(--color-primary-border-subtle);
-      background: var(--color-primary-emphasis);
-      font-size: 32px;
-      box-shadow: inset 2px 2px 24px 0 rgba(var(--color-primary-shadow-raw) / 10%), inset 2px 2px 8px 0 rgba(var(--color-primary-shadow-raw) / 15%);
-    }
-  }
-
-  &__icon {
-    color: var(--color-primary-icon);
-  }
-
-  label {
-    display: flex;
-    justify-content: center;
-  }
-
-  &__content {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    background: var(--color-primary-background);
-    border: 1px solid var(--color-primary-border-subtler);
-    color: var(--color-neutral-content-subtle);
-    padding: var(--spacing-base);
-    border-radius: var(--corner-radius-small);
-    transition: all 150ms ease-out;
-
-    &>*:not(:first-child) {
-      margin-top: 32px;
-    }
-
-    header {
-      font-size: 24px;
-      line-height: 32px;
-      text-align: center;
-      color: var(--color-neutral-content);
-    }
-
-    dl {
-      display: grid;
-      grid-template: auto / auto auto;
-      font-size: 14px;
-      line-height: 24px;
-      gap: 0 30px;
-
-      dt {
-        color: var(--color-neutral-content);
-      }
-
-      dd {
-        font-weight: normal;
-      }
-
-      dt:last-of-type,
-      dd:last-of-type {
-        margin-top: 20px;
-      }
-    }
-
-    &:hover {
-      border-color: var(--color-primary-border);
-    }
-
+    /* 由 upload_page__drop-surface_drag 承担视觉 */
   }
 }
 

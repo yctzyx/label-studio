@@ -17,4 +17,5 @@ class ProjectsConfig(AppConfig):
         Note: FSM transitions are now registered centrally in fsm/apps.py.
         Do NOT import transitions here to avoid duplicate registration.
         """
-        pass
+        # Project team allocation side effects (e.g. creator as admin row on create)
+        from projects import receivers_project_team  # noqa: F401

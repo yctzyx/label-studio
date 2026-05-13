@@ -610,6 +610,18 @@ class AnnotationsListAPI(GetParentObjectMixin, generics.ListCreateAPIView):
         if is_skipping and not task.can_be_skipped():
             raise ValidationError({'detail': 'This task cannot be skipped.'})
 
+        if getattr(task.project, 'task_workflow_enabled', False):
+            try:
+                workflow = task.workflow
+            except Exception:
+                workflow = None
+            if workflow is None:
+                raise PermissionDenied('该任务尚未进入工作流，请先进行任务分发。')
+            if workflow.stage != 'annotate':
+                raise PermissionDenied('该任务当前不在标注阶段，不能继续标注。')
+            if workflow.current_assignee_id != user.id:
+                raise PermissionDenied('该任务未分配给当前用户，不能标注。')
+
         # updates history
         result = ser.validated_data.get('result')
         extra_args = {'task_id': self.kwargs['pk'], 'project_id': task.project_id}

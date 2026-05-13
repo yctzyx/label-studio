@@ -13,6 +13,7 @@ import {
   Typography,
 } from "@humansignal/ui";
 import { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { useHistory, useLocation } from "react-router-dom";
 import { useUpdatePageTitle, createTitleFromSegments } from "@humansignal/core";
 import { useProject } from "../../../providers/ProjectProvider";
@@ -22,6 +23,7 @@ import { useStorageCard } from "./hooks/useStorageCard";
 import "./StorageSettings.scss";
 
 export const StorageSettings = () => {
+  const { t } = useTranslation();
   const { project } = useProject();
   const rootClass = cn("storage-settings"); // TODO: Remove in the next BEM cleanup
   const history = useHistory();
@@ -29,7 +31,7 @@ export const StorageSettings = () => {
   const sourceStorageRef = useRef();
   const targetStorageRef = useRef();
 
-  useUpdatePageTitle(createTitleFromSegments([project?.title, "Cloud Storage Settings"]));
+  useUpdatePageTitle(createTitleFromSegments([project?.title, t("Cloud Storage Settings")]));
 
   // Fetch storage data at parent level
   const sourceStorage = useStorageCard("", project?.id);
@@ -57,12 +59,13 @@ export const StorageSettings = () => {
   return (
     <section className="max-w-[680px]">
       <Typography variant="headline" size="medium" className="mb-base">
-        Cloud Storage
+        {t("Cloud Storage")}
       </Typography>
       {hasAnyStorages && (
         <Typography size="small" className="text-neutral-content-subtler mb-wider">
-          Use cloud or database storage as the source for your labeling tasks or the target of your completed
-          annotations.
+          {t(
+            "Use cloud or database storage as the source for your labeling tasks or the target of your completed annotations.",
+          )}
         </Typography>
       )}
 
@@ -77,8 +80,8 @@ export const StorageSettings = () => {
         <div className="grid grid-cols-2 gap-8">
           <StorageSet
             ref={sourceStorageRef}
-            title="Source Cloud Storage"
-            buttonLabel="Add Source Storage"
+            title={t("Source Cloud Storage")}
+            buttonLabel={t("Add Source Storage")}
             rootClass={rootClass}
             storageTypes={sourceStorage.storageTypes}
             storages={sourceStorage.storages}
@@ -90,9 +93,9 @@ export const StorageSettings = () => {
 
           <StorageSet
             ref={targetStorageRef}
-            title="Target Cloud Storage"
+            title={t("Target Cloud Storage")}
             target="export"
-            buttonLabel="Add Target Storage"
+            buttonLabel={t("Add Target Storage")}
             rootClass={rootClass}
             storageTypes={targetStorage.storageTypes}
             storages={targetStorage.storages}
@@ -111,27 +114,29 @@ export const StorageSettings = () => {
             size="medium"
             variant="primary"
             icon={<IconCloudCustom />}
-            title="Add your first cloud storage"
-            description="Use cloud or database storage as the source for your labeling tasks or the target of your completed annotations."
+            title={t("Add your first cloud storage")}
+            description={t(
+              "Use cloud or database storage as the source for your labeling tasks or the target of your completed annotations.",
+            )}
             additionalContent={
               <div className="flex items-center justify-center gap-base" data-testid="dm-storage-provider-icons">
-                <Tooltip title="Amazon S3">
-                  <div className="flex items-center justify-center p-2" aria-label="Amazon S3">
+                <Tooltip title={t("Amazon S3")}>
+                  <div className="flex items-center justify-center p-2" aria-label={t("Amazon S3")}>
                     <IconCloudProviderS3 width={32} height={32} className="text-neutral-content-subtler" />
                   </div>
                 </Tooltip>
-                <Tooltip title="Google Cloud Storage">
-                  <div className="flex items-center justify-center p-2" aria-label="Google Cloud Storage">
+                <Tooltip title={t("Google Cloud Storage")}>
+                  <div className="flex items-center justify-center p-2" aria-label={t("Google Cloud Storage")}>
                     <IconCloudProviderGCS width={32} height={32} className="text-neutral-content-subtler" />
                   </div>
                 </Tooltip>
-                <Tooltip title="Azure Blob Storage">
-                  <div className="flex items-center justify-center p-2" aria-label="Azure Blob Storage">
+                <Tooltip title={t("Azure Blob Storage")}>
+                  <div className="flex items-center justify-center p-2" aria-label={t("Azure Blob Storage")}>
                     <IconCloudProviderAzure width={32} height={32} className="text-neutral-content-subtler" />
                   </div>
                 </Tooltip>
-                <Tooltip title="Redis Storage">
-                  <div className="flex items-center justify-center p-2" aria-label="Redis Storage">
+                <Tooltip title={t("Redis Storage")}>
+                  <div className="flex items-center justify-center p-2" aria-label={t("Redis Storage")}>
                     <IconCloudProviderRedis width={32} height={32} className="text-neutral-content-subtler" />
                   </div>
                 </Tooltip>
@@ -142,18 +147,18 @@ export const StorageSettings = () => {
                 <Button
                   look="primary"
                   data-testid="add-source-storage-button-empty-state"
-                  aria-label="Add Source Storage"
+                  aria-label={t("Add Source Storage")}
                   onClick={() => sourceStorageRef.current?.openAddModal()}
                 >
-                  Add Source Storage
+                  {t("Add Source Storage")}
                 </Button>
                 <Button
                   look="primary"
                   data-testid="add-target-storage-button-empty-state"
-                  aria-label="Add Target Storage"
+                  aria-label={t("Add Target Storage")}
                   onClick={() => targetStorageRef.current?.openAddModal()}
                 >
-                  Add Target Storage
+                  {t("Add Target Storage")}
                 </Button>
               </div>
             }
@@ -165,10 +170,10 @@ export const StorageSettings = () => {
                     target="_blank"
                     rel="noopener noreferrer"
                     data-testid="storage-help-link"
-                    aria-label="Learn more about cloud storage (opens in new window)"
-                    className="inline-flex items-center gap-1 hover:underline"
+                    aria-label={t("Learn more about cloud storage (opens in new window)")}
+                      className="inline-flex items-center gap-1 hover:underline"
                   >
-                    Learn more
+                    {t("Learn more")}
                     <IconExternal width={16} height={16} />
                   </a>
                 </Typography>

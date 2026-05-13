@@ -51,11 +51,19 @@ export const RoutesProvider = ({ children }) => {
   }, [location, config, store, history]);
 
   const routesChain = useMemo(() => {
-    return findMacthingComponents(location.pathname, routesMap);
+    const chain = findMacthingComponents(location.pathname, routesMap);
+    console.log("[LS-embed] routesChain", {
+      pathname: location.pathname,
+      chainLength: chain?.length,
+      chainPaths: chain?.map((r) => r.path),
+    });
+    return chain;
   }, [location, routesMap]);
 
   const lastRoute = useMemo(() => {
-    return routesChain.filter((r) => !r.modal).slice(-1)[0];
+    const last = routesChain.filter((r) => !r.modal).slice(-1)[0];
+    console.log("[LS-embed] lastRoute", { path: last?.path, component: last?.component?.displayName ?? last?.component?.name });
+    return last;
   }, [routesChain]);
 
   const [currentPath, setCurrentPath] = useState(lastRoute?.path);

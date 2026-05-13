@@ -208,24 +208,23 @@ function AnnotationButtonTooltip({
     // Check for both ephemeral drafts (isDraft) and saved drafts (isDraftSaved)
     // Exception: If Draft AND Skipped, show both Draft and Skipped
     if (isDraft || isDraftSaved) {
-      return createBadgeStyle("Draft", "grape");
+      return createBadgeStyle("草稿", "grape");
     }
     if (acceptedState) {
       switch (acceptedState) {
         case "accepted":
-          return createBadgeStyle("Accepted", "kale");
+          return createBadgeStyle("已通过", "kale");
         case "rejected":
-          return createBadgeStyle("Rejected", "persimmon");
+          return createBadgeStyle("已驳回", "persimmon");
         case "fixed":
         case "fixed_and_accepted":
-          return createBadgeStyle("Fixed", "canteloupe");
+          return createBadgeStyle("已修正", "canteloupe");
         default:
           break;
       }
     }
-    // Exception: If Submitted AND Skipped, only show Skipped (don't show Submitted)
     if (isSubmitted && !isSkipped) {
-      return createBadgeStyle("Submitted", "kale");
+      return createBadgeStyle("已提交", "kale");
     }
 
     return null;
@@ -249,26 +248,23 @@ function AnnotationButtonTooltip({
   const tooltipData = useMemo(() => {
     const rows: Array<{ label: string; value: string }> = [];
 
-    // Add Annotation ID first if available
     if (annotationId) {
-      rows.push({ label: "Annotation ID", value: String(annotationId) });
+      rows.push({ label: "标注 ID", value: String(annotationId) });
     }
 
-    // Add Type for all annotations/predictions
     if (isPrediction) {
-      rows.push({ label: "Type", value: "Prediction" });
+      rows.push({ label: "类型", value: "预测" });
       if (isDefined(predictionScore)) {
-        rows.push({ label: "Prediction Score", value: `${(predictionScore * 100).toFixed(2)}%` });
+        rows.push({ label: "预测得分", value: `${(predictionScore * 100).toFixed(2)}%` });
       }
     } else {
-      rows.push({ label: "Type", value: "Annotation" });
+      rows.push({ label: "类型", value: "标注" });
     }
 
-    // Add Last Updated after Type
     if (lastUpdated) {
       const formattedDate = formatDate(lastUpdated);
       if (formattedDate) {
-        rows.push({ label: "Last Updated", value: formattedDate });
+        rows.push({ label: "最近更新", value: formattedDate });
       }
     }
 
@@ -313,7 +309,6 @@ function AnnotationButtonTooltip({
               {statusBadge.label}
             </Badge>
           )}
-          {/* Skipped badge shown after Draft/Submitted */}
           {isSkipped && (
             <Badge
               className={cn("annotation-button").elem("tooltipStatusBadge").toClassName()}
@@ -322,10 +317,9 @@ function AnnotationButtonTooltip({
                 border: "none",
               }}
             >
-              Skipped
+              已跳过
             </Badge>
           )}
-          {/* Ground Truth badge shown last */}
           {isGroundTruth && (
             <Badge
               className={cn("annotation-button").elem("tooltipStatusBadge").toClassName()}
@@ -334,7 +328,7 @@ function AnnotationButtonTooltip({
                 border: "none",
               }}
             >
-              Ground Truth
+              标准答案
             </Badge>
           )}
         </div>
@@ -418,7 +412,7 @@ const AnnotationButtonContextMenu = injector(
         copyLink();
         dropdown?.close();
         toast?.show({
-          message: "Annotation link copied to clipboard",
+          message: "标注链接已复制到剪贴板",
           type: ToastType.info,
         });
       }, [copyLink, toast, dropdown]);
@@ -427,7 +421,7 @@ const AnnotationButtonContextMenu = injector(
         copyAnnotationId();
         dropdown?.close();
         toast?.show({
-          message: "Annotation ID copied to clipboard",
+          message: "标注 ID 已复制到剪贴板",
           type: ToastType.info,
         });
       }, [copyAnnotationId, toast, dropdown]);
@@ -466,16 +460,16 @@ const AnnotationButtonContextMenu = injector(
       const deleteAnnotation = useCallback(() => {
         clickHandler();
         confirm({
-          title: "Delete annotation?",
+          title: "删除标注？",
           body: (
             <>
-              This will <strong>delete all existing regions</strong>. Are you sure you want to delete them?
+              此操作将<strong>删除全部已有选区</strong>，确认要删除吗？
               <br />
-              This action cannot be undone.
+              此操作无法撤销。
             </>
           ),
           buttonLook: "negative",
-          okText: "Delete",
+          okText: "删除",
           onOk: () => {
             entity.list.deleteAnnotation(entity);
           },
@@ -493,13 +487,13 @@ const AnnotationButtonContextMenu = injector(
       const actions = useMemo<ContextMenuAction[]>(
         () => [
           {
-            label: "Copy Annotation ID",
+            label: "复制标注 ID",
             onClick: copyAnnotationIdHandler,
             icon: <IconClipboardCheck width={20} height={20} />,
             enabled: !isDraft,
           },
           {
-            label: `${isGroundTruth ? "Unset " : "Set "} as Ground Truth`,
+            label: `${isGroundTruth ? "取消标准答案" : "设为标准答案"}`,
             onClick: setGroundTruth,
             icon: isGroundTruth ? (
               <IconStar color="#FFC53D" width={iconSize} height={iconSize} />
@@ -509,31 +503,31 @@ const AnnotationButtonContextMenu = injector(
             enabled: showGroundTruth,
           },
           {
-            label: "Duplicate Annotation",
+            label: "复制此标注",
             onClick: duplicateAnnotation,
             icon: <IconDuplicate width={20} height={20} />,
             enabled: showDuplicateAnnotation,
           },
           {
-            label: "Copy Annotation Link",
+            label: "复制标注链接",
             onClick: linkAnnotation,
             icon: <IconLink />,
             enabled: !isDraft && store.hasInterface("annotations:copy-link"),
           },
           {
-            label: "Open Performance Dashboard",
+            label: "打开绩效看板",
             onClick: openPerformanceDashboard,
             icon: <IconAnalytics width={20} height={20} />,
             enabled: isLSE && hasProjectId && !isDraft && !isPrediction,
           },
           {
-            label: "Show Other Annotations",
+            label: "显示其它标注",
             onClick: showOtherAnnotations,
             icon: <IconViewAll width={20} height={20} />,
             enabled: true,
           },
           {
-            label: "Delete Annotation",
+            label: "删除标注",
             onClick: deleteAnnotation,
             icon: <IconTrashRect />,
             separator: true,
@@ -1004,21 +998,21 @@ export const AnnotationButton = observer(
           {!isPrediction && (
             <div className={cn("annotation-button").elem("icons").toClassName()}>
               {(entity.draftId > 0 || isDraft) && (
-                <Tooltip title="Draft">
+                <Tooltip title="草稿">
                   <div className={cn("annotation-button").elem("icon").mod({ draft: true }).toClassName()}>
                     <IconDraftCreated2 color="#617ADA" />
                   </div>
                 </Tooltip>
               )}
               {entity.skipped && (
-                <Tooltip title="Skipped">
+                <Tooltip title="已跳过">
                   <div className={cn("annotation-button").elem("icon").mod({ skipped: true }).toClassName()}>
                     <IconAnnotationSkipped2 color="#DD0000" />
                   </div>
                 </Tooltip>
               )}
               {isGroundTruth && (
-                <Tooltip title="Ground-truth">
+                <Tooltip title="标准答案">
                   <div className={cn("annotation-button").elem("icon").mod({ groundTruth: true }).toClassName()}>
                     <IconAnnotationGroundTruth />
                   </div>

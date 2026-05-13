@@ -1,6 +1,8 @@
 /* global Sentry */
 
+import "../i18n";
 import { createBrowserHistory } from "history";
+import { useEffect } from "react";
 import { render } from "react-dom";
 import { Router } from "react-router-dom";
 import { LEAVE_BLOCKER_KEY, leaveBlockerCallback } from "../components/LeaveBlocker/LeaveBlocker";
@@ -25,12 +27,24 @@ import { ff } from "@humansignal/core";
 import "@humansignal/ui/src/tailwind.css";
 import "./App.scss";
 import { AuthProvider } from "@humansignal/core/providers/AuthProvider";
+import { isEmbeddedLayout } from "../utils/getMainPlatformToken";
 
 const baseURL = new URL(APP_SETTINGS.hostname || location.origin);
 export const UNBLOCK_HISTORY_MESSAGE = "UNBLOCK_HISTORY";
 
+// embed 入口 pathname 为 /embed、/embed/ 或 /embed/projects 等，需设 basename 才能让路由匹配到 /
+const pathname = typeof location?.pathname === "string" ? location.pathname : "";
+const embedMatch = pathname.match(/^(\/embed|\/.*\/embed)(?=\/|$)/);
+const isEmbedPath = !!embedMatch;
+const basename = isEmbedPath ? embedMatch[1] : baseURL.pathname || "/";
+
+/* iframe / 无界 /embed：收紧布局（含「仅 iframe、URL 无 embed」场景） */
+if (typeof document !== "undefined" && isEmbeddedLayout()) {
+  document.documentElement.classList.add("ls-embed");
+}
+
 const browserHistory = createBrowserHistory({
-  basename: baseURL.pathname || "/",
+  basename,
   // callback is an async way to confirm or decline going to another page in the context of routing. It accepts `true` or `false`
   getUserConfirmation: (message, callback) => {
     // `history.block` doesn't block events, so in the case of listeners,
@@ -57,6 +71,10 @@ window.LSH = browserHistory;
 initSentry(browserHistory);
 
 const App = ({ content }) => {
+  useEffect(() => {
+    if (isEmbeddedLayout()) document.documentElement.classList.add("ls-embed");
+  }, []);
+
   return (
     <ErrorBoundary>
       <Router history={browserHistory}>
@@ -87,8 +105,21 @@ const App = ({ content }) => {
 
 const root = document.querySelector(".app-wrapper");
 const content = document.querySelector("#main-content");
+const contentHTML = content?.innerHTML ?? "";
 
-render(<App content={content.innerHTML} />, root);
+// [LS-embed] 排查空白页：记录挂载时的关键信息
+console.log("[LS-embed] App mount", {
+  hasRoot: !!root,
+  hasContent: !!content,
+  contentLength: contentHTML?.length ?? 0,
+  hostname: window.APP_SETTINGS?.hostname,
+  pathname: location.pathname,
+  basename,
+  isEmbedPath,
+  origin: location.origin,
+});
+
+render(<App content={contentHTML} />, root);
 
 if (module?.hot) {
   module.hot.accept(); // Enable HMR for React components

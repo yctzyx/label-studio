@@ -1,0 +1,168 @@
+/* 与 my-tasks-page fast-pagination 一致（pidata / Element Table 页脚） */
+$pi-primary: #409eff;
+$pi-border: #dcdfe6;
+$pi-border-light: #e3e6ed;
+$pi-table-border: #ebeef5;
+$pi-text: #606266;
+$pi-text-secondary: #909399;
+
+.pi-data-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 16px 16px;
+  border-top: 1px solid $pi-table-border;
+  font-size: 14px;
+  color: $pi-text;
+  background: #fff;
+
+  &__total {
+    flex: 1;
+    min-width: 200px;
+    margin-top: 4px;
+    color: $pi-text;
+  }
+
+  &__inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0;
+  }
+
+  &__size {
+    display: flex;
+    align-items: center;
+    color: $pi-text;
+    margin-right: 12px;
+
+    select {
+      width: 80px;
+      height: 32px;
+      margin: 0 6px;
+      padding: 0 8px;
+      border: 1px solid $pi-border;
+      border-radius: 4px;
+      font-size: 14px;
+      color: $pi-text;
+      background: #fff;
+      cursor: pointer;
+
+      &:focus {
+        outline: none;
+        border-color: $pi-primary;
+      }
+    }
+  }
+
+  &__pg-btn {
+    min-width: 32px;
+    height: 32px;
+    padding: 0 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    line-height: 1;
+    color: $pi-text;
+    background: #fff;
+    border: 1px solid $pi-border-light;
+    cursor: pointer;
+
+    &:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    &:not(:disabled):hover {
+      color: $pi-primary;
+    }
+
+    &_prev {
+      border-radius: 6px 0 0 6px;
+      margin-right: -1px;
+    }
+
+    &_next {
+      border-radius: 0 6px 6px 0;
+      margin-left: -1px;
+    }
+  }
+
+  &__pager {
+    display: inline-flex;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    vertical-align: top;
+  }
+
+  &__pager li {
+    display: inline-flex;
+  }
+
+  &__pager-num {
+    min-width: 32px;
+    height: 32px;
+    padding: 0 4px;
+    margin: 0 0 0 -1px;
+    font-size: 13px;
+    color: $pi-text;
+    background: #fff;
+    border: 1px solid $pi-border-light;
+    cursor: pointer;
+
+    &:hover {
+      color: $pi-primary;
+    }
+
+    &_active {
+      color: $pi-primary;
+      font-weight: 600;
+      border-color: $pi-primary;
+      z-index: 1;
+      position: relative;
+    }
+  }
+
+  &__pager-ellipsis {
+    min-width: 32px;
+    height: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 0 0 -1px;
+    border: 1px solid $pi-border-light;
+    background: #fff;
+    color: $pi-text-secondary;
+    font-size: 12px;
+  }
+
+  &__jumper {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 12px;
+    font-size: 14px;
+    color: $pi-text;
+    white-space: nowrap;
+  }
+
+  &__jumper-input {
+    width: 48px;
+    height: 32px;
+    margin: 0 8px;
+    padding: 0 8px;
+    text-align: center;
+    border: 1px solid $pi-border;
+    border-radius: 4px;
+    font-size: 14px;
+
+    &:focus {
+      outline: none;
+      border-color: $pi-primary;
+    }
+  }
+}

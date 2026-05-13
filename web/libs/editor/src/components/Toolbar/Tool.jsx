@@ -5,7 +5,7 @@ import { Fragment } from "react";
 import { Hotkey } from "../../core/Hotkey";
 import { ToolbarContext } from "./ToolbarContext";
 
-const hotkeys = Hotkey("SegmentationToolbar", "Segmentation Tools");
+const hotkeys = Hotkey("SegmentationToolbar", "分割工具");
 
 const keysDictionary = {
   plus: "+",
@@ -179,3 +179,4 @@ export const Tool = ({
     </button>
   );
 };
+

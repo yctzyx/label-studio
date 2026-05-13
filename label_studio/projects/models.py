@@ -110,7 +110,10 @@ class ProjectManager(models.Manager):
         return ProjectQuerySetWithFSM(self.model, using=self._db)
 
     def for_user(self, user):
-        return self.get_queryset().filter(organization=user.active_organization)
+        from projects.access import apply_project_team_visibility
+
+        qs = self.get_queryset().filter(organization=user.active_organization)
+        return apply_project_team_visibility(qs, user)
 
     def with_state(self):
         """
@@ -292,6 +295,22 @@ class Project(ProjectMixin, FsmHistoryStateModel):
 
     data_types = JSONField(_('data_types'), default=dict, null=True)
 
+    parent_platform_dataset = models.JSONField(
+        _('parent platform dataset'),
+        null=True,
+        blank=True,
+        default=None,
+        help_text='父平台数据集绑定（md_data_set / data_database 元数据），用于 S3 同步生成任务',
+    )
+
+    template_group = models.CharField(
+        _('template group'),
+        max_length=255,
+        blank=True,
+        default='',
+        help_text='标注模板库分组名称（与 annotation_templates/groups.txt 及选中模板的 group 一致）',
+    )
+
     is_draft = models.BooleanField(
         _('is draft'), default=False, help_text='Whether or not the project is in the middle of being created'
     )
@@ -326,8 +345,13 @@ class Project(ProjectMixin, FsmHistoryStateModel):
     annotator_evaluation_enabled = models.BooleanField(
         _('annotator evaluation enabled'),
         default=False,
-        db_default=False,
         help_text='Enable annotator evaluation for the project',
+    )
+
+    task_workflow_enabled = models.BooleanField(
+        _('task workflow enabled'),
+        default=False,
+        help_text='When true, tasks use annotate → review → accept flow with pool round-robin for review/accept',
     )
 
     show_overlap_first = models.BooleanField(_('show overlap first'), default=False)
@@ -1691,3 +1715,6 @@ class ProjectReimport(models.Model):
 
     def has_permission(self, user):
         return self.project.has_permission(user)
+
+
+from projects.workflow_models import ProjectTeamAllocation, ProjectWorkflowSettings, TaskWorkflow  # noqa: E402, F401

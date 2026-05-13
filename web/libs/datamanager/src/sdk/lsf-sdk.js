@@ -46,6 +46,16 @@ const resolveLabelStudio = () => {
 // We allow certain errors to bubble so the app-level ApiProvider can show modals:
 // - 403 PAUSED: User is paused in the project
 // - 400 OVERLAP_REACHED: Annotation overlap limit has been reached (only when feature flag is enabled)
+/** Swallow errors from optional workflow POST (e.g. workflow off, wrong stage). */
+const errorHandlerSwallowWorkflow = () => true;
+
+/** DM store project vs React-seeded `datamanager.project` can diverge; accept both key styles. */
+function isTaskWorkflowEnabledForProject(projectLike) {
+  if (!projectLike || typeof projectLike !== "object") return false;
+  const v = projectLike.task_workflow_enabled ?? projectLike.taskWorkflowEnabled;
+  return v === true;
+}
+
 const errorHandlerAllowSpecialErrors = (result) => {
   const isPaused =
     result?.status === 403 &&
@@ -233,6 +243,9 @@ export class LSFWrapper {
       onStorageInitialized: this.onStorageInitialized,
       onSubmitAnnotation: this.onSubmitAnnotation,
       onUpdateAnnotation: this.onUpdateAnnotation,
+      /** Review / acceptance: LS fires these when user presses Accept / Reject in review UI */
+      onAcceptAnnotation: this.onAcceptAnnotation,
+      onRejectAnnotation: this.onRejectAnnotation,
       onDeleteAnnotation: this.onDeleteAnnotation,
       onSkipTask: this.onSkipTask,
       onUnskipTask: this.onUnskipTask,
@@ -747,6 +760,164 @@ export class LSFWrapper {
     }
   }
 
+  /**
+   * 项目开启 task_workflow 时，在标注已成功写入后调用，将任务从 annotate 推进到 review。
+   * 须在 loadTask 替换当前 task 之前传入 taskId。
+   */
+  maybeAdvanceTaskWorkflowAfterLabeling = async (taskId) => {
+    const dm = this.datamanager;
+    const fromStore = isTaskWorkflowEnabledForProject(dm?.store?.project);
+    const fromSdkConfig = isTaskWorkflowEnabledForProject(dm?.project);
+    if (!fromStore && !fromSdkConfig) return;
+    const res = await dm.apiCall(
+      "taskWorkflowSubmitAnnotation",
+      { taskID: taskId },
+      { body: {} },
+      { errorHandler: errorHandlerSwallowWorkflow },
+    );
+    if (res?.error) {
+      console.warn("[task workflow] submit-annotation failed:", res.response?.detail ?? res.error);
+    }
+  };
+
+  /**
+   * When review interface Accept/Reject fires: persist reviewer edits then POST workflow transition.
+   */
+  isTaskWorkflowProjectEnabled() {
+    const dm = this.datamanager;
+    return isTaskWorkflowEnabledForProject(dm?.store?.project) || isTaskWorkflowEnabledForProject(dm?.project);
+  }
+
+  maybeAdvanceTaskWorkflowAfterReviewDecision = async (taskId, approve) => {
+    const dm = this.datamanager;
+    if (!this.isTaskWorkflowProjectEnabled()) return { ok: true, skipped: true };
+
+    const detail = await dm.apiCall(
+      "taskWorkflowDetail",
+      { taskID: taskId },
+      {},
+      { errorHandler: errorHandlerSwallowWorkflow },
+    );
+
+    if (detail?.error || detail?.workflow == null) return { ok: true, skipped: true };
+
+    const stage = detail.workflow.stage;
+    let res;
+    if (stage === "review") {
+      res = await dm.apiCall(
+        "taskWorkflowReview",
+        { taskID: taskId },
+        { body: { approve } },
+        { errorHandler: errorHandlerSwallowWorkflow },
+      );
+    } else if (stage === "accept") {
+      res = await dm.apiCall(
+        "taskWorkflowAccept",
+        { taskID: taskId },
+        { body: { approve } },
+        { errorHandler: errorHandlerSwallowWorkflow },
+      );
+    } else {
+      return { ok: true, skipped: true };
+    }
+
+    if (res?.error) {
+      console.warn("[task workflow] review/accept decision failed:", res.response?.detail ?? res.error);
+      return { ok: false, response: res };
+    }
+    return { ok: true };
+  };
+
+  /** @private */
+  async persistReviewEditsIfDirty(ls, entity, isDirty) {
+    if (!isDirty || !entity?.pk) return true;
+    const { task } = this;
+    await this.saveUserLabels();
+
+    const serializedAnnotation = this.prepareData(entity);
+
+    const result = await this.withinLoadingState(async () => {
+      return this.datamanager.apiCall(
+        "updateAnnotation",
+        { taskID: task.id, annotationID: entity.pk },
+        { body: serializedAnnotation },
+        { errorHandler: errorHandlerAllowSpecialErrors },
+      );
+    });
+
+    const status = result?.$meta?.status;
+    this.showOperationToast(status, "Annotation updated successfully", "Annotation is not updated", result);
+    this.datamanager.invoke("updateAnnotation", ls, entity, result);
+    return status < 400;
+  }
+
+  /**
+   * @param {string|undefined} reselectAnnotationPk - After review accept/reject, reload same task with this
+   *   annotation selected so BottomBar stays in review mode (avoids createAnnotation() + 「提交」).
+   */
+  reloadAfterWorkflowReviewAction = async (reselectAnnotationPk) => {
+    if (this.shouldExitStream()) {
+      await this.exitStream();
+      return;
+    }
+    const taskID = this.task?.id;
+    if (!this.shouldLoadNext() || this.datamanager.isExplorer) {
+      await this.loadTask(taskID, reselectAnnotationPk, Boolean(reselectAnnotationPk));
+    } else {
+      await this.loadTask();
+    }
+  };
+
+  /** @private */
+  onAcceptAnnotation = async (ls, { entity, isDirty } = {}) => {
+    const taskId = this.task?.id;
+    if (taskId == null) return;
+
+    if (!(await this.persistReviewEditsIfDirty(ls, entity, isDirty))) return;
+
+    const wfOutcome = await this.maybeAdvanceTaskWorkflowAfterReviewDecision(taskId, true);
+    if (!wfOutcome.ok) {
+      const detail =
+        wfOutcome.response?.response?.detail ??
+        wfOutcome.response?.error ??
+        "Workflow transition failed";
+      this.datamanager.invoke("toast", { message: String(detail), type: "error" });
+      return;
+    }
+
+    this.datamanager.invoke("toast", {
+      message: wfOutcome.skipped ? "操作已完成" : "已通过审核",
+      type: "info",
+    });
+    const pk = entity?.pk != null ? String(entity.pk) : undefined;
+    await this.reloadAfterWorkflowReviewAction(pk);
+  };
+
+  /** @private */
+  onRejectAnnotation = async (ls, { entity, isDirty } = {}) => {
+    const taskId = this.task?.id;
+    if (taskId == null) return;
+
+    if (!(await this.persistReviewEditsIfDirty(ls, entity, isDirty))) return;
+
+    const wfOutcome = await this.maybeAdvanceTaskWorkflowAfterReviewDecision(taskId, false);
+    if (!wfOutcome.ok) {
+      const detail =
+        wfOutcome.response?.response?.detail ??
+        wfOutcome.response?.error ??
+        "Workflow transition failed";
+      this.datamanager.invoke("toast", { message: String(detail), type: "error" });
+      return;
+    }
+
+    this.datamanager.invoke("toast", {
+      message: wfOutcome.skipped ? "操作已完成" : "已驳回，任务已退回标注员",
+      type: "info",
+    });
+    const pk = entity?.pk != null ? String(entity.pk) : undefined;
+    await this.reloadAfterWorkflowReviewAction(pk);
+  };
+
   /** @private */
   onSubmitAnnotation = async () => {
     // Prevent submission if overlap is reached (only when feature flag is enabled)
@@ -757,6 +928,7 @@ export class LSFWrapper {
 
     const exitStream = this.shouldExitStream();
     const loadNext = exitStream ? false : this.shouldLoadNext();
+    const submittedTaskId = this.task?.id;
     const result = await this.submitCurrentAnnotation(
       "submitAnnotation",
       async (taskID, body) => {
@@ -774,6 +946,11 @@ export class LSFWrapper {
     const status = result?.$meta?.status;
 
     this.showOperationToast(status, "Annotation saved successfully", "Annotation is not saved", result);
+
+    const savedOk = result && !result.error && result.id !== undefined;
+    if (savedOk && submittedTaskId != null) {
+      await this.maybeAdvanceTaskWorkflowAfterLabeling(submittedTaskId);
+    }
 
     if (exitStream) return this.exitStream();
   };
@@ -813,6 +990,8 @@ export class LSFWrapper {
     if (status >= 400) {
       return;
     }
+
+    await this.maybeAdvanceTaskWorkflowAfterLabeling(task.id);
 
     const isRejectedQueue = isDefined(task.default_selected_annotation);
 

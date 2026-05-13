@@ -1,9 +1,10 @@
 import { isDefined, isEmptyString } from "../../../utils/helpers";
+import i18n from "../../../i18n";
 import "./Validation.scss";
 
 export const required = (fieldName, value) => {
   if (!isDefined(value) || isEmptyString(value)) {
-    return `${fieldName} is required`;
+    return i18n.t("validators.field_required", { field: fieldName, defaultValue: "{{field}} is required" });
   }
 };
 

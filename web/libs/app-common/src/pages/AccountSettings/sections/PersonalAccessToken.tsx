@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useCopyText } from "@humansignal/core";
 import { Button, IconFileCopy, IconLaunch, Label, Typography } from "@humansignal/ui";
 /**
@@ -41,6 +42,7 @@ const curlStringAtom = atom((get) => {
 });
 
 export const PersonalAccessToken = () => {
+  const { t } = useTranslation();
   const token = useAtomValue(currentTokenAtom);
   const reset = useAtomValue(resetTokenAtom);
   const curl = useAtomValue(curlStringAtom);
@@ -51,7 +53,7 @@ export const PersonalAccessToken = () => {
     <div id="personal-access-token">
       <div className="flex flex-col gap-6">
         <div>
-          <Label text="Access Token" className={styles.label} />
+          <Label text={t("Access Token")} className={styles.label} />
           <div className="flex gap-2 w-full justify-between">
             <Input name="token" className={styles.input} readOnly value={token ?? ""} />
             <Button
@@ -62,15 +64,15 @@ export const PersonalAccessToken = () => {
               look="outlined"
               className="w-[116px]"
             >
-              {tokenCopied ? "Copied!" : "Copy"}
+              {tokenCopied ? t("Copied!") : t("Copy")}
             </Button>
             <Button variant="negative" look="outlined" onClick={() => reset.mutate()}>
-              Reset
+              {t("Reset")}
             </Button>
           </div>
         </div>
         <div>
-          <Label text="Example CURL Request" className={styles.label} />
+          <Label text={t("Example CURL Request")} className={styles.label} />
           <div className="flex gap-2 w-full justify-between">
             <TextArea
               name="example-curl"
@@ -87,7 +89,7 @@ export const PersonalAccessToken = () => {
               look="outlined"
               className="w-[116px]"
             >
-              {curlCopied ? "Copied!" : "Copy"}
+              {curlCopied ? t("Copied!") : t("Copy")}
             </Button>
           </div>
         </div>
@@ -97,15 +99,16 @@ export const PersonalAccessToken = () => {
 };
 
 export function PersonalAccessTokenDescription() {
+  const { t } = useTranslation();
   return (
     <Typography>
-      Authenticate with our API using your personal access token.
+      {t("Authenticate with our API using your personal access token.")}
       {!window.APP_SETTINGS?.whitelabel_is_active && (
         <>
           {" "}
-          See{" "}
           <a href="https://labelstud.io/guide/api.html" target="_blank" rel="noreferrer" className="inline-flex gap-1">
-            Docs{" "}
+            {t("Docs")}
+            {" "}
             <span>
               <IconLaunch className="h-6 w-6" />
             </span>

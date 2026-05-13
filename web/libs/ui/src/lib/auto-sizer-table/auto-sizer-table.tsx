@@ -32,14 +32,22 @@ export const AutoSizerTable = forwardRef<VariableSizeList, AutoSizerTableProps>(
     },
     ref: ForwardedRef<VariableSizeList>,
   ) => {
+    const {
+      itemCount: explicitItemCount,
+      ...variableSizeListRest
+    } = rest as typeof rest & { itemCount?: number };
+
+    /** Must match VariableSizeList.itemCount (e.g. tasks + sticky header row). */
+    const virtualRowCount = explicitItemCount ?? totalCount;
+
     return (
-      <AutoSizer className={clsx(className)}>
+      <AutoSizer className={clsx(className)} style={{ width: "100%", height: "100%", minHeight: 0 }}>
         {({ width, height }) => {
           const adjustedHeight = Math.max(0, height - heightAdjustment);
 
           return (
             <InfiniteLoader
-              itemCount={totalCount}
+              itemCount={virtualRowCount}
               loadMoreItems={loadMore}
               isItemLoaded={isItemLoaded}
               threshold={5}
@@ -55,12 +63,12 @@ export const AutoSizerTable = forwardRef<VariableSizeList, AutoSizerTableProps>(
                     ref={infiniteLoaderRef}
                     width={width}
                     height={adjustedHeight}
-                    itemCount={totalCount}
+                    itemCount={virtualRowCount}
                     itemData={itemData}
                     itemSize={itemSize}
                     onItemsRendered={onItemsRendered}
                     initialScrollOffset={initialScrollOffset?.(adjustedHeight) ?? 0}
-                    {...rest}
+                    {...variableSizeListRest}
                   >
                     {ItemWrapper}
                   </VariableSizeList>

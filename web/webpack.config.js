@@ -144,11 +144,12 @@ module.exports = composePlugins(
     };
 
     config.module.rules.forEach((rule) => {
+      if (!rule.test) return;
       const testString = rule.test.toString();
       const isScss = testString.includes("scss");
       const isCssModule = testString.includes(".module");
 
-      if (isScss) {
+      if (isScss && rule.oneOf) {
         rule.oneOf.forEach((loader) => {
           if (loader.use) {
             const cssLoader = loader.use.find((use) => use.loader && use.loader.includes("css-loader"));
@@ -165,10 +166,10 @@ module.exports = composePlugins(
         });
       }
 
-      if (rule.test.toString().match(/scss|sass/) && !isCssModule) {
+      if (rule.test.toString().match(/scss|sass/) && !isCssModule && rule.oneOf) {
         const r = rule.oneOf.filter((r) => {
           // we don't need rules that don't have loaders
-          if (!r.use) return false;
+          if (!r.use || !r.test) return false;
 
           const testString = r.test.toString();
 

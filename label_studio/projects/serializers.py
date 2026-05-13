@@ -97,6 +97,12 @@ class ProjectSerializer(FlexFieldsModelSerializer):
     control_weights = OpenApiObjectJSONField(
         required=False, allow_null=True, help_text='Dict of weights for each control tag in metric calculation.'
     )
+    parent_platform_dataset = OpenApiObjectJSONField(
+        required=False,
+        allow_null=True,
+        default=None,
+        help_text='父平台数据集绑定（用于 S3 同步）；含 dataset_id、source_id、path 等',
+    )
     parsed_label_config = OpenApiObjectJSONField(
         default=None, read_only=True, help_text='JSON-formatted labeling configuration'
     )
@@ -114,6 +120,14 @@ class ProjectSerializer(FlexFieldsModelSerializer):
     queue_total = serializers.SerializerMethodField()
     queue_done = serializers.SerializerMethodField()
     state = FSMStateField(read_only=True)  # FSM state - automatically uses annotation if present
+    can_manage_team = serializers.SerializerMethodField(
+        read_only=True,
+        help_text='Whether the current user may manage settings, team allocations, and distribute tasks',
+    )
+    workflow_stage_counts = serializers.SerializerMethodField(
+        read_only=True,
+        help_text='Per-stage counters for task workflow projects (annotate/review/accept/done).',
+    )
 
     @property
     def user_id(self):
@@ -121,6 +135,45 @@ class ProjectSerializer(FlexFieldsModelSerializer):
             return self.context['request'].user.id
         except KeyError:
             return next(iter(self.context['user_cache']))
+
+    def get_can_manage_team(self, obj) -> bool:
+        request = self.context.get('request')
+        user = getattr(request, 'user', None) if request else None
+        if not user or not user.is_authenticated:
+            return False
+        from projects.access import user_can_manage_project
+
+        return user_can_manage_project(user, obj)
+
+    @extend_schema_field({'type': 'object', 'additionalProperties': {'type': 'integer'}})
+    def get_workflow_stage_counts(self, obj):
+        """Return per-stage workflow counters (annotate/review/accept/done).
+
+        Only meaningful for projects with ``task_workflow_enabled``; for non-workflow projects we
+        return zeros so the frontend can still render a stable shape.
+        """
+        from django.db.models import Count
+        from projects.workflow_models import TaskWorkflow, TaskWorkflowStage
+
+        zeros = {
+            TaskWorkflowStage.ANNOTATE.value: 0,
+            TaskWorkflowStage.REVIEW.value: 0,
+            TaskWorkflowStage.ACCEPT.value: 0,
+            TaskWorkflowStage.DONE.value: 0,
+        }
+        if not getattr(obj, 'task_workflow_enabled', False):
+            return zeros
+
+        agg = (
+            TaskWorkflow.objects.filter(project=obj)
+            .values('stage')
+            .annotate(n=Count('task_id'))
+        )
+        for row in agg:
+            stage = row.get('stage')
+            if stage in zeros:
+                zeros[stage] = int(row.get('n') or 0)
+        return zeros
 
     @staticmethod
     def get_config_has_control_tags(project) -> bool:
@@ -252,11 +305,14 @@ class ProjectSerializer(FlexFieldsModelSerializer):
             'sampling',
             'show_ground_truth_first',
             'annotator_evaluation_enabled',
+            'task_workflow_enabled',
             'show_overlap_first',
             'overlap_cohort_percentage',
             'task_data_login',
             'task_data_password',
             'control_weights',
+            'parent_platform_dataset',
+            'template_group',
             'parsed_label_config',
             'evaluate_predictions_automatically',
             'config_has_control_tags',
@@ -268,6 +324,8 @@ class ProjectSerializer(FlexFieldsModelSerializer):
             'queue_done',
             'config_suitable_for_bulk_annotation',
             'state',
+            'can_manage_team',
+            'workflow_stage_counts',
         ]
 
     def validate_label_config(self, value):

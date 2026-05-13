@@ -44,13 +44,13 @@ const BaseInput = observer(({ value, onChange, placeholder }) => {
 export const TaskStateFilter = [
   {
     key: "contains",
-    label: "contains",
+    label: "包含",
     valueType: "list",
     input: (props) => <BaseInput {...props} />,
   },
   {
     key: "not_contains",
-    label: "not contains",
+    label: "不包含",
     valueType: "list",
     input: (props) => <BaseInput {...props} />,
   },

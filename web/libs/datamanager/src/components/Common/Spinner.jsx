@@ -1,6 +1,6 @@
 import { inject } from "mobx-react";
 import React from "react";
-import Running from "../../assets/running";
+import { Spinner as UiSpinner } from "@humansignal/ui";
 
 const injector = inject(({ store }) => {
   return {
@@ -8,9 +8,9 @@ const injector = inject(({ store }) => {
   };
 });
 
-export const Spinner = injector(({ SDK, visible = true, ...props }) => {
+export const Spinner = injector(({ SDK, visible = true, size: sizeKey, className, style, ...rest }) => {
   const size = React.useMemo(() => {
-    switch (props.size) {
+    switch (sizeKey) {
       case "large":
         return SDK?.spinnerSize?.large ?? 128;
       case "middle":
@@ -20,36 +20,29 @@ export const Spinner = injector(({ SDK, visible = true, ...props }) => {
       default:
         return SDK?.spinnerSize?.middle ?? 48;
     }
-  }, [props.size]);
-
-  const source = Running.default;
-
-  const videoStyles = {
-    width: "100%",
-    height: "100%",
-    objectFit: "contain",
-  };
+  }, [SDK?.spinnerSize?.large, SDK?.spinnerSize?.middle, SDK?.spinnerSize?.small, sizeKey]);
 
   const ExternalSpinner = SDK?.spinner;
 
-  return visible ? (
+  if (!visible) return null;
+
+  return (
     <div
-      {...props}
-      style={{ width: size, height: size }}
-      children={
-        <div style={{ width: "100%", height: "100%" }}>
-          {ExternalSpinner ? (
-            <ExternalSpinner size={size} />
-          ) : (
-            <img
-              src={source.x1}
-              srcSet={[`${source.x1} 1x`, `${source.x2} 2x`].join(",")}
-              style={videoStyles}
-              alt="opossum loader"
-            />
-          )}
-        </div>
-      }
-    />
-  ) : null;
+      className={className}
+      style={{ width: size, height: size, ...style }}
+      {...rest}
+    >
+      <div
+        style={{
+          width: "100%",
+          height: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {ExternalSpinner ? <ExternalSpinner size={size} /> : <UiSpinner size={size} />}
+      </div>
+    </div>
+  );
 });

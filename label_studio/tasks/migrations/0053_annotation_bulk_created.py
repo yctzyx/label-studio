@@ -14,7 +14,6 @@ class Migration(migrations.Migration):
             model_name="annotation",
             name="bulk_created",
             field=models.BooleanField(
-                db_default=False,
                 default=False,
                 help_text="Annotation was created in bulk mode",
                 null=True,

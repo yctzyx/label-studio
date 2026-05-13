@@ -79,16 +79,51 @@ const translateNumpad = (event: any) => {
   document.dispatchEvent(new KeyboardEvent("keydown", { keyCode: translatedToDigit }));
 };
 
+/**
+ * Whether the element should use INPUT_SCOPE so canvas hotkeys (e.g. v, backspace) do not fire.
+ */
+function elementIsEditableField(el: EventTarget | null | undefined): boolean {
+  if (!el || (el as Node).nodeType !== Node.ELEMENT_NODE) return false;
+  const node = el as HTMLElement;
+  const tag = node.tagName;
+  if (/^(INPUT|TEXTAREA|SELECT)$/i.test(tag)) return true;
+  if (node.isContentEditable) return true;
+  return false;
+}
+
+/**
+ * Detect focus inside a text field. Uses composedPath first so Shadow DOM / Wujie sandboxes
+ * still resolve the real target (event.target alone may point at a host div).
+ */
+function isInEditableField(event: KeyboardEvent): boolean {
+  if (typeof event.composedPath === "function") {
+    const path = event.composedPath();
+    for (let i = 0; i < path.length; i++) {
+      if (elementIsEditableField(path[i])) return true;
+    }
+  }
+
+  if (elementIsEditableField(document.activeElement)) return true;
+
+  const ae = document.activeElement as HTMLElement | null;
+  if (ae?.closest?.("[contenteditable='true']")?.isContentEditable) return true;
+
+  const target = (event.target || (event as unknown as { srcElement?: EventTarget }).srcElement) as
+    | EventTarget
+    | undefined;
+  if (elementIsEditableField(target)) return true;
+
+  return false;
+}
+
 keymaster.filter = (event) => {
   if (keymaster.getScope() === "__none__") return false;
 
-  const tag = (event.target || event.srcElement)?.tagName;
   const inNumberPadCodeRange = (event as any).keyCode >= 96 && (event as any).keyCode <= 105;
 
   if (inNumberPadCodeRange) translateNumpad(event);
-  if (tag) {
-    keymaster.setScope(/^(INPUT|TEXTAREA|SELECT)$/.test(tag) ? INPUT_SCOPE : DEFAULT_SCOPE);
-  }
+
+  keymaster.setScope(isInEditableField(event as KeyboardEvent) ? INPUT_SCOPE : DEFAULT_SCOPE);
 
   return true;
 };

@@ -35,12 +35,16 @@ class BaseUserSerializer(FlexFieldsModelSerializer):
         return {'title': title, 'email': email}
 
     def _is_deleted(self, instance):
-        if 'user' in self.context:
+        """判断是否在本轮展示中「对该组织已软删」；优先使用接口传入的组织（人员列表/详情 URL 中的组织）。"""
+        org_id = None
+        if self.context.get('membership_organization_id') is not None:
+            org_id = self.context['membership_organization_id']
+        elif self.context.get('organization') is not None:
+            org_id = self.context['organization'].pk
+        elif 'user' in self.context:
             org_id = self.context['user'].active_organization_id
         elif 'request' in self.context:
             org_id = self.context['request'].user.active_organization_id
-        else:
-            org_id = None
 
         if not org_id:
             return False
@@ -59,22 +63,32 @@ class BaseUserSerializer(FlexFieldsModelSerializer):
             return True
         return bool(organization_member_for_user.deleted_at)
 
+    def _user_cache_bucket_key(self, uid):
+        """同一请求内按「当前展示所属组织」区分缓存，避免管理员切换组织时复用错误条目。"""
+        if self.context.get('membership_organization_id') is not None:
+            return f'{uid}:morg:{self.context["membership_organization_id"]}'
+        org = self.context.get('organization')
+        if org is not None:
+            return f'{uid}:morg:{org.pk}'
+        return str(uid)
+
     def to_representation(self, instance):
         """Returns user with cache, this helps to avoid multiple s3/gcs links resolving for avatars"""
 
         uid = instance.id
+        bucket = self._user_cache_bucket_key(uid)
         key = 'user_cache'
 
         if key not in self.context:
             self.context[key] = {}
-        if uid not in self.context[key]:
-            self.context[key][uid] = super().to_representation(instance)
+        if bucket not in self.context[key]:
+            self.context[key][bucket] = super().to_representation(instance)
 
         if self._is_deleted(instance):
             for field in ['username', 'first_name', 'last_name', 'email']:
-                self.context[key][uid][field] = 'User' if field == 'last_name' else 'Deleted'
+                self.context[key][bucket][field] = 'User' if field == 'last_name' else 'Deleted'
 
-        return self.context[key][uid]
+        return self.context[key][bucket]
 
     class Meta:
         model = User
@@ -103,9 +117,10 @@ class BaseUserSerializerUpdate(BaseUserSerializer):
 
 class BaseWhoAmIUserSerializer(BaseUserSerializer):
     permissions = serializers.SerializerMethodField()
+    is_staff = serializers.BooleanField(read_only=True)
 
     class Meta(BaseUserSerializer.Meta):
-        fields = BaseUserSerializer.Meta.fields + ('permissions',)
+        fields = BaseUserSerializer.Meta.fields + ('permissions', 'is_staff')
 
     def get_permissions(self, user) -> list[str]:
         return [perm for _, perm in all_permissions]

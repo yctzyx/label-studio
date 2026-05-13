@@ -25,6 +25,8 @@ export type APIProxyOptions<T extends {}> = {
   gateway: string | URL;
   endpoints: T;
   commonHeaders?: Record<string, string>;
+  /** When set, called at request time to merge dynamic headers (e.g. Bearer token from host app). */
+  getCommonHeaders?: () => Record<string, string>;
   mockDelay?: number;
   mockDisabled?: boolean;
   sharedParams?: Record<string, any>;

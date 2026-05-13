@@ -1,12 +1,14 @@
-@keyframes toast-enter-up {
+/* Message：顶部轻量提示（与嵌入式工作台 / Element Message 类风格一致，非底部黑条） */
+
+@keyframes toast-enter-from-top {
   from {
     opacity: 0;
-    transform: translateY(100%);
+    transform: translateY(-14px) scale(0.98);
   }
 
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
@@ -20,15 +22,15 @@
   }
 }
 
-@keyframes toast-leave-down {
+@keyframes toast-leave-dismiss {
   from {
     opacity: 1;
-    transform: translateY(var(--radix-toast-swipe-end-y));
+    transform: translateY(var(--radix-toast-swipe-end-y, 0));
   }
 
   to {
     opacity: 0;
-    transform: translateY(100%);
+    transform: translateY(-24px);
   }
 }
 
@@ -42,8 +44,15 @@
   right: 0;
   width: 100%;
   z-index: 9999;
-  bottom: 24px;
+  top: 72px;
+  bottom: auto;
   pointer-events: none;
+
+  @media (max-width: 640px) {
+    top: 16px;
+    padding: 0 16px;
+    box-sizing: border-box;
+  }
 
   & ol {
     list-style: none;
@@ -64,11 +73,11 @@
       will-change: opacity, transform;
 
       &[data-state="open"] {
-        animation: toast-enter-up 100ms ease-out forwards;
+        animation: toast-enter-from-top 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
       }
 
       &[data-state="closed"] {
-        animation: toast-leave-fade 100ms ease-out forwards;
+        animation: toast-leave-fade 160ms ease-out forwards;
       }
 
       &[data-swipe="move"] {
@@ -80,33 +89,48 @@
       }
 
       &[data-swipe="end"] {
-        animation: toast-leave-down 100ms ease-out forwards;
+        animation: toast-leave-dismiss 180ms ease-out forwards;
       }
     }
   }
 }
 
 .toast {
-  --text-color: var(--color-neutral-inverted-content);
-  --background-color: var(--color-neutral-inverted-surface);
-  --border-color: var(--color-surface-border);
-  --hover-color: var(--color-neutral-inverted-surface-hover);
-  --padding: var(--toast-spacing);
+  --text-color: var(--color-neutral-content);
+  --background-color: var(--color-neutral-surface);
+  --border-color: var(--color-neutral-border);
+  --hover-color: var(--color-neutral-surface-hover);
+  --padding: 12px 14px;
+  --accent-line: transparent;
 
   display: flex;
-  align-items: center;
-  gap: 16px;
-  border-radius: 4px;
+  align-items: stretch;
+  gap: 0;
+  min-height: 44px;
+  min-width: 240px;
+  max-width: min(480px, calc(100vw - 48px));
+  border-radius: 10px;
   overflow: hidden;
   color: var(--text-color);
   border: 1px solid var(--border-color);
   background-color: var(--background-color);
   pointer-events: all;
+  box-shadow:
+    0 4px 6px rgb(15 23 42 / 6%),
+    0 12px 28px rgb(20 40 90 / 10%);
+
+  &::before {
+    content: "";
+    width: 3px;
+    flex: 0 0 3px;
+    background: var(--accent-line);
+    align-self: stretch;
+  }
 
   & > div,
   &__content {
     font-size: 14px;
-    line-height: 24px;
+    line-height: 22px;
     flex: 1;
   }
 
@@ -114,25 +138,43 @@
   &__content {
     padding: var(--padding);
     color: var(--text-color);
+    display: flex;
+    align-items: center;
+  }
+
+  &__content {
+    padding-left: 10px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
   }
 
   &__action {
     flex: 0;
     min-width: min-content;
     font-weight: 500;
-    font-size: 16px;
-    line-height: 24px;
+    font-size: 14px;
+    line-height: 1;
     border: none;
     border-radius: 0;
     border-left: 1px solid var(--border-color);
     white-space: nowrap;
     background: none;
     align-self: stretch;
-    display: flex;
-    align-items: center;
+    justify-content: center;
+    color: #64748b;
+    padding-left: 14px;
+    padding-right: 14px;
+    cursor: pointer;
+    transition: color 0.15s ease, background 0.15s ease;
 
     &:hover {
-      color: var(--color-negative-border);
+      color: #1f2937;
+      background: #f8fafc;
+    }
+
+    &:focus-visible {
+      outline: 2px solid rgb(47 107 255 / 35%);
+      outline-offset: -2px;
     }
   }
 
@@ -156,47 +198,41 @@
     }
   }
 
+  /* 成功 / 普通信息：白底 + 冷灰字 + 左侧主题色条（对齐工作台 #2f6bff） */
   &_info {
-    // Always maintain a dark background for info toasts
-    --text-color: var(--color-sand-100);
-    --background-color: var(--color-sand-900);
-    --border-color: var(--color-sand-700);
-    --hover-color: var(--color-sand-800);
+    --text-color: #344054;
+    --background-color: #fff;
+    --border-color: #e8edf5;
+    --hover-color: #f1f5f9;
+    --accent-line: #2f6bff;
   }
 
   &_error {
-    --text-color: var(--color-negative-surface-content);
-    --background-color: var(--color-negative-surface);
-    --border-color: var(--color-negative-border);
-    --hover-color: var(--color-negative-surface-hover);
+    --text-color: #b42318;
+    --background-color: #fef3f2;
+    --border-color: #fecdca;
+    --hover-color: #fee4e2;
+    --accent-line: #f04438;
   }
 
   &_alertError {
     --text-color: var(--color-neutral-content);
-    --background-color: var(--color-neutral-surface);
-    --border-color: var(--color-neutral-border);
-    --hover-color: var(--color-neutral-inverted-surface-hover);
+    --background-color: #fff;
+    --border-color: #e8edf5;
+    --hover-color: #f1f5f9;
+    --accent-line: #f04438;
 
-    border-bottom: 5px solid var(--color-negative-border);
-    border-radius: 4px;
+    border-bottom: 4px solid var(--color-negative-border);
+    border-radius: 10px;
     text-align: center;
-
-    &__action {
-      display: flex;
-      align-items: center;
-      align-self: stretch;
-    }
-
-    &__content {
-      display: block;
-    }
-
+    box-shadow:
+      0 4px 6px rgb(15 23 42 / 6%),
+      0 12px 28px rgb(20 40 90 / 10%);
   }
-
 }
 
 .messageToast {
-  border-radius: 4px;
+  border-radius: 10px;
 
   &_alertError {
     position: fixed;

@@ -9,6 +9,14 @@ import type { ApiResponse } from "@humansignal/core/lib/api-proxy/types";
 import { ErrorWrapper } from "../components/Error/Error";
 import { modal } from "../components/Modal/Modal";
 import { API_CONFIG } from "../config/ApiConfig";
+import { getMainPlatformAuthHeaders, isWujieEmbed } from "../utils/getMainPlatformToken";
+
+// Expose auth headers for image requests (ImageCache, FileLoader) when embedded - gateway requires token
+declare global {
+  interface Window {
+    __LS_IMAGE_REQUEST_HEADERS__?: () => Record<string, string>;
+  }
+}
 import { absoluteURL, isDefined } from "../utils/helpers";
 import { FF_IMPROVE_GLOBAL_ERROR_MESSAGES, isFF } from "../utils/feature-flags";
 import { ToastType, useToast } from "@humansignal/ui";
@@ -18,11 +26,13 @@ export const IMPROVE_GLOBAL_ERROR_MESSAGES = isFF(FF_IMPROVE_GLOBAL_ERROR_MESSAG
 // Duration for toast errors
 export const API_ERROR_TOAST_DURATION = 10000;
 
-// Initialize API instance with Label Studio configuration
+// Initialize API instance with Label Studio configuration.
+// When embedded via 无界 (wujie), getCommonHeaders adds Authorization: <token> (no Bearer prefix).
 const apiInstance = createApiInstance({
   ...API_CONFIG,
+  getCommonHeaders: () => getMainPlatformAuthHeaders(),
   onRequestFinished(res) {
-    if (res.status === 401) {
+    if (res.status === 401 && !isWujieEmbed()) {
       location.href = "/";
     }
   },
@@ -120,10 +130,12 @@ export const ApiProvider = forwardRef<ApiContextType, PropsWithChildren<Record<s
 
     const status = result.$meta?.status;
 
-    // Handle 401 redirects
+    // Handle 401 redirects (skip in 无界 embed: shell stays until parent provides token)
     if (status === 401) {
-      apiLocked = true;
-      location.href = absoluteURL("/");
+      if (!isWujieEmbed()) {
+        apiLocked = true;
+        location.href = absoluteURL("/");
+      }
       return;
     }
 
@@ -153,6 +165,17 @@ export const ApiProvider = forwardRef<ApiContextType, PropsWithChildren<Record<s
       sessionStorage.removeItem("redirectMessage");
     }
   }, [toast]);
+
+  // When embedded (无界), provide auth headers for image requests (ImageCache, FileLoader)
+  // so /data/upload/* and other media requests include Authorization for the gateway
+  useEffect(() => {
+    if (isWujieEmbed()) {
+      window.__LS_IMAGE_REQUEST_HEADERS__ = () => getMainPlatformAuthHeaders();
+    }
+    return () => {
+      delete (window as any).__LS_IMAGE_REQUEST_HEADERS__;
+    };
+  }, []);
 
   return (
     <CoreApiProvider ref={ref} onError={handleError} onFatalError={handleFatalError}>

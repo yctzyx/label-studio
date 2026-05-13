@@ -4,6 +4,7 @@ from django.urls import include, path
 from rest_framework import routers
 
 from . import api
+from projects import workflow_api
 
 app_name = 'tasks'
 
@@ -14,6 +15,14 @@ _api_urlpatterns = [
     # CRUD
     path('', api.TaskListAPI.as_view(), name='task-list'),
     path('<int:pk>/', api.TaskAPI.as_view(), name='task-detail'),
+    path('<int:pk>/workflow/', workflow_api.TaskWorkflowDetailAPI.as_view(), name='task-workflow-detail'),
+    path(
+        '<int:pk>/workflow/submit-annotation/',
+        workflow_api.TaskWorkflowSubmitAnnotationAPI.as_view(),
+        name='task-workflow-submit-annotation',
+    ),
+    path('<int:pk>/workflow/review/', workflow_api.TaskWorkflowReviewAPI.as_view(), name='task-workflow-review'),
+    path('<int:pk>/workflow/accept/', workflow_api.TaskWorkflowAcceptAPI.as_view(), name='task-workflow-accept'),
     path('<int:pk>/annotations/', api.AnnotationsListAPI.as_view(), name='task-annotations'),
     path('<int:pk>/drafts', api.AnnotationDraftListAPI.as_view(), name='task-drafts'),
     path(

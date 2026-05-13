@@ -133,8 +133,8 @@ const AnnotationHistoryComponent: FC<any> = ({
   const defaultEmptyState = (
     <EmptyState
       icon={<IconHistoryRewind width={24} height={24} />}
-      header="View annotation activity"
-      description={<>See a log of user actions for this annotation</>}
+      header="查看标注活动"
+      description={<>查看该标注的用户操作记录</>}
     />
   );
 
@@ -228,27 +228,27 @@ const HistoryItemComponent: FC<{
   const reason = useMemo(() => {
     switch (acceptedState) {
       case "accepted":
-        return "Accepted";
+        return "已通过";
       case "rejected":
-        return "Rejected";
+        return "已驳回";
       case "fixed_and_accepted":
-        return "Fixed";
+        return "已修正";
       case "updated":
-        return "Updated";
+        return "已更新";
       case "submitted":
-        return "Submitted";
+        return "已提交";
       case "prediction":
-        return "From prediction";
+        return "来自预测";
       case "imported":
-        return "Imported";
+        return "已导入";
       case "skipped":
-        return "Skipped";
+        return "已跳过";
       case "draft_created":
-        return "Draft";
+        return "草稿";
       case "deleted_review":
-        return "Review deleted";
+        return "审核已删除";
       case "propagated_annotation":
-        return "Propagated";
+        return "已传播";
       default:
         return null;
     }
@@ -339,7 +339,7 @@ const HistoryComment: FC<{
             setCollapsed((v) => !v);
           }}
         >
-          {collapsed ? "Show more" : "Show less"}
+          {collapsed ? "展开" : "收起"}
         </div>
       )}
     </div>

@@ -5,8 +5,10 @@ def get_user_repr(user):
     user_data = {'email': user.email}
     user_data['key'] = user_data['email']
     if user.active_organization is not None:
+        owner = getattr(user.active_organization, 'created_by', None)
+        owner_email = getattr(owner, 'email', None)
         user_data['custom'] = {
-            'organization': user.active_organization.created_by.email,
+            'organization': owner_email,
             'organization_id': user.active_organization.id,
         }
     else:

@@ -74,20 +74,6 @@
   }
 }
 
-.workspace-placeholder {
-  &__badge-wrapper {
-    display: flex;
-    margin-bottom: 8px;
-    line-height: normal;
-  }
-
-  &__title {
-    font-size: 0.875rem;
-    color: var(--color-neutral-content);
-    font-weight: 500;
-  }
-}
-
 .settings-caption {
   color: var(--color-neutral-content-subtler);
   font-size: 12px;

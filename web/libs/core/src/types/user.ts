@@ -6,6 +6,8 @@ export type APIUser = {
   last_name: string;
   username: string;
   email: string;
+  /** Django staff：后端用于「查看全部组织/成员」等目录能力 */
+  is_staff?: boolean;
   last_activity: string;
   avatar: string | null;
   initials: string;

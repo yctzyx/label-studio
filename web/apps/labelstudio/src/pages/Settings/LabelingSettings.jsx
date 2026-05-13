@@ -86,6 +86,9 @@ export const LabelingSettings = () => {
       onUpdate={onUpdate}
       onSaveClick={onSave}
       onValidate={onValidate}
+      onTemplateGroupChange={(group) => {
+        void updateProject({ template_group: group });
+      }}
       hasChanges={hasChanges}
     />
   );

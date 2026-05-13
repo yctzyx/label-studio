@@ -139,7 +139,7 @@ export const Annotations = observer(({ store, annotationStore, commentStore }) =
       <div className={cn("annotations-list").toClassName()} ref={dropdownRef}>
         <div className={cn("annotations-list").elem("selected").toClassName()}>
           <Annotation
-            aria-label="Annotations List Toggle"
+            aria-label="标注列表切换"
             entity={annotationStore.selected}
             onClick={(e) => {
               e.stopPropagation();
@@ -183,14 +183,14 @@ const CreateAnnotation = observer(({ annotationStore, onClick }) => {
   return (
     <div
       className={cn("annotations-list").elem("create").toClassName()}
-      aria-label="Create Annotation"
+      aria-label="新建标注"
       onClick={onCreateAnnotation}
     >
       <Space size="small">
         <Userpic className={cn("annotations-list").elem("userpic").mod({ prediction: true }).toClassName()}>
           <IconPlusCircle />
         </Userpic>
-        Create Annotation
+        新建标注
       </Space>
     </div>
   );
@@ -228,7 +228,7 @@ const Annotation = observer(({ entity, selected, onClick, extra, ...props }) => 
               </div>
             ) : (
               <div className={cn("annotations-list").elem("created").toClassName()}>
-                created,{" "}
+                创建于{" "}
                 <TimeAgo className={cn("annotations-list").elem("date").toClassName()} date={entity.createdDate} />
               </div>
             )}

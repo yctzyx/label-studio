@@ -39,6 +39,8 @@ export interface ApiProviderConfig {
   gateway: string;
   endpoints: Record<string, unknown>;
   commonHeaders?: Record<string, string>;
+  /** When set, called at request time to merge dynamic headers (e.g. Bearer token from host app). */
+  getCommonHeaders?: () => Record<string, string>;
   onRequestFinished?: (res: Response) => void;
   alwaysExpectJSON?: boolean;
   sharedParams?: Record<string, unknown>;

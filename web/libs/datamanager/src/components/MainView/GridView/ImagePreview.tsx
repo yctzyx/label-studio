@@ -1,10 +1,18 @@
 import { useState, useRef, useEffect, type CSSProperties, useCallback } from "react";
 import { observer } from "mobx-react";
+import { imageCache } from "@humansignal/core";
 import styles from "./GridPreview.module.scss";
 import { cn } from "@humansignal/ui";
+import { absoluteURL } from "../../../utils/helpers";
 
 const MAX_ZOOM = 20;
 const ZOOM_FACTOR = 0.01;
+
+const needsAuth = (): boolean => {
+  if (typeof window === "undefined") return false;
+  const headers = (window as any).__LS_IMAGE_REQUEST_HEADERS__?.();
+  return headers && typeof headers === "object" && Object.keys(headers).length > 0;
+};
 
 type Task = {
   id: number;
@@ -18,7 +26,10 @@ type ImagePreviewProps = {
 
 // @todo constrain the position of the image to the container
 const ImagePreview = observer(({ task, field }: ImagePreviewProps) => {
-  const src = task.data?.[field] ?? "";
+  const rawSrc = task.data?.[field] ?? "";
+  const src = rawSrc ? absoluteURL(rawSrc) : "";
+  const [displaySrc, setDisplaySrc] = useState<string>("");
+  const [loadError, setLoadError] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
@@ -39,6 +50,23 @@ const ImagePreview = observer(({ task, field }: ImagePreviewProps) => {
     dragAnchor: { x: 0, y: 0 },
     startOffset: { x: 0, y: 0 },
   });
+
+  // Fetch with auth when needed (embed mode)
+  useEffect(() => {
+    setLoadError(false);
+    if (!src) {
+      setDisplaySrc("");
+      return;
+    }
+    if (!needsAuth()) {
+      setDisplaySrc(src);
+      return;
+    }
+    imageCache
+      .load(src, "anonymous")
+      .then((cached) => setDisplaySrc(cached.blobUrl))
+      .catch(() => setLoadError(true));
+  }, [src]);
 
   // Reset on task change
   // biome-ignore lint/correctness/useExhaustiveDependencies: those are setStates, not values
@@ -213,10 +241,10 @@ const ImagePreview = observer(({ task, field }: ImagePreviewProps) => {
       onWheel={handleWheel}
       onMouseDown={handleMouseDown}
     >
-      {src && (
+      {src && !loadError && (displaySrc || !needsAuth()) && (
         <img
           ref={imageRef}
-          src={src}
+          src={displaySrc || src}
           alt="Task Preview"
           style={imageStyle}
           className={styles.image}

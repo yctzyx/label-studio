@@ -6,7 +6,7 @@ import { FF_DEV_3873, isFF } from "../../utils/feature-flags";
 import "./GroundTruth.scss";
 
 export const GroundTruth = observer(({ entity, disabled = false, size = "md" }) => {
-  const title = entity.ground_truth ? "Unset this result as a ground truth" : "Set this result as a ground truth";
+  const title = entity.ground_truth ? "取消设为标准答案" : "设为标准答案";
   const IndicatorIcon = isFF(FF_DEV_3873) && !entity.ground_truth ? IconStarOutline : IconStar;
 
   return (

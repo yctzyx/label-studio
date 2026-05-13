@@ -6,6 +6,7 @@ from core.feature_flags import flag_set
 from core.mixins import GetParentObjectMixin
 from core.utils.common import load_func
 from django.conf import settings
+from django.db.models import QuerySet
 from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.utils.functional import cached_property
@@ -41,6 +42,15 @@ logger = logging.getLogger(__name__)
 HasObjectPermission = load_func(settings.MEMBER_PERM)
 
 
+def directory_admin_can_view_all(user) -> bool:
+    """Staff / superuser：可浏览全部组织及成员（人员管理-目录）。"""
+    return bool(
+        user
+        and user.is_authenticated
+        and (getattr(user, 'is_staff', False) or getattr(user, 'is_superuser', False))
+    )
+
+
 @method_decorator(
     name='get',
     decorator=extend_schema(
@@ -69,6 +79,8 @@ class OrganizationListAPI(generics.ListCreateAPIView):
     serializer_class = OrganizationIdSerializer
 
     def filter_queryset(self, queryset):
+        if directory_admin_can_view_all(self.request.user):
+            return queryset.order_by('pk')
         return queryset.filter(
             organizationmember__in=self.request.user.om_through.filter(deleted_at__isnull=True)
         ).distinct()
@@ -130,6 +142,16 @@ class OrganizationMemberListAPI(generics.ListAPIView):
     )
     serializer_class = OrganizationMemberListSerializer
     pagination_class = OrganizationMemberListPagination
+    lookup_field = 'pk'
+    lookup_url_kwarg = 'pk'
+
+    @cached_property
+    def target_organization(self):
+        pk = self.kwargs[self.lookup_url_kwarg]
+        user = self.request.user
+        if directory_admin_can_view_all(user):
+            return get_object_or_404(Organization.objects.all(), pk=pk)
+        return get_object_or_404(user.organizations, pk=pk)
 
     @cached_property
     def paginated_members(self):
@@ -138,8 +160,9 @@ class OrganizationMemberListAPI(generics.ListAPIView):
     def _get_created_projects_map(self):
         members = self.paginated_members
         user_ids = [member.user_id for member in members]
+        org = self.target_organization
         projects = (
-            Project.objects.filter(created_by_id__in=user_ids, organization=self.request.user.active_organization)
+            Project.objects.filter(created_by_id__in=user_ids, organization=org)
             .values('created_by_id', 'id', 'title')
             .distinct()
         )
@@ -156,9 +179,8 @@ class OrganizationMemberListAPI(generics.ListAPIView):
     def _get_contributed_to_projects_map(self):
         members = self.paginated_members
         user_ids = [member.user_id for member in members]
-        org_project_ids = Project.objects.filter(organization=self.request.user.active_organization).values_list(
-            'id', flat=True
-        )
+        org = self.target_organization
+        org_project_ids = Project.objects.filter(organization=org).values_list('id', flat=True)
         annotations = (
             Annotation.objects.filter(completed_by__in=list(user_ids), project__in=list(org_project_ids))
             .values('completed_by', 'project_id')
@@ -182,6 +204,7 @@ class OrganizationMemberListAPI(generics.ListAPIView):
         context = super().get_serializer_context()
         contributed_to_projects = bool_from_request(self.request.GET, 'contributed_to_projects', False)
         return {
+            'membership_organization_id': self.target_organization.pk,
             'contributed_to_projects': contributed_to_projects,
             'created_projects_map': self._get_created_projects_map() if contributed_to_projects else None,
             'contributed_to_projects_map': self._get_contributed_to_projects_map()
@@ -191,7 +214,7 @@ class OrganizationMemberListAPI(generics.ListAPIView):
         }
 
     def get_queryset(self):
-        org = generics.get_object_or_404(self.request.user.organizations, pk=self.kwargs[self.lookup_field])
+        org = self.target_organization
         if flag_set('fix_backend_dev_3134_exclude_deactivated_users', self.request.user):
             serializer = OrganizationMemberListParamsSerializer(data=self.request.GET)
             serializer.is_valid(raise_exception=True)
@@ -273,9 +296,24 @@ class OrganizationMemberDetailAPI(GetParentObjectMixin, generics.RetrieveDestroy
         DELETE=all_permissions.organizations_change,
     )
     parent_queryset = Organization.objects.all()
+    parent_lookup_url_kwarg = 'pk'
+    lookup_url_kwarg = 'user_pk'
     parser_classes = (JSONParser, FormParser, MultiPartParser)
     serializer_class = OrganizationMemberSerializer
     http_method_names = ['delete', 'get']
+
+    def _get_parent_object(self):
+        assert self.parent_queryset is not None
+        queryset = self.parent_queryset
+        if isinstance(queryset, QuerySet):
+            queryset = queryset.all()
+        lookup_url_kwarg = self._get_parent_lookup_url_kwarg()
+        lookup_field = self._get_parent_lookup_field()
+        filter_kwargs = {lookup_field: self.kwargs[lookup_url_kwarg]}
+        obj = get_object_or_404(queryset, **filter_kwargs)
+        if not directory_admin_can_view_all(self.request.user):
+            self.check_object_permissions(self.request, obj)
+        return obj
 
     @property
     def permission_classes(self):
@@ -302,7 +340,7 @@ class OrganizationMemberDetailAPI(GetParentObjectMixin, generics.RetrieveDestroy
 
     def delete(self, request, pk=None, user_pk=None):
         org = self.parent_object
-        if org != request.user.active_organization:
+        if not directory_admin_can_view_all(request.user) and org != request.user.active_organization:
             raise PermissionDenied('You can delete members only for your current active organization')
 
         user = get_object_or_404(User, pk=user_pk)

@@ -67,6 +67,8 @@ const StaticContentDrawer = React.forwardRef(
 
 export const StaticContent = React.forwardRef((props, ref) => {
   const pageSource = React.useContext(AsyncPageContext);
-
+  if (!pageSource) {
+    console.warn("[LS-embed] StaticContent: no pageSource (AsyncPageContext), cannot render");
+  }
   return pageSource ? <StaticContentDrawer {...props} source={pageSource} ref={ref} /> : null;
 });

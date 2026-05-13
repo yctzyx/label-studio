@@ -67,6 +67,14 @@ export class FileLoader {
       });
 
       xhr.open("GET", url);
+      // Attach auth headers when available (e.g. 无界 embed - gateway requires Authorization)
+      const headers =
+        typeof window !== "undefined" && (window as any).__LS_IMAGE_REQUEST_HEADERS__?.();
+      if (headers && typeof headers === "object") {
+        for (const [key, value] of Object.entries(headers)) {
+          if (value != null && value !== "") xhr.setRequestHeader(key, String(value));
+        }
+      }
       xhr.send();
     });
   }

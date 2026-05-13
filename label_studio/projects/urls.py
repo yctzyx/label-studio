@@ -1,8 +1,9 @@
 """This file and its contents are licensed under the Apache License 2.0. Please see the included NOTICE for copyright information and LICENSE for a copy of the license.
 """
 from django.urls import include, path
+from parent_integration.sync_api import ParentPlatformDatasetObjectProxyAPI, ParentPlatformDatasetSyncAPI
 
-from . import api, views
+from . import api, views, workflow_api
 
 app_name = 'projects'
 
@@ -47,6 +48,35 @@ _api_urlpatterns = [
     path('<int:pk>/model-versions/', api.ProjectModelVersions.as_view(), name='project-model-versions'),
     # List all annotators for project
     path('<int:pk>/annotators/', api.ProjectAnnotatorsAPI.as_view(), name='project-annotators'),
+    # Parent platform dataset: same-origin GET proxy for MinIO/S3 objects (avoid browser CORS)
+    path(
+        '<int:pk>/parent-dataset/object/',
+        ParentPlatformDatasetObjectProxyAPI.as_view(),
+        name='project-parent-dataset-object',
+    ),
+    # Parent platform dataset: sync objects from S3 to tasks
+    path(
+        '<int:pk>/parent-dataset/sync/',
+        ParentPlatformDatasetSyncAPI.as_view(),
+        name='project-parent-dataset-sync',
+    ),
+    # Task workflow (annotate → review → accept)
+    path('<int:pk>/workflow/team/', workflow_api.ProjectTeamAllocationListCreateAPI.as_view(), name='project-workflow-team'),
+    path(
+        '<int:pk>/workflow/team/<int:allocation_id>/',
+        workflow_api.ProjectTeamAllocationDeleteAPI.as_view(),
+        name='project-workflow-team-delete',
+    ),
+    path(
+        '<int:pk>/workflow/distribute/',
+        workflow_api.ProjectWorkflowDistributeAPI.as_view(),
+        name='project-workflow-distribute',
+    ),
+    path(
+        '<int:pk>/workflow/my-tasks/',
+        workflow_api.ProjectWorkflowMyTasksAPI.as_view(),
+        name='project-workflow-my-tasks',
+    ),
 ]
 
 _api_urlpatterns_templates = [

@@ -14,7 +14,6 @@ class Migration(migrations.Migration):
             model_name="project",
             name="annotator_evaluation_enabled",
             field=models.BooleanField(
-                db_default=False,
                 default=False,
                 help_text="Enable annotator evaluation for the project",
                 verbose_name="annotator evaluation enabled",

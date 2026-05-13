@@ -1,7 +1,10 @@
 .root {
   height: 100%;
+  min-height: 0;
   box-sizing: border-box;
   background-color: var(--color-neutral-background);
+  display: flex;
+  flex-direction: column;
 }
 
 .tab-panel {

@@ -88,6 +88,9 @@ declare type APIProject = {
   /** JSON-formatted labeling configuration */
   parsed_label_config?: string;
 
+  /** 创建项目时从模板库选中的分组标题（与 /templates 的 groups 一致） */
+  template_group?: string;
+
   /**
    * Total number of tasks in the queue
    */

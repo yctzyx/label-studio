@@ -14,7 +14,6 @@ class Migration(migrations.Migration):
             model_name="azureblobimportstorage",
             name="recursive_scan",
             field=models.BooleanField(
-                db_default=False,
                 default=False,
                 help_text="Perform recursive scan over the container content",
                 null=True,
@@ -25,7 +24,6 @@ class Migration(migrations.Migration):
             model_name="gcsimportstorage",
             name="recursive_scan",
             field=models.BooleanField(
-                db_default=False,
                 default=False,
                 help_text="Perform recursive scan over the bucket content",
                 null=True,
@@ -36,7 +34,6 @@ class Migration(migrations.Migration):
             model_name="localfilesimportstorage",
             name="recursive_scan",
             field=models.BooleanField(
-                db_default=False,
                 default=False,
                 help_text="Perform recursive scan over the directory content",
                 null=True,

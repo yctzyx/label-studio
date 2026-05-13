@@ -1,82 +1,441 @@
 .projects-page {
-  min-height: calc(100vh - var(--header-height));
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  /* 默认铺满；若父级 iframe 仍包含占位顶栏，可设 --projects-embed-top-offset: 45px 等 */
+  height: calc(100% - var(--projects-embed-top-offset, 0px));
+  max-height: calc(100% - var(--projects-embed-top-offset, 0px));
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+
+  &__content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
 
   &__loading {
+    flex: 1;
     width: 100%;
-    height: 100%;
+    min-height: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: calc(100vh - var(--header-height));
   }
 
-  &__list {
-    padding: 40px;
-    display: grid;
+  /*
+   * 参照算子广场 / 数据集页：左侧筛选 + 右侧列表主区；
+   * 背景透明以继承父级；内边距统一 16px（与红框示意一致）。
+   */
+  &__studio {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    background: #f5f7fb;
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding: 16px;
     box-sizing: border-box;
-    grid-gap: 32px;
-    grid-auto-rows: 1fr;
-    grid-template-columns: repeat(4, 1fr);
+  }
+
+  &__studio-layout {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    flex: 1;
+    height: 100%;
+    min-height: 0;
+    gap: 16px;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    align-items: stretch;
+    background: transparent;
+    border-radius: 12px;
+
+    @media (width <= 960px) {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto;
+      align-items: start;
+    }
+  }
+
+  &__sidebar {
+    height: 100%;
+    min-height: 0;
+    box-sizing: border-box;
+    background: #fff;
+    border: 1px solid #e8edf5;
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 6px 20px rgb(20 40 90 / 5%);
+  }
+
+  &__sidebar-section {
+    & + & {
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid #f0f0f0;
+    }
+  }
+
+  &__sidebar-heading-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  &__sidebar-heading {
+    font-size: 13px;
+    font-weight: 600;
+    color: #262626;
+    margin: 0 0 10px;
+  }
+
+  &__sidebar-heading-row &__sidebar-heading {
+    margin-bottom: 0;
+  }
+
+  &__sidebar-manage {
+    border: none;
+    background: none;
+    padding: 0;
+    font-size: 12px;
+    color: #1677ff;
+    cursor: pointer;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  &__chip-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  &__chip {
+    min-width: 56px;
+    padding: 6px 10px;
+    font-size: 12px;
+    border-radius: 6px;
+    border: 1px solid #e8e8e8;
+    background: #fafafa;
+    color: #595959;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, color 0.15s;
+
+    &:hover {
+      border-color: #91caff;
+      color: #1677ff;
+    }
+
+    &_active {
+      border-color: #1677ff;
+      background: #e6f4ff;
+      color: #1677ff;
+      font-weight: 500;
+    }
+  }
+
+  &__tag-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    /* 不设 max-height，标签全部展开，避免侧栏内滚动条 */
+  }
+
+  &__tag-pill {
+    text-align: left;
+    padding: 8px 10px;
+    font-size: 12px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    background: #fafafa;
+    color: #595959;
+    cursor: pointer;
+    line-height: 1.35;
+    transition: background 0.15s, border-color 0.15s;
+
+    &:hover {
+      background: #f0f0f0;
+    }
+
+    &_active {
+      border-color: #d3adf7;
+      background: #f9f0ff;
+      color: #531dab;
+      font-weight: 500;
+    }
+  }
+
+  &__studio-main {
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* 仅卡片列表（及空状态）内部滚动，顶部搜索/创建与底部分页固定 */
+  &__studio-scroll {
+    flex: 1;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  &__toolbar {
+    flex-shrink: 0;
+    margin-top: 28px;
+    margin-bottom: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  /* 搜索框与搜索/重置同一行：输入在左，按钮在右 */
+  &__toolbar-search {
+    margin-bottom: 0;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  &__toolbar-inline {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-width: 0;
+    flex-wrap: nowrap;
+
+    @media (width <= 520px) {
+      flex-wrap: wrap;
+
+      .projects-page__toolbar-actions {
+        margin-left: 0;
+        width: 100%;
+        justify-content: flex-end;
+      }
+    }
+  }
+
+  &__field-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 400;
+    color: #8c8c8c;
+    margin-bottom: 6px;
+  }
+
+  &__toolbar-actions {
+    display: flex;
+    flex-shrink: 0;
+    flex-wrap: nowrap;
+    gap: 8px;
+    align-items: center;
+    margin-left: auto;
+  }
+
+  &__search-input {
+    flex: 0 1 auto;
+    width: min(360px, 100%);
+    max-width: 360px;
+    min-width: 120px;
+    height: 32px;
+    padding: 0 12px;
+    font-size: 13px;
+    line-height: 30px;
+    border: 1px solid #d9d9d9;
+    border-radius: 4px;
+    background: #fff;
+    color: #262626;
+    box-sizing: border-box;
+
+    &::placeholder {
+      color: #bfbfbf;
+    }
+
+    &:focus {
+      outline: none;
+      border-color: #1677ff;
+      box-shadow: 0 0 0 2px rgb(22 119 255 / 15%);
+    }
+  }
+
+  &__create-wide {
+    width: auto !important;
+    align-self: flex-start;
+    display: inline-flex !important;
+    justify-content: center;
+    align-items: center;
+    font-weight: 500;
+    background: #1677ff !important;
+    border-color: #1677ff !important;
+    color: #fff !important;
+    padding: 0 16px !important;
+    min-height: 36px;
+    border-radius: 4px !important;
+
+    &:hover {
+      filter: brightness(1.05);
+    }
+  }
+
+  &__grid {
+    display: grid;
+    /* 每行固定 2 张卡片，两列均分宽度，避免多列挤得过窄 */
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+    padding-bottom: 16px;
+    box-sizing: border-box;
+
+    @media (width <= 640px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  &__empty-filter {
+    text-align: center;
+    padding: 48px 24px;
+    background: #fff;
+    border: 1px dashed #d9d9d9;
+    border-radius: 8px;
+    color: #8c8c8c;
+    font-size: 14px;
+
+    p {
+      margin: 0 0 12px;
+    }
   }
 
   &__link {
-    color: var(--color-neutral-content);
+    color: inherit;
     display: block;
-    display: flex;
     text-decoration: none;
 
     &:hover {
-      color: var(--color-neutral-content);
+      color: inherit;
     }
   }
 
+  /* 与「我的任务」一致：底栏由 PidataStylePagination 自带上边框与内边距 */
   &__pages {
-    background: var(--color-neutral-background);
-    border-top: 1px solid var(--color-neutral-border);
-    bottom: 0;
+    flex-shrink: 0;
+    margin-top: 0;
+    padding: 0;
     width: 100%;
-    position: sticky;
-    display: flex;
-    padding: 10px 40px;
-    justify-content: flex-end;
     box-sizing: border-box;
   }
+}
 
-  @media (width >= 1200px) {
-    &__list {
-      grid-template-columns: repeat(3, 1fr);
-    }
+/* 嵌入：用 flex 占满固定层，避免 height:100% 与 padding 叠加多出 1～2px 触发文档滚动 */
+html.ls-embed .projects-page {
+  flex: 1 1 0%;
+  min-height: 0;
+  height: auto;
+  max-height: none;
+}
+
+/*
+ * label_studio/core/static/css/main.css 中 main.main 带有 padding: 2em 4rem 2rem 2rem，
+ * 会导致项目列表两侧留白。若页面挂载在 main.main 内，用负边距拉满可用宽度。
+ */
+main.main .projects-page {
+  margin: -2em -4rem -2rem -2rem;
+  width: calc(100% + 2rem + 4rem);
+  max-width: none;
+  box-sizing: border-box;
+}
+
+/* 嵌入场景勿拉宽，否则会超出 iframe 出现横向滚动条 */
+html.ls-embed main.main .projects-page {
+  margin: 0;
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (max-width: 768px) {
+  main.main .projects-page {
+    margin: -2em -1rem -2rem -1rem;
+    width: calc(100% + 2rem);
   }
 
-  @media (width >= 1360px) {
-    &__list {
-      grid-template-columns: repeat(4, 1fr);
-    }
+  html.ls-embed main.main .projects-page {
+    margin: 0;
+    width: 100%;
   }
 }
 
 .empty-projects-page {
-  text-align: center;
+  min-height: 62vh;
   display: flex;
-  flex-direction: column;
   align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  box-sizing: border-box;
 
-  &__heidi {
-    height: 12rem;
-    margin-top: 6rem;
+  &__panel {
+    width: min(560px, 100%);
+    text-align: center;
+    border-radius: 12px;
+    border: 1px solid #e8edf5;
+    background: #fff;
+    padding: 36px 28px;
+    box-shadow: 0 8px 24px rgb(20 40 90 / 6%);
+  }
+
+  &__icon-wrap {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 16px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #e8f2ff 0%, #d5e6ff 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  &__icon {
+    width: 32px;
+    height: 32px;
+    color: #2f6bff;
   }
 
   &__header {
-    font-size: 32px;
-    font-weight: 700;
-    margin: 16px;
-    color: var(--color-neutral-content);
+    font-size: 28px;
+    font-weight: 600;
+    margin: 0 0 8px;
+    color: #1f2937;
   }
 
-  p {
-    font-size: 1.25rem;
-    color: var(--color-neutral-content-subtle);
-    margin: 0;
+  &__desc {
+    font-size: 14px;
+    line-height: 1.6;
+    color: #6b7280;
+    margin: 0 0 20px;
+  }
+
+  &__create {
+    min-width: 132px;
   }
 }
 
@@ -84,93 +443,189 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: var(--color-neutral-background);
-  border: 1px solid var(--color-neutral-border);
-  border-radius: 0.5rem;
+  background: #fff;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
   overflow: hidden;
-  color: var(--color-neutral-content-subtle);
-  box-shadow: 0 4px 8px rgb(0 0 0 / 5%);
-  transition: all 150ms ease-out;
+  color: #595959;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 4%);
+  transition: box-shadow 0.2s, border-color 0.2s;
+  min-height: 100%;
 
   &:hover {
-    background-color: var(--color-neutral-surface);
-    border-color: var(--color-primary-border-subtle);
+    border-color: #d9d9d9;
+    box-shadow: 0 4px 12px rgb(0 0 0 / 8%);
   }
 
-  &__header {
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--color-neutral-border);
-    transition: all 150ms ease-out;
+  &_studio {
+    cursor: pointer;
   }
 
-  &__menu {
-    margin-left: auto;
-
-    .button-ls {
-      margin-right: -10px;
-      opacity: 0.5;
-
-      --button-color: var(--text-color);
-
-      &__icon {
-        width: 18px;
-        height: 18px;
-      }
-    }
+  &__studio-top {
+    padding: 16px 16px 0;
   }
 
-  &__title {
+  &__title-row {
     display: flex;
     flex-wrap: wrap;
-    font-size: 16px;
-    font-weight: 500;
-    margin-bottom: 0.25rem;
-    line-height: 22px;
     align-items: center;
-    row-gap: 0.25rem;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
 
-    &-text-wrapper {
-      flex: 1;
-      min-width: 0;
-      display: flex;
-    }
+  &__title-wrap {
+    flex: 1;
+    min-width: 0;
+  }
 
-    &-text {
-      flex: 1;
-      min-width: 0;
+  &__studio-title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #262626;
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  &__subtitle {
+    font-size: 12px;
+    color: #8c8c8c;
+    margin-bottom: 8px;
+  }
+
+  &__badges {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &__badge {
+    display: inline-block;
+    padding: 2px 10px;
+    font-size: 12px;
+    line-height: 1.5;
+    border-radius: 4px;
+    background: #f9f0ff;
+    color: #531dab;
+    border: 1px solid #d3adf7;
+  }
+
+  &__state-inline {
+    transform: scale(0.92);
+    transform-origin: left center;
+  }
+
+  &__actions {
+    display: flex;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    justify-content: flex-end;
+    max-width: 100%;
+
+    a {
+      text-decoration: none;
       white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
     }
   }
 
-  &__state-chip {
-    width: 100%;
+  /* link 型操作：主色文字、透明底，与 Ant Design type="link" 一致 */
+  &__action-btn {
+    min-height: auto !important;
+    padding: 4px 4px !important;
+    border-radius: 4px !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    line-height: 1.25 !important;
+    border: none !important;
+    background: transparent !important;
+    color: #1677ff !important;
+    box-shadow: none !important;
+    text-decoration: none !important;
+
+    &:hover {
+      filter: none;
+      background: transparent !important;
+      color: #4096ff !important;
+      text-decoration: underline !important;
+    }
+
+    &:focus-visible {
+      outline: none;
+      box-shadow:
+        0 0 0 2px #fff,
+        0 0 0 4px rgb(22 119 255 / 45%) !important;
+    }
+  }
+
+  &__studio-desc {
+    margin: 12px 16px 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #8c8c8c;
+    flex: 1;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-word;
+  }
+
+  &__studio-stats {
     display: flex;
-    justify-content: flex-end;
     align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px 0;
+    font-size: 13px;
+  }
+
+  &__stat-total {
+    font-weight: 600;
+    color: #262626;
+  }
+
+  &__progress-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  &__progress-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    line-height: 1.4;
+  }
+
+  &__progress-label {
+    color: #8c8c8c;
+    font-size: 12px;
     white-space: nowrap;
   }
 
-  &__summary {
-    flex: 1;
-    font-size: 14px;
-    line-height: 22px;
-  }
-
-  &__annotation {
-    display: flex;
-    justify-content: space-between;
+  &__progress-value {
+    font-weight: 600;
+    color: #262626;
+    font-variant-numeric: tabular-nums;
   }
 
   &__detail {
     display: grid;
     grid-auto-flow: column;
-    grid-gap: 16px;
+    grid-gap: 12px;
     grid-auto-columns: max-content;
+    color: #8c8c8c;
 
     &-item {
-      --icon-color: var(--color-neutral-background);
+      --icon-color: #bfbfbf;
 
       display: flex;
       align-items: center;
@@ -181,77 +636,41 @@
 
       &_type {
         &_completed {
-          --icon-color: var(--color-positive-icon);
+          --icon-color: #52c41a;
         }
 
         &_rejected {
-          --icon-color: var(--color-negative-icon);
+          --icon-color: #faad14;
         }
 
         &_predictions {
-          --icon-color: var(--color-primary-icon);
+          --icon-color: #1677ff;
         }
       }
     }
   }
 
   &__icon {
-    margin-right: 10px;
+    margin-right: 6px;
+    width: 14px;
+    height: 14px;
   }
 
-  &__description {
-    flex: 1;
-    font-size: 14px;
-    line-height: 16px;
-    padding: 12px 16px 0;
-    overflow: hidden;
-    color: var(--color-neutral-content-subtle);
-    text-overflow: ellipsis;
-    display: -webkit-box;
-    word-break: break-word;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-  }
-
-  &__info {
+  &__studio-footer {
     display: flex;
     align-items: center;
-    padding: 16px 16px 10px;
-    justify-content: space-between;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 14px 16px 16px;
+    margin-top: auto;
+    border-top: 1px solid #f5f5f5;
   }
 
-  &__created-date {
-    color: var(--color-neutral-content-subtler);
-    font-size: 0.875rem;
-
-    & > span {
-      font-weight: 500;
-    }
-  }
-
-  &_colored {
-    --color-project-header-content: var(--color-sand-000);
-    --color-project-header-icon: var(--color-neutral-icon);
-
-    background-color: var(--background-color);
-    border-color: var(--border-color);
-
-    &:hover {
-      border-color: var(--header-color);
-    }
-
-    & .project-card__header {
-      background-color: var(--header-color);
-      color: var(--color-project-header-content);
-      box-shadow: none;
-    }
-
-    & .project-card__detail {
-      color: var(--content-color);
-
-      &-item {
-        --icon-color: var(--icon-color);
-      }
-    }
+  &__meta {
+    font-size: 12px;
+    color: #bfbfbf;
+    line-height: 1.4;
+    flex: 1;
+    min-width: 0;
   }
 }

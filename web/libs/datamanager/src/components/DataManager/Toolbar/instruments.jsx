@@ -27,7 +27,7 @@ const style = {
  * If expired it renders disabled Import button with a tooltip.
  */
 const ImportButtonWithChecks = ({ size }) => {
-  const simpleButton = <ImportButton size={size}>Import</ImportButton>;
+  const simpleButton = <ImportButton size={size}>导入</ImportButton>;
   const isOpenSource = !window.APP_SETTINGS.billing;
   // Check if user is on Starter Cloud plan
   const isStarterCloud = isStarterCloudPlan();
@@ -51,7 +51,7 @@ const ImportButtonWithChecks = ({ size }) => {
   // Disabled buttons ignore hover, so we use wrapper to properly handle a tooltip
   return (
     <Tooltip
-      title="You must upgrade your plan to import data"
+      title="需要升级套餐才能导入数据"
       style={{
         maxWidth: 200,
         textAlign: "center",
@@ -59,7 +59,7 @@ const ImportButtonWithChecks = ({ size }) => {
     >
       <div className={cn("button-wrapper").toClassName()}>
         <ImportButton disabled size={size}>
-          Import
+          导入
         </ImportButton>
       </div>
     </Tooltip>
@@ -84,7 +84,7 @@ export const instruments = {
       <FieldsButton
         wrapper={FieldsButton.Checkbox}
         trailingIcon={<Icon {...iconProps} />}
-        title={"Columns"}
+        title={"列"}
         size={size}
         style={style}
         openUpwardForShortViewport={false}
@@ -125,7 +125,7 @@ export const instruments = {
   "export-button": ({ size }) => {
     return (
       <Interface name="export">
-        <ExportButton size={size}>Export</ExportButton>
+        <ExportButton size={size}>导出</ExportButton>
       </Interface>
     );
   },

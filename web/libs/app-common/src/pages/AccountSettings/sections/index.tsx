@@ -1,5 +1,4 @@
 import { PersonalInfo } from "./PersonalInfo";
-import { EmailPreferences } from "./EmailPreferences";
 import { PersonalAccessToken, PersonalAccessTokenDescription } from "./PersonalAccessToken";
 import { MembershipInfo } from "./MembershipInfo";
 import { HotkeysManager } from "./Hotkeys";
@@ -8,57 +7,60 @@ import { PersonalJWTToken } from "./PersonalJWTToken";
 import type { AuthTokenSettings } from "../types";
 import { ABILITY, type AuthPermissions } from "@humansignal/core/providers/AuthProvider";
 import { ff } from "@humansignal/core";
-import { Badge } from "@humansignal/ui";
+import type { TFunction } from "i18next";
 
 export type SectionType = {
   title: string | React.ReactNode;
+  /** Used for document title when `title` is not a plain string */
+  pageTitle?: string;
   id: string;
   component: React.FC;
   description?: React.FC;
 };
 
-export const accountSettingsSections = (settings: AuthTokenSettings, permissions: AuthPermissions): SectionType[] => {
+export const accountSettingsSections = (
+  settings: AuthTokenSettings,
+  permissions: AuthPermissions,
+  t: TFunction,
+): SectionType[] => {
   const canCreateTokens = permissions.can(ABILITY.can_create_tokens);
 
   return [
     {
-      title: "Personal Info",
+      title: t("Personal Info"),
+      pageTitle: t("Personal Info"),
       id: "personal-info",
       component: PersonalInfo,
     },
     {
-      title: (
-        <div className="flex items-center gap-tight">
-          <span>Hotkeys</span>
-          <Badge variant="beta">Beta</Badge>
-        </div>
-      ),
+      title: t("Hotkeys"),
+      pageTitle: t("Hotkeys"),
       id: "hotkeys",
       component: HotkeysManager,
       description: () =>
-        "Customize your keyboard shortcuts to speed up your workflow. Click on any hotkey below to assign a new key combination that works best for you.",
+        t(
+          "Customize your keyboard shortcuts to speed up your workflow. Click on any hotkey below to assign a new key combination that works best for you.",
+        ),
     },
     {
-      title: "Email Preferences",
-      id: "email-preferences",
-      component: EmailPreferences,
-    },
-    {
-      title: "Membership Info",
+      title: t("Membership Info"),
+      pageTitle: t("Membership Info"),
       id: "membership-info",
       component: MembershipInfo,
     },
     settings.api_tokens_enabled &&
       canCreateTokens &&
       ff.isActive(ff.FF_AUTH_TOKENS) && {
-        title: "Personal Access Token",
+        title: t("Personal Access Token"),
+        pageTitle: t("Personal Access Token"),
         id: "personal-access-token",
         component: PersonalJWTToken,
         description: PersonalAccessTokenDescription,
       },
     settings.legacy_api_tokens_enabled &&
       canCreateTokens && {
-        title: ff.isActive(ff.FF_AUTH_TOKENS) ? "Legacy Token" : "Access Token",
+        title: ff.isActive(ff.FF_AUTH_TOKENS) ? t("Legacy Token") : t("Access Token"),
+        pageTitle: ff.isActive(ff.FF_AUTH_TOKENS) ? t("Legacy Token") : t("Access Token"),
         id: "legacy-token",
         component: PersonalAccessToken,
         description: PersonalAccessTokenDescription,

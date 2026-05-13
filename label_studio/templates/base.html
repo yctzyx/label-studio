@@ -176,7 +176,7 @@
     lookupHotkey: lookupHotkey,
     debug: {{settings.DEBUG|yesno:"true,false"}},
     polling: {% if feature_flags.fflag_dev_disable_polling_killswitch_short %}false{% else %}true{% endif %},
-    hostname: "{{settings.HOSTNAME}}",
+    hostname: "{% block app_settings_hostname %}{{ settings.HOSTNAME }}{% endblock %}",
     version: {{ versions|json_dumps_ensure_ascii|safe }},
     sentry_dsn: {% if settings.FRONTEND_SENTRY_DSN %}"{{ settings.FRONTEND_SENTRY_DSN }}"{% else %}null{% endif %},
     sentry_rate: "{{ settings.FRONTEND_SENTRY_RATE }}",
@@ -216,7 +216,7 @@
 {% endblock %}
 
 {% block bottomjs %}
-  <script src="{{settings.HOSTNAME}}{% static 'js/jquery.min.js' %}"></script>
+  <script src="{% static 'js/jquery.min.js' %}"></script>
   <script nonce="{{request.csp_nonce}}">
 
     // CSRF

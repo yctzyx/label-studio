@@ -3,6 +3,13 @@
  * This prevents re-downloading the same images when switching between annotations on the same task
  */
 
+declare global {
+  interface Window {
+    /** When set (e.g. by 无界 embed), provides auth headers for image requests (XHR/fetch). */
+    __LS_IMAGE_REQUEST_HEADERS__?: () => Record<string, string>;
+  }
+}
+
 /**
  * Custom error class for image cache errors that should not be sent to Sentry
  * These are expected errors (network issues, invalid images) not code bugs
@@ -231,6 +238,13 @@ class ImageCacheManager {
       });
 
       xhr.open("GET", url);
+      // Attach auth headers when available (e.g. 无界 embed - gateway requires Authorization)
+      const headers = typeof window !== "undefined" && window.__LS_IMAGE_REQUEST_HEADERS__?.();
+      if (headers && typeof headers === "object") {
+        for (const [key, value] of Object.entries(headers)) {
+          if (value != null && value !== "") xhr.setRequestHeader(key, String(value));
+        }
+      }
       xhr.send();
     });
   }

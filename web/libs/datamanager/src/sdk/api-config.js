@@ -85,6 +85,27 @@ export const APIConfig = {
       method: "patch",
     },
 
+    /** Task workflow: after labeling saved, move annotate → review (project.task_workflow_enabled) */
+    taskWorkflowSubmitAnnotation: {
+      path: "/../tasks/:taskID/workflow/submit-annotation/",
+      method: "post",
+    },
+
+    /** Task workflow: GET stage / assignee */
+    taskWorkflowDetail: "/../tasks/:taskID/workflow/",
+
+    /** Task workflow: reviewer approve / reject (review → accept or back to annotate) */
+    taskWorkflowReview: {
+      path: "/../tasks/:taskID/workflow/review/",
+      method: "post",
+    },
+
+    /** Task workflow: acceptance approve / reject (accept → done or back to annotate) */
+    taskWorkflowAccept: {
+      path: "/../tasks/:taskID/workflow/accept/",
+      method: "post",
+    },
+
     /** Delete annotation */
     deleteAnnotation: {
       path: "/../annotations/:annotationID",

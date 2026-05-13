@@ -5,6 +5,14 @@ import { RouteWithStaticFallback } from "./RouteWithStaticFallback";
 export const ProjectRoutes = ({ content }) => {
   const routes = useRoutesMap();
   const resolvedRoutes = resolveRoutes(routes, { content });
-
-  return resolvedRoutes ? <RouteWithStaticFallback path="/" children={resolvedRoutes} /> : null;
+  console.log("[LS-embed] ProjectRoutes", {
+    routesCount: routes?.length,
+    hasResolvedRoutes: !!resolvedRoutes,
+    contentLength: typeof content === "string" ? content?.length : "n/a",
+  });
+  return resolvedRoutes ? (
+    <div className="route-outlet">
+      <RouteWithStaticFallback path="/" children={resolvedRoutes} />
+    </div>
+  ) : null;
 };

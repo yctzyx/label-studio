@@ -9,6 +9,8 @@ class OrganizationMixin:
 
 class OrganizationMemberMixin:
     def has_permission(self, user):
+        if getattr(user, 'is_staff', False) or getattr(user, 'is_superuser', False):
+            return True
         if user.active_organization_id == self.organization_id:
             return True
         return False

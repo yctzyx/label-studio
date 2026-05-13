@@ -19,6 +19,12 @@
     flex-direction: column;
     margin-left: 0;
     height: 100%;
+    /* 单层子节点（.route-outlet）时填满中间区，才能把 %/flex 高度传到 /data */
+    &:has(> :only-child) > :only-child {
+      flex: 1 1 0%;
+      min-height: 0;
+      min-width: 0;
+    }
     will-change: margin-left;
     transition: background-color 400ms ease-out;
     
@@ -26,4 +32,25 @@
       margin-left: var(--menu-sidebar-width);
     }
   }
+}
+
+/* 嵌入且无顶栏时，不应再按「顶栏高度」扣减 max-height，否则与 100% 高度链冲突并挤出外层滚动条 */
+html.ls-embed .content-wrapper {
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
+}
+
+html.ls-embed .content-wrapper__body {
+  max-height: none;
+  min-height: 0;
+  flex: 1 1 0%;
+  overflow: hidden;
+}
+
+html.ls-embed .content-wrapper__content {
+  min-height: 0;
+  flex: 1 1 0%;
+  overflow: hidden;
 }

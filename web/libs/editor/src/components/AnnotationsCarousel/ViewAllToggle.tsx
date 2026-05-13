@@ -15,7 +15,7 @@ export const ViewAllToggle = observer(({ isActive, onClick }: ViewAllToggleProps
       type="button"
       className={cn("view-all-toggle").mod({ selected: isActive }).toClassName()}
       onClick={onClick}
-      aria-label="Compare all annotations"
+      aria-label="对比全部标注"
       aria-pressed={isActive}
       data-testid="compare-all-toggle"
     >
@@ -25,7 +25,7 @@ export const ViewAllToggle = observer(({ isActive, onClick }: ViewAllToggleProps
         </div>
         <div className={cn("view-all-toggle").elem("content").toClassName()}>
           <Typography variant="label" size="small" className={cn("view-all-toggle").elem("label").toClassName()}>
-            Compare All
+            对比全部
           </Typography>
         </div>
       </div>

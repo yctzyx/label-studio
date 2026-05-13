@@ -1,5 +1,6 @@
 import { type FormEventHandler, useCallback, useEffect, useRef, useState } from "react";
 import clsx from "clsx";
+import { useTranslation } from "react-i18next";
 import { Button, InputFile, ToastType, useToast, Userpic } from "@humansignal/ui";
 import { getApiInstance } from "@humansignal/core";
 import styles from "../AccountSettings.module.scss";
@@ -40,6 +41,7 @@ const updateUserAvatarAtom = atomWithMutation(() => ({
 }));
 
 export const PersonalInfo = () => {
+  const { t } = useTranslation();
   const toast = useToast();
   const { user, refetch: refetchUser, isLoading: userInProgress, update: updateUser } = useAuth();
   const updateUserAvatar = useAtomValue(updateUserAvatarAtom);
@@ -61,13 +63,13 @@ export const PersonalInfo = () => {
       });
 
       if (!response.$meta.ok) {
-        toast?.show({ message: response?.response?.detail ?? "Error updating avatar", type: ToastType.error });
+        toast?.show({ message: response?.response?.detail ?? t("Error updating avatar"), type: ToastType.error });
       } else {
         refetchUser();
       }
       input.value = "";
     },
-    [user?.id],
+    [user, refetchUser, t, toast, updateUserAvatar],
   );
 
   const deleteUserAvatar = async () => {
@@ -86,10 +88,10 @@ export const PersonalInfo = () => {
 
       refetchUser();
       if (!response?.$meta.ok) {
-        toast?.show({ message: response?.response?.detail ?? "Error updating user", type: ToastType.error });
+        toast?.show({ message: response?.response?.detail ?? t("Error updating user"), type: ToastType.error });
       }
     },
-    [user?.id],
+    [user, refetchUser, t, toast, updateUser],
   );
 
   useEffect(() => {
@@ -113,11 +115,12 @@ export const PersonalInfo = () => {
               onChange={fileChangeHandler}
               accept="image/png, image/jpeg, image/jpg"
               ref={avatarRef}
+              text={t("Upload Image")}
             />
           </form>
           {user?.avatar && (
             <Button type="submit" variant="negative" look="outlined" size="medium" onClick={deleteUserAvatar}>
-              Delete
+              {t("Delete")}
             </Button>
           )}
         </div>
@@ -125,7 +128,7 @@ export const PersonalInfo = () => {
           <div className={styles.flexRow}>
             <div className={styles.flex1}>
               <Input
-                label="First Name"
+                label={t("First Name")}
                 value={fname}
                 onChange={(e: React.KeyboardEvent<HTMLInputElement>) => setFname(e.currentTarget.value)}
                 name="first_name"
@@ -133,7 +136,7 @@ export const PersonalInfo = () => {
             </div>
             <div className={styles.flex1}>
               <Input
-                label="Last Name"
+                label={t("Last Name")}
                 value={lname}
                 onChange={(e: React.KeyboardEvent<HTMLInputElement>) => setLname(e.currentTarget.value)}
                 name="last_name"
@@ -142,11 +145,11 @@ export const PersonalInfo = () => {
           </div>
           <div className={styles.flexRow}>
             <div className={styles.flex1}>
-              <Input label="E-mail" type="email" readOnly={true} value={user?.email ?? ""} />
+              <Input label={t("E-mail")} type="email" readOnly={true} value={user?.email ?? ""} />
             </div>
             <div className={styles.flex1}>
               <Input
-                label="Phone"
+                label={t("Phone")}
                 type="phone"
                 onChange={(e: React.KeyboardEvent<HTMLInputElement>) => setPhone(e.currentTarget.value)}
                 value={phone}
@@ -156,7 +159,7 @@ export const PersonalInfo = () => {
           </div>
           <div className={clsx(styles.flexRow, styles.flexEnd)}>
             <Button style={{ width: 125 }} waiting={isInProgress}>
-              Save
+              {t("Save")}
             </Button>
           </div>
         </form>

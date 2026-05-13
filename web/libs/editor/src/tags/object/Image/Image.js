@@ -35,6 +35,36 @@ import MultiItemObjectBase from "../MultiItemObjectBase";
 
 const IMAGE_PRELOAD_COUNT = 3;
 const ZOOM_INTENSITY = 0.009;
+
+/**
+ * Resolve relative task URLs (e.g. /data/upload/xxx, /static/xxx) to absolute when in embed mode.
+ * When APP_SETTINGS.hostname is set (e.g. gateway URL), prepend it so requests go through gateway.
+ * For full URLs (http/https) that point to static/data paths, rewrite to use gateway so auth headers work.
+ */
+function resolveTaskUrl(src) {
+  if (!src || typeof src !== "string") return src;
+  const hostname = typeof window !== "undefined" && window.APP_SETTINGS?.hostname;
+
+  if (hostname) {
+    // Relative path: prepend gateway
+    if (src.startsWith("/")) {
+      return [hostname.replace(/([/]+)$/, ""), src.replace(/^\/+/, "")].join("/");
+    }
+    // Full URL pointing to static/data: rewrite to gateway so requests include auth (e.g. 无界 embed)
+    if (src.match(/^https?:/) && (src.includes("/static/") || src.includes("/data/upload/"))) {
+      try {
+        const u = new URL(src);
+        const path = u.pathname + u.search;
+        return [hostname.replace(/([/]+)$/, ""), path.replace(/^\/+/, "")].join("/");
+      } catch {
+        return src;
+      }
+    }
+  }
+
+  if (src.match(/^https?:/) || src.match(/^\/\//)) return src;
+  return src;
+}
 const MIN_ZOOM = 0.1;
 const MAX_ZOOM = 100;
 const MAX_ZOOM_CHANGE_PER_EVENT = 0.3; // Maximum zoom change per wheel event (30%)
@@ -599,18 +629,25 @@ const Model = types
       const parsedValue = self.multiImage ? self.parsedValueList : self.parsedValue;
       const idPostfix = self.annotation ? `@${self.annotation.id}` : "";
 
+      const toResolvedSrc = (item) => {
+        const raw = typeof item === "string" ? item : item?.url;
+        return raw && typeof raw === "string" ? resolveTaskUrl(raw) : item;
+      };
+
       if (Array.isArray(parsedValue)) {
-        parsedValue.forEach((src, index) => {
+        parsedValue.forEach((item, index) => {
+          const src = toResolvedSrc(item);
           self.imageEntities.push({
             id: `${self.name}#${index}${idPostfix}`,
-            src,
+            src: typeof src === "string" ? src : (typeof item === "string" ? item : item?.url ?? ""),
             index,
           });
         });
       } else {
+        const src = toResolvedSrc(parsedValue);
         self.imageEntities.push({
           id: `${self.name}#0${idPostfix}`,
-          src: parsedValue,
+          src: typeof src === "string" ? src : (typeof parsedValue === "string" ? parsedValue : parsedValue?.url ?? ""),
           index: 0,
         });
       }

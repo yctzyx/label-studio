@@ -28,6 +28,41 @@ logger = logging.getLogger(__name__)
 _PARAGRAPH_SAMPLE = None
 
 
+class _EmbedMockUser:
+    """Minimal user-like object for embed shell. Frontend will get real user via API (whoami) with token."""
+
+    pk = 0
+    username = ''
+    first_name = ''
+    last_name = ''
+    email = ''
+    allow_newsletters = None
+    custom_hotkeys = {}
+    avatar = None
+
+    def get_initials(self):
+        return ''
+
+
+def embed(request):
+    """
+    Embed entry: no login required, returns app shell so 无界 can load.
+    APP_SETTINGS.hostname is set to EMBED_GATEWAY_HOSTNAME so subsequent API calls go through gateway.
+    """
+    embed_hostname = getattr(settings, 'EMBED_GATEWAY_HOSTNAME', None) or settings.HOSTNAME or ''
+    if not embed_hostname and request:
+        embed_hostname = request.build_absolute_uri('/').rstrip('/')
+    logger.info("[LS-embed] embed view render hostname=%s", embed_hostname)
+    return render(
+        request,
+        'embed/embed_shell.html',
+        {
+            'user': _EmbedMockUser(),
+            'embed_gateway_hostname': embed_hostname,
+        },
+    )
+
+
 def main(request):
     user = request.user
 

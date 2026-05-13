@@ -10,6 +10,7 @@ from core.utils.common import load_func, retry_database_locked
 from core.utils.db import fast_first
 from core.utils.exceptions import extract_message
 from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
 from django.db import IntegrityError, transaction
 from drf_spectacular.utils import extend_schema_field
 from fsm.serializer_fields import FSMStateField
@@ -219,6 +220,25 @@ class TaskSimpleSerializer(ModelSerializer):
 
 class BaseTaskSerializer(FlexFieldsModelSerializer):
     """Task Serializer with project scheme configs validation"""
+
+    workflow = serializers.SerializerMethodField(
+        read_only=True,
+        help_text='Team task workflow state when project.task_workflow_enabled; null otherwise or if no workflow row.',
+    )
+
+    def get_workflow(self, obj):
+        """Expose workflow stage so UIs do not mistake is_labeled (overlap) for pipeline completion."""
+        project = getattr(obj, 'project', None)
+        if project is None or not getattr(project, 'task_workflow_enabled', False):
+            return None
+        try:
+            wf = obj.workflow
+        except ObjectDoesNotExist:
+            return None
+        return {
+            'stage': wf.stage,
+            'current_assignee_id': wf.current_assignee_id,
+        }
 
     def project(self, task=None):
         """Take the project from context"""

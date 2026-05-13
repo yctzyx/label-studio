@@ -53,7 +53,8 @@ class OrganizationMember(OrganizationMemberMixin, models.Model):
 
     @cached_property
     def is_owner(self):
-        return self.user.id == self.organization.created_by.id
+        cb = self.organization.created_by_id
+        return cb is not None and self.user.id == cb
 
     class Meta:
         ordering = ['pk']
@@ -80,6 +81,16 @@ class Organization(OrganizationMixin, models.Model):
     """ """
 
     title = models.CharField(_('organization title'), max_length=1000, null=False)
+
+    external_org_id = models.CharField(
+        _('external organization id'),
+        max_length=64,
+        null=True,
+        blank=True,
+        unique=True,
+        db_index=True,
+        help_text=_('父平台 pub_org.id，用于目录同步与幂等 upsert'),
+    )
 
     token = models.CharField(_('token'), max_length=256, default=create_hash, unique=True, null=True, blank=True)
 

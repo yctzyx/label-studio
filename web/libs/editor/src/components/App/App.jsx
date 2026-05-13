@@ -2,7 +2,8 @@
  * Libraries
  */
 import React, { Component } from "react";
-import { Result, Spin } from "antd";
+import { Result } from "antd";
+import { Spinner } from "@humansignal/ui";
 import { getEnv, getRoot } from "mobx-state-tree";
 import { observer, Provider } from "mobx-react";
 
@@ -131,7 +132,11 @@ class App extends Component {
   }
 
   renderLoader() {
-    return <Result icon={<Spin size="large" />} />;
+    return (
+      <div className={cn("editor").elem("page-loader").toClassName()}>
+        <Spinner size={48} />
+      </div>
+    );
   }
 
   _renderUI(root, as) {

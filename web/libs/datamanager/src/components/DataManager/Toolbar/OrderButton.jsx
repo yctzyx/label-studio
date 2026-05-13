@@ -20,10 +20,10 @@ export const OrderButton = injector(({ size, ordering, view, ...rest }) => {
         <FieldsButton
           size={size}
           style={{ minWidth: 67, textAlign: "left", marginRight: -1 }}
-          title={ordering ? ordering.column?.title : "Order by"}
+          title={ordering ? ordering.column?.title : "排序"}
           onClick={(col) => view.setOrdering(col.id)}
           onReset={() => view.setOrdering(null)}
-          resetTitle="Default"
+          resetTitle="默认"
           selected={ordering?.field}
           filter={(col) => {
             return col.orderable ?? col.original?.orderable;
@@ -47,7 +47,7 @@ export const OrderButton = injector(({ size, ordering, view, ...rest }) => {
           variant="neutral"
           disabled={!!ordering === false}
           onClick={() => view.setOrdering(ordering?.field)}
-          aria-label={ordering?.desc ? "Sort ascending" : "Sort descending"}
+          aria-label={ordering?.desc ? "升序" : "降序"}
         >
           {ordering?.desc ? <IconSortUp /> : <IconSortDown />}
         </Button>

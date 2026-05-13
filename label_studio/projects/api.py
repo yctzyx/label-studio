@@ -20,7 +20,9 @@ from django.conf import settings
 from django.db import IntegrityError
 from django.db.models import F
 from django.http import Http404
+from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
+from django.utils.functional import cached_property
 from django_filters import CharFilter, FilterSet
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
@@ -30,6 +32,7 @@ from ml.serializers import MLBackendSerializer
 from projects.functions.next_task import get_next_task
 from projects.functions.stream_history import get_label_stream_history
 from projects.functions.utils import recalculate_created_annotations_and_labels_from_scratch
+from projects.access import user_can_manage_project
 from projects.models import Project, ProjectImport, ProjectManager, ProjectReimport, ProjectSummary
 from projects.serializers import (
     GetFieldsSerializer,
@@ -43,6 +46,8 @@ from projects.serializers import (
     ProjectSummarySerializer,
 )
 from rest_framework import filters, generics, status
+from rest_framework.exceptions import PermissionDenied
+from rest_framework.permissions import SAFE_METHODS
 from rest_framework.exceptions import NotFound
 from rest_framework.exceptions import ValidationError as RestValidationError
 from rest_framework.pagination import PageNumberPagination
@@ -180,12 +185,12 @@ class ProjectListAPI(generics.ListCreateAPIView):
         serializer.is_valid(raise_exception=True)
         fields = serializer.validated_data.get('include')
         filter = serializer.validated_data.get('filter')
-        projects = Project.objects.filter(organization=self.request.user.active_organization).order_by(
+        ordered = Project.objects.for_user(self.request.user).order_by(
             F('pinned_at').desc(nulls_last=True), '-created_at'
         )
         if filter in ['pinned_only', 'exclude_pinned']:
-            projects = projects.filter(pinned_at__isnull=filter == 'exclude_pinned')
-        projects = ProjectManager.with_counts_annotate(projects, fields=fields)
+            ordered = ordered.filter(pinned_at__isnull=filter == 'exclude_pinned')
+        projects = ProjectManager.with_counts_annotate(ordered, fields=fields)
 
         # Only annotate FSM state for UI/API consumption when both feature flags are enabled
         if flag_set('fflag_feat_fit_568_finite_state_management', user=self.request.user) and flag_set(
@@ -247,9 +252,7 @@ class ProjectCountsListAPI(generics.ListAPIView):
         serializer = GetFieldsSerializer(data=self.request.query_params)
         serializer.is_valid(raise_exception=True)
         fields = serializer.validated_data.get('include')
-        projects = Project.objects.with_counts(fields=fields).filter(
-            organization=self.request.user.active_organization
-        )
+        projects = ProjectManager.with_counts_annotate(Project.objects.for_user(self.request.user), fields=fields)
 
         # Only annotate FSM state for UI/API consumption when both feature flags are enabled
         if flag_set('fflag_feat_fit_568_finite_state_management', user=self.request.user) and flag_set(
@@ -381,9 +384,7 @@ class ProjectAPI(generics.RetrieveUpdateDestroyAPIView):
         serializer = GetFieldsSerializer(data=self.request.query_params)
         serializer.is_valid(raise_exception=True)
         fields = serializer.validated_data.get('include')
-        projects = Project.objects.with_counts(fields=fields).filter(
-            organization=self.request.user.active_organization
-        )
+        projects = ProjectManager.with_counts_annotate(Project.objects.for_user(self.request.user), fields=fields)
 
         # Only annotate FSM state for UI/API consumption when both feature flags are enabled
         if flag_set('fflag_feat_fit_568_finite_state_management', user=self.request.user) and flag_set(
@@ -392,6 +393,12 @@ class ProjectAPI(generics.RetrieveUpdateDestroyAPIView):
             projects = projects.with_state()
 
         return projects
+
+    def check_object_permissions(self, request, obj):
+        super().check_object_permissions(request, obj)
+        if request.method not in SAFE_METHODS:
+            if not user_can_manage_project(request.user, obj):
+                raise PermissionDenied('只有项目创建者或项目管理员可以修改或删除项目。')
 
     def get(self, request, *args, **kwargs):
         return super(ProjectAPI, self).get(request, *args, **kwargs)
@@ -444,7 +451,9 @@ class ProjectAPI(generics.RetrieveUpdateDestroyAPIView):
 class ProjectNextTaskAPI(generics.RetrieveAPIView):
     permission_required = all_permissions.tasks_view
     serializer_class = TaskWithAnnotationsAndPredictionsAndDraftsSerializer
-    queryset = Project.objects.all()
+
+    def get_queryset(self):
+        return Project.objects.for_user(self.request.user)
 
     def get(self, request, *args, **kwargs):
         project = self.get_object()
@@ -468,7 +477,9 @@ class ProjectNextTaskAPI(generics.RetrieveAPIView):
 @extend_schema(exclude=True)
 class LabelStreamHistoryAPI(generics.RetrieveAPIView):
     permission_required = all_permissions.tasks_view
-    queryset = Project.objects.all()
+
+    def get_queryset(self):
+        return Project.objects.for_user(self.request.user)
 
     def get(self, request, *args, **kwargs):
         project = self.get_object()
@@ -544,7 +555,14 @@ class ProjectLabelConfigValidateAPI(generics.RetrieveAPIView):
     parser_classes = (JSONParser, FormParser, MultiPartParser)
     serializer_class = ProjectLabelConfigSerializer
     permission_required = all_permissions.projects_change
-    queryset = Project.objects.all()
+
+    def get_queryset(self):
+        return Project.objects.for_user(self.request.user)
+
+    def check_object_permissions(self, request, obj):
+        super().check_object_permissions(request, obj)
+        if request.method == 'POST' and not user_can_manage_project(request.user, obj):
+            raise PermissionDenied('只有项目创建者或项目管理员可以校验/修改配置。')
 
     def post(self, request, *args, **kwargs):
         project = self.get_object()
@@ -581,7 +599,11 @@ class ProjectSummaryResetAPI(GetParentObjectMixin, generics.CreateAPIView):
     """
 
     parser_classes = (JSONParser,)
-    parent_queryset = Project.objects.all()
+
+    @cached_property
+    def parent_object(self):
+        return get_object_or_404(Project.objects.for_user(self.request.user), pk=self.kwargs['pk'])
+
     permission_required = ViewClassPermission(
         POST=all_permissions.projects_reset_cache,
     )
@@ -589,6 +611,8 @@ class ProjectSummaryResetAPI(GetParentObjectMixin, generics.CreateAPIView):
     @extend_schema(exclude=True)
     def post(self, *args, **kwargs):
         project = self.parent_object
+        if not user_can_manage_project(self.request.user, project):
+            raise PermissionDenied('只有项目创建者或项目管理员可以重置标注缓存。')
         summary = project.summary
         start_job_async_or_sync(
             recalculate_created_annotations_and_labels_from_scratch,
@@ -728,7 +752,11 @@ class ProjectReimportAPI(generics.RetrieveAPIView):
 class ProjectTaskListAPI(GetParentObjectMixin, generics.ListCreateAPIView, generics.DestroyAPIView):
     parser_classes = (JSONParser, FormParser)
     queryset = Task.objects.all()
-    parent_queryset = Project.objects.all()
+
+    @cached_property
+    def parent_object(self):
+        return get_object_or_404(Project.objects.for_user(self.request.user), pk=self.kwargs['pk'])
+
     permission_required = ViewClassPermission(
         GET=all_permissions.tasks_view,
         POST=all_permissions.tasks_change,
@@ -747,7 +775,7 @@ class ProjectTaskListAPI(GetParentObjectMixin, generics.ListCreateAPIView, gener
     def filter_queryset(self, queryset):
         project = generics.get_object_or_404(Project.objects.for_user(self.request.user), pk=self.kwargs.get('pk', 0))
         # ordering is deprecated here
-        tasks = Task.objects.filter(project=project).order_by('-updated_at')
+        tasks = Task.objects.for_user(self.request.user).filter(project=project).order_by('-updated_at')
         page = paginator(tasks, self.request)
         if page:
             return page
@@ -823,9 +851,11 @@ class TemplateListAPI(generics.ListAPIView):
 @extend_schema(exclude=True)
 class ProjectSampleTask(generics.RetrieveAPIView):
     parser_classes = (JSONParser,)
-    queryset = Project.objects.all()
     permission_required = all_permissions.projects_view
     serializer_class = ProjectSerializer
+
+    def get_queryset(self):
+        return Project.objects.for_user(self.request.user)
 
     def post(self, request, *args, **kwargs):
         label_config = self.request.data.get('label_config')
@@ -862,7 +892,12 @@ class ProjectModelVersions(generics.RetrieveAPIView):
     permission_required = all_permissions.projects_view
 
     def get_queryset(self):
-        return Project.objects.filter(organization=self.request.user.active_organization)
+        return Project.objects.for_user(self.request.user)
+
+    def check_object_permissions(self, request, obj):
+        super().check_object_permissions(request, obj)
+        if request.method == 'DELETE' and not user_can_manage_project(request.user, obj):
+            raise PermissionDenied('只有项目创建者或项目管理员可以删除模型版本数据。')
 
     def get(self, request, *args, **kwargs):
         project = self.get_object()
@@ -918,7 +953,9 @@ class ProjectModelVersions(generics.RetrieveAPIView):
 )
 class ProjectAnnotatorsAPI(generics.RetrieveAPIView):
     permission_required = all_permissions.projects_view
-    queryset = Project.objects.all()
+
+    def get_queryset(self):
+        return Project.objects.for_user(self.request.user)
 
     def get(self, request, *args, **kwargs):
         project = self.get_object()

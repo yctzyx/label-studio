@@ -4,17 +4,21 @@
   display: flex;
   flex-direction: column;
   overflow-y: auto;
+  background: #f5f7fb;
 
   .modal-ls__header {
-    border-bottom: 1px solid var(--color-neutral-border);
+    border-bottom: 1px solid #e8edf5;
+    background: #fff;
+    padding: 12px 20px;
 
     & h1 {
-      width: 224px;
+      width: 200px;
       margin-right: auto;
       margin-bottom: 0;
       margin-top: 0;
-      font-size: 24px;
-      color: var(--color-neutral-content);
+      font-size: 20px;
+      font-weight: 600;
+      color: #1f2937;
     }
 
     & button {
@@ -22,14 +26,53 @@
       min-width: 100px;
     }
 
-    .toggle-items {
-      width: 500px;
+    .toggle-items.create-project__steps {
+      width: 520px;
       margin-right: auto;
       box-sizing: border-box;
+      background: #f3f6fb;
+      border: 1px solid #dbe5f4;
+      border-radius: 999px;
+      padding: 4px;
+      box-shadow: inset 0 1px 1px rgb(16 24 40 / 4%);
+
+      .toggle-items__item {
+        border-radius: 999px;
+        font-size: 13px;
+        color: #667085;
+        padding: 7px 14px;
+      }
+
+      .toggle-items__item_active {
+        color: #1d4ed8;
+        background: #fff;
+        box-shadow: 0 2px 8px rgb(45 93 240 / 18%);
+        font-weight: 600;
+      }
     }
 
     .space-ls_direction_horizontal {
       min-width: 224px;
+    }
+  }
+
+  &__header-btn {
+    min-height: 34px;
+    border-radius: 8px;
+    font-weight: 500;
+    padding: 0 16px;
+
+    &_cancel {
+      border-color: #d0d5dd !important;
+      color: #344054 !important;
+      background: #fff !important;
+    }
+
+    &_save {
+      border-color: #2f6bff !important;
+      background: #2f6bff !important;
+      color: #fff !important;
+      box-shadow: 0 4px 12px rgb(47 107 255 / 28%);
     }
   }
 
@@ -50,35 +93,68 @@
   }
 
   form.project-name {
-    width: 500px;
-    margin: 32px auto;
+    width: 100%;
+    max-width: 780px;
+    margin: 24px auto;
+    padding: 28px 32px 36px;
+    box-sizing: border-box;
+    background: #fff;
+    border: 1px solid #e8edf5;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgb(20 40 90 / 6%);
 
     & > *:not(:first-child) {
-      margin-top: 32px;
+      margin-top: 24px;
     }
 
     label {
-      display: inline-flex;
-      align-items: center;
+      display: block;
+      font-weight: 600;
+      color: #1f2937;
+      font-size: 13px;
     }
 
     input, textarea {
-      background: var(--color-neutral-background);
-      border: 1px solid var(--color-neutral-border);
-      color: var(--color-neutral-content);
-      border-radius: var(--corner-radius-smaller);
-      box-shadow: inset 0 1px 2px rgba(var(--color-neutral-shadow-raw) / 12%);
+      background: #fff;
+      border: 1px solid #d0d5dd;
+      color: #101828;
+      border-radius: 8px;
+      box-shadow: none;
       transition: all 150ms ease-out;
 
       &:hover {
-        border-color: var(--color-neutral-border-bold);
+        border-color: #98a2b3;
       }
 
       &:focus, &:focus-visible {
-        border-color: var(--color-neutral-border-bolder);
+        border-color: #2f6bff;
         outline: none;
-        box-shadow: 0 0 0 4px var(--color-primary-focus-outline);
+        box-shadow: 0 0 0 3px rgb(47 107 255 / 18%);
       }
+    }
+
+    input.project-title {
+      height: 40px;
+      padding: 0 12px;
+    }
+
+    /* 全局 lsf-textarea-ls 会把 height 锁在 40px；勿使用未编译的 `.textarea-ls` 选择器（webpack 会加成 lsf- 前缀），否则覆盖不生效 */
+    textarea[id="project_description"] {
+      display: block;
+      width: 100%;
+      max-width: 100%;
+      height: auto;
+      min-height: 360px;
+      padding: 12px 14px;
+      line-height: 1.55;
+      resize: vertical;
+      box-sizing: border-box;
+
+      --input-size: auto;
+    }
+
+    .project-name__description-field {
+      align-self: stretch;
     }
   }
 }

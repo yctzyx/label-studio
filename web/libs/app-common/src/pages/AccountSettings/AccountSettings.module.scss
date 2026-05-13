@@ -2,12 +2,19 @@
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
 
   &__content {
     display: flex;
     flex-direction: column;
+    flex: 1;
     gap: var(--spacing-wide);
-    max-width: 660px;
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    min-height: 0;
 
     h1 {
       font-size: var(--font-size-header, 28px);
@@ -16,8 +23,43 @@
   }
 }
 
+/* 覆盖 Card 默认 660px 宽度，与右侧主区同宽；视觉与项目页白卡片一致 */
+.accountSettingsCard {
+  width: 100% !important;
+  max-width: 100%;
+  box-sizing: border-box;
+  border-radius: 12px !important;
+  border: 1px solid #e8edf5 !important;
+  box-shadow: 0 6px 20px rgb(20 40 90 / 5%);
+}
+
 .accountSettingsPadding {
-  padding: var(--spacing-wide);
+  padding: 0;
+}
+
+:global(main.main) .accountSettings {
+  margin: -2em -4rem -2rem -2rem;
+  width: calc(100% + 2rem + 4rem);
+  max-width: none;
+  box-sizing: border-box;
+}
+
+:global(html.ls-embed main.main) .accountSettings {
+  margin: 0;
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (width <= 768px) {
+  :global(main.main) .accountSettings {
+    margin: -2em -1rem -2rem;
+    width: calc(100% + 2rem);
+  }
+
+  :global(html.ls-embed main.main) .accountSettings {
+    margin: 0;
+    width: 100%;
+  }
 }
 
 .sectionContent {

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useHistory } from "react-router";
+import { useTranslation } from "react-i18next";
 import { Button, Typography, useToast } from "@humansignal/ui";
 import { useUpdatePageTitle, createTitleFromSegments } from "@humansignal/core";
 import { Label } from "../../components/Form";
@@ -17,9 +18,10 @@ export const DangerZone = () => {
   const api = useAPI();
   const history = useHistory();
   const toast = useToast();
+  const { t } = useTranslation();
   const [processing, setProcessing] = useState(null);
 
-  useUpdatePageTitle(createTitleFromSegments([project?.title, "Danger Zone"]));
+  useUpdatePageTitle(createTitleFromSegments([project?.title, t("Danger Zone")]));
 
   const showDangerConfirmation = ({ title, message, requiredWord, buttonText, onConfirm }) => {
     const isDev = process.env.NODE_ENV === "development";
@@ -38,7 +40,7 @@ export const DangerZone = () => {
               {message}
             </Typography>
             <Input
-              label={`To proceed, type "${requiredWord}" in the field below:`}
+              label={t('To proceed, type "{{word}}" in the field below:', { word: requiredWord })}
               value={inputValue}
               onChange={(e) => ctrl?.setState({ inputValue: e.target.value })}
               autoFocus
@@ -61,7 +63,7 @@ export const DangerZone = () => {
               onClick={() => ctrl?.hide()}
               data-testid="danger-zone-cancel-button"
             >
-              Cancel
+              {t("Cancel")}
             </Button>
             <Button
               variant="negative"
@@ -83,34 +85,22 @@ export const DangerZone = () => {
   const handleOnClick = (type) => () => {
     const actionConfig = {
       reset_cache: {
-        title: "Reset Cache",
-        message: (
-          <>
-            You are about to reset the cache for <strong>{project.title}</strong>. This action cannot be undone.
-          </>
-        ),
+        title: t("Reset Cache"),
+        message: t("danger.reset_cache_message", { name: project.title }),
         requiredWord: "cache",
-        buttonText: "Reset Cache",
+        buttonText: t("Reset Cache"),
       },
       tabs: {
-        title: "Drop All Tabs",
-        message: (
-          <>
-            You are about to drop all tabs for <strong>{project.title}</strong>. This action cannot be undone.
-          </>
-        ),
+        title: t("Drop All Tabs"),
+        message: t("danger.drop_tabs_message", { name: project.title }),
         requiredWord: "tabs",
-        buttonText: "Drop All Tabs",
+        buttonText: t("Drop All Tabs"),
       },
       project: {
-        title: "Delete Project",
-        message: (
-          <>
-            You are about to delete the project <strong>{project.title}</strong>. This action cannot be undone.
-          </>
-        ),
+        title: t("Delete Project"),
+        message: t("danger.delete_project_message", { name: project.title }),
         requiredWord: "delete",
-        buttonText: "Delete Project",
+        buttonText: t("Delete Project"),
       },
     };
 
@@ -131,25 +121,25 @@ export const DangerZone = () => {
                 pk: project.id,
               },
             });
-            toast.show({ message: "Cache reset successfully" });
+            toast.show({ message: t("Cache reset successfully") });
           } else if (type === "tabs") {
             await api.callApi("deleteTabs", {
               body: {
                 project: project.id,
               },
             });
-            toast.show({ message: "All tabs dropped successfully" });
+            toast.show({ message: t("All tabs dropped successfully") });
           } else if (type === "project") {
             await api.callApi("deleteProject", {
               params: {
                 pk: project.id,
               },
             });
-            toast.show({ message: "Project deleted successfully" });
+            toast.show({ message: t("Project deleted successfully") });
             history.replace("/projects");
           }
         } catch (error) {
-          toast.show({ message: `Error: ${error.message}`, type: "error" });
+          toast.show({ message: t("Error: {{message}}", { message: error.message }), type: "error" });
         } finally {
           setProcessing(null);
         }
@@ -162,48 +152,50 @@ export const DangerZone = () => {
       {
         type: "annotations",
         disabled: true, //&& !project.total_annotations_number,
-        label: `Delete ${project.total_annotations_number} Annotations`,
+        label: t("Delete {{count}} Annotations", { count: project.total_annotations_number }),
       },
       {
         type: "tasks",
         disabled: true, //&& !project.task_number,
-        label: `Delete ${project.task_number} Tasks`,
+        label: t("Delete {{count}} Tasks", { count: project.task_number }),
       },
       {
         type: "predictions",
         disabled: true, //&& !project.total_predictions_number,
-        label: `Delete ${project.total_predictions_number} Predictions`,
+        label: t("Delete {{count}} Predictions", { count: project.total_predictions_number }),
       },
       {
         type: "reset_cache",
-        help:
-          "Reset Cache may help in cases like if you are unable to modify the labeling configuration due " +
-          "to validation errors concerning existing labels, but you are confident that the labels don't exist. You can " +
-          "use this action to reset the cache and try again.",
-        label: "Reset Cache",
+        help: t(
+          "Reset Cache may help in cases like if you are unable to modify the labeling configuration due to validation errors concerning existing labels, but you are confident that the labels don't exist. You can use this action to reset the cache and try again.",
+        ),
+        label: t("Reset Cache"),
       },
       {
         type: "tabs",
-        help: "If the Data Manager is not loading, dropping all Data Manager tabs can help.",
-        label: "Drop All Tabs",
+        help: t("If the Data Manager is not loading, dropping all Data Manager tabs can help."),
+        label: t("Drop All Tabs"),
       },
       {
         type: "project",
-        help: "Deleting a project removes all tasks, annotations, and project data from the database.",
-        label: "Delete Project",
+        help: t(
+          "Deleting a project removes all tasks, annotations, and project data from the database.",
+        ),
+        label: t("Delete Project"),
       },
     ],
-    [project],
+    [project, t],
   );
 
   return (
     <div className={cn("simple-settings")}>
       <Typography variant="headline" size="medium" className="mb-tighter">
-        Danger Zone
+        {t("Danger Zone")}
       </Typography>
       <Typography variant="body" size="medium" className="text-neutral-content-subtler !mb-base">
-        Perform these actions at your own risk. Actions you take on this page can't be reverted. Make sure your data is
-        backed up.
+        {t(
+          "Perform these actions at your own risk. Actions you take on this page can't be reverted. Make sure your data is backed up.",
+        )}
       </Typography>
 
       {project.id ? (

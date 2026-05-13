@@ -25,6 +25,12 @@ def forward_migration(migration_name, db_alias):
         SET created_at = datetime(expire_at, %s);
         """
         sql_params = (f'-{settings.TASK_LOCK_TTL} seconds',)
+    elif conn.vendor == 'mysql':
+        sql_update_created_at = """
+        UPDATE tasks_tasklock
+        SET created_at = DATE_SUB(expire_at, INTERVAL %s SECOND);
+        """
+        sql_params = (settings.TASK_LOCK_TTL,)
     else:
         sql_update_created_at = """
         UPDATE tasks_tasklock

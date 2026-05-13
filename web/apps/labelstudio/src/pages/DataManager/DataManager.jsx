@@ -10,6 +10,7 @@ import { useProject } from "../../providers/ProjectProvider";
 import { useContextProps, useParams } from "../../providers/RoutesProvider";
 import { addCrumb, deleteCrumb } from "../../services/breadrumbs";
 import { cn } from "../../utils/bem";
+import { getMainPlatformAuthHeaders } from "../../utils/getMainPlatformToken";
 import { isDefined } from "../../utils/helpers";
 import { ImportModal } from "../CreateProject/Import/ImportModal";
 import { ExportPage } from "../ExportPage/ExportPage";
@@ -36,11 +37,13 @@ const initializeDataManager = async (root, props, params) => {
     polling: window.APP_SETTINGS?.polling,
     showPreviews: false,
     apiEndpoints: APIConfig.endpoints,
+    apiHeaders: getMainPlatformAuthHeaders(),
     interfaces: {
       import: true,
       export: true,
       backButton: false,
       labelingHeader: false,
+      instruction: true,
       autoAnnotation: params.autoAnnotation,
     },
     labelStudio: {
@@ -126,9 +129,9 @@ export const DataManagerPage = ({ ...props }) => {
       history.push(buildLink("/data/import", { id: params?.id ?? project?.id }));
     });
 
-    // Navigate to Storage Settings and auto-open Add Source Storage modal
+    // Cloud storage UI hidden from project settings; fall back to general settings
     dataManager.on("openSourceStorageModal", () => {
-      history.push(buildLink("/settings/storage?open=source", { id: params?.id ?? project?.id }));
+      history.push(buildLink("/settings", { id: params?.id ?? project?.id }));
     });
 
     dataManager.on("exportClicked", () => {
@@ -221,7 +224,7 @@ export const DataManagerPage = ({ ...props }) => {
       </Button>
     </div>
   ) : (
-    <>
+    <div className={cn("datamanager-layout").toClassName()}>
       {loading && (
         <div className="flex-1 absolute inset-0 flex items-center justify-center">
           <Spinner size={64} />
@@ -229,7 +232,7 @@ export const DataManagerPage = ({ ...props }) => {
       )}
       {/* Allow this to exist before the DataManager is initialized as the async app.fetchData call eventually calls startLabeling, and that requires the root element to exist */}
       <div ref={root} className={cn("datamanager").toClassName()} />
-    </>
+    </div>
   );
 };
 
@@ -241,6 +244,12 @@ DataManagerPage.pages = {
 DataManagerPage.context = ({ dmRef }) => {
   const { project } = useProject();
   const [mode, setMode] = useState(dmRef?.mode ?? "explorer");
+  /** 一次进入标注工作台（explorer 之外）只自动弹一次，离开工作台后清零 */
+  const instructionAutoShownRef = useRef(false);
+
+  useEffect(() => {
+    instructionAutoShownRef.current = false;
+  }, [project?.id]);
 
   const links = {
     "/settings": "Settings",
@@ -259,34 +268,45 @@ DataManagerPage.context = ({ dmRef }) => {
     }
   };
 
-  const showLabelingInstruction = (currentMode) => {
-    const isLabelStream = currentMode === "labelstream";
-    const { expert_instruction, show_instruction } = project;
+  const showLabelingInstruction = useCallback(
+    (currentMode) => {
+      const { expert_instruction, show_instruction } = project ?? {};
+      const inLabelWorkspace = currentMode === "labelstream" || currentMode === "labeling";
 
-    if (isLabelStream && show_instruction && expert_instruction) {
+      if (!inLabelWorkspace) {
+        instructionAutoShownRef.current = false;
+        return;
+      }
+      if (!show_instruction || !expert_instruction?.trim?.()) return;
+      if (instructionAutoShownRef.current) return;
+
+      instructionAutoShownRef.current = true;
       modal({
         title: "Labeling Instructions",
         body: <div dangerouslySetInnerHTML={{ __html: expert_instruction }} />,
         style: { width: 680 },
       });
-    }
-  };
-
-  const onDMModeChanged = (currentMode) => {
-    setMode(currentMode);
-    updateCrumbs(currentMode);
-    showLabelingInstruction(currentMode);
-  };
+    },
+    [project],
+  );
 
   useEffect(() => {
-    if (dmRef) {
-      dmRef.on("modeChanged", onDMModeChanged);
-    }
+    if (!dmRef) return;
+
+    const onModeChanged = (currentMode) => {
+      setMode(currentMode);
+      updateCrumbs(currentMode);
+      showLabelingInstruction(currentMode);
+    };
+
+    dmRef.on("modeChanged", onModeChanged);
+    // 进入 /data?labeling=1&task=… 等场景下，常在监听挂载前就触发过 modeChanged；同步当前模式补齐弹窗。
+    onModeChanged(dmRef.mode);
 
     return () => {
-      dmRef?.off?.("modeChanged", onDMModeChanged);
+      dmRef.off?.("modeChanged", onModeChanged);
     };
-  }, [dmRef, project]);
+  }, [dmRef, showLabelingInstruction]);
 
   return project && project.id ? (
     <Space size="small">

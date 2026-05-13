@@ -162,39 +162,30 @@ const invokeAction = (action, destructive, store, formRef) => {
     // Generate dynamic content for destructive actions
     let dialogTitle = title;
     let dialogText = text;
-    let okButtonText = "OK";
+    let okButtonText = "确定";
 
     if (destructive && !title) {
-      // Extract object type from action ID and title
       const objectMap = {
-        delete_tasks: "tasks",
-        delete_annotations: "annotations",
-        delete_predictions: "predictions",
-        delete_reviews: "reviews",
-        delete_reviewers: "review assignments",
-        delete_annotators: "annotator assignments",
-        delete_ground_truths: "ground truths",
+        delete_tasks: "任务",
+        delete_annotations: "标注",
+        delete_predictions: "预测",
+        delete_reviews: "审核记录",
+        delete_reviewers: "审核分配",
+        delete_annotators: "标注分配",
+        delete_ground_truths: "标准答案",
       };
 
-      const objectType = objectMap[action.id] || action.title.toLowerCase().replace("delete ", "");
-      dialogTitle = `Delete selected ${objectType}?`;
-
-      // Convert to title case for button text
-      const titleCaseObject = objectType
-        .split(" ")
-        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(" ");
-      okButtonText = `Delete ${titleCaseObject}`;
+      const objectType = objectMap[action.id] || action.title;
+      dialogTitle = `确定删除所选${objectType}？`;
+      okButtonText = `删除${objectType}`;
     }
 
     if (destructive && !form) {
-      // Use standardized warning message for simple delete actions
-      const objectType = dialogTitle ? dialogTitle.replace("Delete selected ", "").replace("?", "") : "items";
-      dialogText = `You are about to delete the selected ${objectType}.\n\nThis can't be undone.`;
+      dialogText = `你正在删除所选项。\n\n此操作不可撤销。`;
     }
 
     dialog({
-      title: dialogTitle ? dialogTitle : destructive ? "Destructive action" : "Confirm action",
+      title: dialogTitle ? dialogTitle : destructive ? "危险操作" : "确认操作",
       body: <DialogContent text={dialogText} form={form} formRef={formRef} store={store} action={action} />,
       buttonLook: destructive ? "negative" : "primary",
       okText: destructive ? okButtonText : undefined,
@@ -233,7 +224,7 @@ export const ActionsButton = injector(
     const actionButtons = actions.map((action) => (
       <ActionButton key={action.id} action={action} parentRef={formRef} store={store} formRef={formRef} />
     ));
-    const recordTypeLabel = isFFLOPSE3 && store.SDK.type === "DE" ? "Record" : "Task";
+    const recordTypeLabel = isFFLOPSE3 && store.SDK.type === "DE" ? "条记录" : "条任务";
 
     return (
       <Dropdown.Trigger
@@ -241,7 +232,7 @@ export const ActionsButton = injector(
           <Menu size="compact">
             {isLoading || isFetching ? (
               <Menu.Item data-testid="loading-actions" disabled>
-                Loading actions...
+                加载操作中...
               </Menu.Item>
             ) : (
               actionButtons
@@ -258,10 +249,10 @@ export const ActionsButton = injector(
           look="outlined"
           disabled={!hasSelected}
           trailing={<IconChevronDown />}
-          aria-label="Tasks Actions"
+          aria-label="任务操作"
           {...rest}
         >
-          {selectedCount > 0 ? `${selectedCount} ${recordTypeLabel}${selectedCount > 1 ? "s" : ""}` : "Actions"}
+          {selectedCount > 0 ? `${selectedCount} ${recordTypeLabel}` : "操作"}
         </Button>
       </Dropdown.Trigger>
     );

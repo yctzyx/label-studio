@@ -116,6 +116,16 @@ class User(UserMixin, AbstractBaseUser, PermissionsMixin, UserLastActivityMixin)
     username = models.CharField(_('username'), max_length=256)
     email = models.EmailField(_('email address'), unique=True, blank=True)
 
+    external_user_id = models.CharField(
+        _('external user id'),
+        max_length=64,
+        null=True,
+        blank=True,
+        unique=True,
+        db_index=True,
+        help_text=_('父平台 pub_user.id，用于目录同步与幂等 upsert'),
+    )
+
     first_name = models.CharField(_('first name'), max_length=256, blank=True)
     last_name = models.CharField(_('last name'), max_length=256, blank=True)
     phone = models.CharField(_('phone'), max_length=256, blank=True)

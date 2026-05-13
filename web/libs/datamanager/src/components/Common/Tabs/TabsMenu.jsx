@@ -6,20 +6,20 @@ export const TabsMenu = ({ onClick, editable = true, closable = true, clonable =
     () => [
       {
         key: "edit",
-        title: "Rename",
+        title: "重命名",
         enabled: editable && !virtual,
         action: () => onClick("edit"),
       },
       {
         key: "duplicate",
-        title: "Duplicate",
+        title: "复制",
         enabled: !virtual && clonable,
         action: () => onClick("duplicate"),
         willLeave: true,
       },
       {
         key: "save",
-        title: "Save",
+        title: "保存",
         enabled: virtual,
         action: () => onClick("save"),
         willLeave: true,
@@ -44,7 +44,7 @@ export const TabsMenu = ({ onClick, editable = true, closable = true, clonable =
         <>
           {showDivider && <Menu.Divider />}
           <Menu.Item onClick={() => onClick("close")} data-leave>
-            Close
+            关闭
           </Menu.Item>
         </>
       ) : null}
