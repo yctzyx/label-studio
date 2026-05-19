@@ -20,7 +20,7 @@ import "./DataManager.scss";
 
 const loadDependencies = () => [import("@humansignal/datamanager"), import("@humansignal/editor")];
 
-const initializeDataManager = async (root, props, params) => {
+const initializeDataManager = async (root, props, params, runtimeUser) => {
   if (!window.LabelStudio) throw Error("Label Studio Frontend doesn't exist on the page");
   if (!root && root.dataset.dmInitialized) return;
 
@@ -48,6 +48,9 @@ const initializeDataManager = async (root, props, params) => {
     },
     labelStudio: {
       keymap: window.APP_SETTINGS.editor_keymap,
+      // In embed mode APP_SETTINGS.user can be a mock shell user (e.g. id=0).
+      // Prefer runtime whoami user resolved via authenticated API.
+      user: runtimeUser ?? window.APP_SETTINGS?.user,
     },
     ...props,
     ...settings,
@@ -86,6 +89,16 @@ export const DataManagerPage = ({ ...props }) => {
     });
 
     const interactiveBacked = (mlBackends ?? []).find(({ is_interactive }) => is_interactive);
+    let runtimeUser = null;
+
+    try {
+      const me = await api.callApi("me");
+      if (me && !me.error) {
+        runtimeUser = me;
+      }
+    } catch {
+      // Keep APP_SETTINGS fallback when whoami isn't available in local/dev shells
+    }
 
     const dataManager = (dataManagerRef.current =
       dataManagerRef.current ??
@@ -93,7 +106,7 @@ export const DataManagerPage = ({ ...props }) => {
         ...params,
         project,
         autoAnnotation: isDefined(interactiveBacked),
-      })));
+      }, runtimeUser)));
 
     Object.assign(window, { dataManager });
 

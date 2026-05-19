@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import math
-from typing import List, Sequence
+from typing import Dict, List, Sequence
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.db.models import CharField, Q
+from django.db.models.functions import Cast
 from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import ValidationError
 
@@ -148,7 +150,8 @@ def _mark_task_done(wf: TaskWorkflow) -> None:
     """Set the workflow row to done and ensure the task is_labeled flag is up to date."""
     wf.stage = TaskWorkflowStage.DONE
     wf.current_assignee = None
-    wf.save(update_fields=['stage', 'current_assignee', 'updated_at'])
+    wf.returned_to_annotation = False
+    wf.save(update_fields=['stage', 'current_assignee', 'returned_to_annotation', 'updated_at'])
     task = wf.task
     if task and not task.is_labeled:
         task.is_labeled = True
@@ -176,18 +179,20 @@ def submit_annotation_after_labeling(task_id: int, user) -> TaskWorkflow:
     ).exists():
         raise ValidationError('Submit at least one non-cancelled annotation first')
 
+    wf.returned_to_annotation = False
+
     if _review_pool_ids(project):
         reviewer = pick_next_round_robin(project, ProjectTeamRole.REVIEW)
         wf.stage = TaskWorkflowStage.REVIEW
         wf.current_assignee = reviewer
-        wf.save(update_fields=['stage', 'current_assignee', 'updated_at'])
+        wf.save(update_fields=['stage', 'current_assignee', 'returned_to_annotation', 'updated_at'])
         return wf
 
     if _accept_pool_ids(project):
         accepter = pick_next_round_robin(project, ProjectTeamRole.ACCEPT)
         wf.stage = TaskWorkflowStage.ACCEPT
         wf.current_assignee = accepter
-        wf.save(update_fields=['stage', 'current_assignee', 'updated_at'])
+        wf.save(update_fields=['stage', 'current_assignee', 'returned_to_annotation', 'updated_at'])
         return wf
 
     _mark_task_done(wf)
@@ -205,7 +210,8 @@ def review_decision(task_id: int, user, approve: bool) -> TaskWorkflow:
     if not approve:
         wf.stage = TaskWorkflowStage.ANNOTATE
         wf.current_assignee_id = wf.annotate_user_id
-        wf.save(update_fields=['stage', 'current_assignee', 'updated_at'])
+        wf.returned_to_annotation = True
+        wf.save(update_fields=['stage', 'current_assignee_id', 'returned_to_annotation', 'updated_at'])
         return wf
 
     if _accept_pool_ids(project):
@@ -229,15 +235,135 @@ def accept_decision(task_id: int, user, approve: bool) -> TaskWorkflow:
     if not approve:
         wf.stage = TaskWorkflowStage.ANNOTATE
         wf.current_assignee_id = wf.annotate_user_id
-        wf.save(update_fields=['stage', 'current_assignee', 'updated_at'])
+        wf.returned_to_annotation = True
+        wf.save(update_fields=['stage', 'current_assignee_id', 'returned_to_annotation', 'updated_at'])
         return wf
 
     _mark_task_done(wf)
     return wf
 
 
-def queryset_my_tasks(project, user, stage: str):
-    """stage: annotate | review | accept"""
+def release_workflows_after_team_allocation_removed(project, removed_user_id: int, role: str) -> Dict[str, int]:
+    """
+    Call **after** deleting the ``ProjectTeamAllocation`` row so pools exclude the removed user.
+
+    - **label**: Delete workflow rows still in ``annotate`` owned by this annotator → tasks become
+      undistributed and can receive new rows on the next ``distribute_tasks_for_project``.
+    - **review**: Reassign ``current_assignee`` for tasks in ``review`` waiting on this user;
+      if no reviewers remain, send tasks back to ``annotate`` / ``annotate_user``.
+    - **accept**: Same pattern for ``accept`` stage; if no accept pool, fall back to ``review`` or ``annotate``.
+    - **admin**: No workflow rows tied to admin role — no-op.
+
+    Returns coarse counters for observability (best-effort).
+    """
+    stats = {'annotate_workflows_deleted': 0, 'review_reassigned': 0, 'accept_reassigned': 0}
+
+    if role == ProjectTeamRole.ADMIN:
+        return stats
+
+    if role == ProjectTeamRole.LABEL:
+        total_deleted, _ = TaskWorkflow.objects.filter(
+            project=project,
+            annotate_user_id=removed_user_id,
+            stage=TaskWorkflowStage.ANNOTATE,
+        ).delete()
+        stats['annotate_workflows_deleted'] = total_deleted
+        return stats
+
+    if role == ProjectTeamRole.REVIEW:
+        with transaction.atomic():
+            workflows = list(
+                TaskWorkflow.objects.select_for_update().filter(
+                    project=project,
+                    stage=TaskWorkflowStage.REVIEW,
+                    current_assignee_id=removed_user_id,
+                )
+            )
+            pool = _review_pool_ids(project)
+            if pool:
+                for wf in workflows:
+                    next_u = pick_next_round_robin(project, ProjectTeamRole.REVIEW)
+                    wf.current_assignee_id = next_u.id
+                    wf.save(update_fields=['current_assignee_id', 'updated_at'])
+                    stats['review_reassigned'] += 1
+            else:
+                for wf in workflows:
+                    wf.stage = TaskWorkflowStage.ANNOTATE
+                    wf.current_assignee_id = wf.annotate_user_id
+                    wf.returned_to_annotation = False
+                    wf.save(update_fields=['stage', 'current_assignee_id', 'returned_to_annotation', 'updated_at'])
+                    stats['review_reassigned'] += 1
+        return stats
+
+    if role == ProjectTeamRole.ACCEPT:
+        with transaction.atomic():
+            workflows = list(
+                TaskWorkflow.objects.select_for_update().filter(
+                    project=project,
+                    stage=TaskWorkflowStage.ACCEPT,
+                    current_assignee_id=removed_user_id,
+                )
+            )
+            accept_pool = _accept_pool_ids(project)
+            review_pool = _review_pool_ids(project)
+            if accept_pool:
+                for wf in workflows:
+                    next_u = pick_next_round_robin(project, ProjectTeamRole.ACCEPT)
+                    wf.current_assignee_id = next_u.id
+                    wf.save(update_fields=['current_assignee_id', 'updated_at'])
+                    stats['accept_reassigned'] += 1
+            elif review_pool:
+                for wf in workflows:
+                    wf.stage = TaskWorkflowStage.REVIEW
+                    next_u = pick_next_round_robin(project, ProjectTeamRole.REVIEW)
+                    wf.current_assignee_id = next_u.id
+                    wf.save(update_fields=['stage', 'current_assignee_id', 'updated_at'])
+                    stats['accept_reassigned'] += 1
+            else:
+                for wf in workflows:
+                    wf.stage = TaskWorkflowStage.ANNOTATE
+                    wf.current_assignee_id = wf.annotate_user_id
+                    wf.returned_to_annotation = False
+                    wf.save(update_fields=['stage', 'current_assignee_id', 'returned_to_annotation', 'updated_at'])
+                    stats['accept_reassigned'] += 1
+        return stats
+
+    return stats
+
+
+def _apply_my_tasks_pipeline_status(qs, status: str):
+    """Filter Task queryset by coarse pipeline UI status (workflow-enabled tasks only)."""
+    if status == 'annotating':
+        return qs.filter(
+            workflow__stage=TaskWorkflowStage.ANNOTATE,
+            workflow__returned_to_annotation=False,
+        )
+    if status == 'rejected':
+        return qs.filter(
+            workflow__stage=TaskWorkflowStage.ANNOTATE,
+            workflow__returned_to_annotation=True,
+        )
+    if status == 'in_review':
+        return qs.filter(workflow__stage=TaskWorkflowStage.REVIEW)
+    if status == 'in_accept':
+        return qs.filter(workflow__stage=TaskWorkflowStage.ACCEPT)
+    if status == 'done':
+        return qs.filter(workflow__stage=TaskWorkflowStage.DONE)
+    return qs
+
+
+def queryset_my_tasks(project, user, stage: str, *, search: str | None = None, status: str | None = None):
+    """stage: annotate | review | accept
+
+    Optional filters (AND):
+    - search: match task id substring and/or task.data JSON text (same intent as DM quick search)
+    - status: annotating | rejected | in_review | in_accept | done (workflow-enabled); legacy without row uses is_labeled for done vs annotating
+
+    Annotate tab: tasks where this user is ``annotate_user`` (assigned labeler). Includes rows still in
+    annotate stage (must usually also be ``current_assignee``), and rows already moved to
+    review/accept/done after submit — so labelers still see completed / downstream tasks.
+    Review/accept tabs: tasks currently in that stage with ``current_assignee`` = user.
+    """
     from tasks.models import Task
 
     stage_map = {
@@ -248,8 +374,49 @@ def queryset_my_tasks(project, user, stage: str):
     if stage not in stage_map:
         raise ValidationError('Invalid stage filter')
 
-    return Task.objects.filter(
-        project=project,
-        workflow__stage=stage_map[stage],
-        workflow__current_assignee_id=user.id,
-    ).select_related('workflow', 'project')
+    allowed_status = (
+        None,
+        '',
+        'annotating',
+        'rejected',
+        'in_review',
+        'in_accept',
+        'done',
+    )
+    if status not in allowed_status:
+        raise ValidationError('Invalid status filter (annotating|rejected|in_review|in_accept|done)')
+
+    if stage == 'annotate':
+        qs = (
+            Task.objects.filter(project=project, workflow__annotate_user_id=user.id)
+            .filter(
+                Q(~Q(workflow__stage=TaskWorkflowStage.ANNOTATE))
+                | Q(workflow__current_assignee_id=user.id)
+            )
+            .select_related('workflow', 'project')
+        )
+    else:
+        qs = Task.objects.filter(
+            project=project,
+            workflow__stage=stage_map[stage],
+            workflow__current_assignee_id=user.id,
+        ).select_related('workflow', 'project')
+
+    if search:
+        term = search.strip()
+        if term:
+            qs = qs.annotate(_mt_id_text=Cast('id', output_field=CharField())).filter(
+                Q(_mt_id_text__icontains=term) | Q(data__icontains=term)
+            )
+
+    if status:
+        if project.task_workflow_enabled:
+            qs = _apply_my_tasks_pipeline_status(qs, status)
+        elif status == 'done':
+            qs = qs.filter(is_labeled=True)
+        elif status == 'annotating':
+            qs = qs.filter(is_labeled=False)
+        else:
+            qs = qs.none()
+
+    return qs

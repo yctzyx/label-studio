@@ -195,6 +195,43 @@ def _annotate_has_ground_truths(tasks: QuerySet[Task]) -> QuerySet[Task]:
     return tasks.annotate(has_ground_truths=Exists(ground_truth))
 
 
+def _workflow_rework_q(project: Project, user: User) -> Q:
+    """Team workflow: task rejected back to the same annotator for re-labeling."""
+    if not getattr(project, 'task_workflow_enabled', False):
+        return Q(pk__in=[])
+    from projects.workflow_models import TaskWorkflowStage
+
+    return Q(
+        workflow__project_id=project.id,
+        workflow__stage=TaskWorkflowStage.ANNOTATE,
+        workflow__returned_to_annotation=True,
+        workflow__current_assignee_id=user.id,
+    )
+
+
+def workflow_rework_queue(next_task, prepared_tasks, project, user, assigned_flag, queue_info):
+    if next_task:
+        return next_task, queue_info
+
+    if not getattr(project, 'task_workflow_enabled', False):
+        return next_task, queue_info
+
+    rework_q = _workflow_rework_q(project, user)
+
+    rework_tasks = prepared_tasks.filter(rework_q).order_by('workflow__updated_at')
+    if not rework_tasks.exists():
+        return next_task, queue_info
+
+    if assigned_flag:
+        next_task = fast_first(rework_tasks)
+    else:
+        next_task = _get_first_unlocked(rework_tasks, user)
+    if next_task:
+        queue_info += (' & ' if queue_info else '') + 'Workflow rework queue'
+
+    return next_task, queue_info
+
+
 def get_not_solved_tasks_qs(
     user: User,
     project: Project,
@@ -204,7 +241,8 @@ def get_not_solved_tasks_qs(
 ) -> Tuple[QuerySet[Task], List[int], str, bool]:
     user_solved_tasks_array = user.annotations.filter(project=project, task__isnull=False)
     user_solved_tasks_array = user_solved_tasks_array.distinct().values_list('task__pk', flat=True)
-    not_solved_tasks = prepared_tasks.exclude(pk__in=user_solved_tasks_array)
+    rework_q = _workflow_rework_q(project, user)
+    not_solved_tasks = prepared_tasks.filter(~Q(pk__in=user_solved_tasks_array) | rework_q)
 
     # annotation can't have postponed draft, so skip annotation__project filter
     postponed_drafts = user.drafts.filter(task__project=project, was_postponed=True)
@@ -248,9 +286,11 @@ def get_not_solved_tasks_qs(
             if include_gt:
                 # Include GT tasks + is labeled=False
                 not_solved_tasks = _annotate_has_ground_truths(not_solved_tasks)
-                not_solved_tasks = not_solved_tasks.filter(Q(is_labeled=False) | Q(has_ground_truths=True))
+                not_solved_tasks = not_solved_tasks.filter(
+                    Q(is_labeled=False) | Q(has_ground_truths=True) | rework_q
+                )
             else:
-                not_solved_tasks = not_solved_tasks.filter(is_labeled=False)
+                not_solved_tasks = not_solved_tasks.filter(Q(is_labeled=False) | rework_q)
 
     if not flag_set('fflag_fix_back_lsdv_4523_show_overlap_first_order_27022023_short'):
         # show tasks with overlap > 1 first (unless tasks are already prioritized on agreement)
@@ -290,7 +330,11 @@ def get_not_solved_tasks_qs(
                 .values_list('pk', flat=True)
             )
 
-            not_solved_tasks = not_solved_tasks.exclude(pk__in=tasks_at_overlap)
+            overlap_exclude = tasks_at_overlap
+            if getattr(project, 'task_workflow_enabled', False):
+                rework_pks = prepared_tasks.filter(rework_q).values_list('pk', flat=True)
+                overlap_exclude = overlap_exclude.exclude(pk__in=rework_pks)
+            not_solved_tasks = not_solved_tasks.exclude(pk__in=overlap_exclude)
 
     return not_solved_tasks, user_solved_tasks_array, queue_info, prioritized_on_agreement
 
@@ -491,9 +535,13 @@ def get_next_task(
         )
 
         if not dm_queue:
-            next_task, use_task_lock, queue_info = get_next_task_without_dm_queue(
-                user, project, not_solved_tasks, assigned_flag, prioritized_low_agreement
+            next_task, queue_info = workflow_rework_queue(
+                next_task, prepared_tasks, project, user, assigned_flag, queue_info
             )
+            if not next_task:
+                next_task, use_task_lock, queue_info = get_next_task_without_dm_queue(
+                    user, project, not_solved_tasks, assigned_flag, prioritized_low_agreement
+                )
 
         if flag_set('fflag_fix_back_lsdv_4523_show_overlap_first_order_27022023_short'):
             # show tasks with overlap > 1 first

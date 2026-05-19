@@ -56,6 +56,75 @@ function isTaskWorkflowEnabledForProject(projectLike) {
   return v === true;
 }
 
+/**
+ * Read team workflow payload from the task snapshot.
+ * DM MST task model often omits `workflow` on the node; `source` is `JSON.stringify(taskData)` from the task API.
+ */
+function parseWorkflowFromTask(task) {
+  if (!task) return null;
+  let wf = task.workflow;
+  if (wf && typeof wf === "object" && wf.stage != null) return wf;
+  const raw = task.source;
+  if (!raw) return null;
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    wf = parsed?.workflow;
+    if (wf && typeof wf === "object" && wf.stage != null) return wf;
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+/** Resolve current LS user id (AppStore root — `lsf` in DM — or APP_SETTINGS fallback). */
+function resolveCurrentUserId(lsfRoot) {
+  const u = lsfRoot?.user;
+  const id = u?.id ?? u?.pk ?? window.APP_SETTINGS?.user?.id;
+  return id != null ? Number(id) : null;
+}
+
+/**
+ * Team workflow: switch bottom bar between labeling (submit/update) and review (accept/reject).
+ * @param {import("../stores/LabelStudio").LabelStudio} lsf
+ * @param {{ stage?: string, current_assignee_id?: number, currentAssigneeId?: number } | null | undefined} workflow
+ * @param {number | null} currentUserId
+ */
+function applyWorkflowEditorInterfaces(lsf, workflow, currentUserId) {
+  if (!lsf) return;
+
+  const assigneeId = workflow?.current_assignee_id ?? workflow?.currentAssigneeId;
+  const isAssignee =
+    assigneeId != null && currentUserId != null && Number(assigneeId) === Number(currentUserId);
+  const stage = workflow?.stage;
+  const isReviewStage = stage === "review" || stage === "accept";
+  const isAnnotateStage = stage === "annotate";
+  const isDone = stage === "done";
+
+  if (isDone) {
+    lsf.toggleInterface("review", false);
+    lsf.toggleInterface("submit", false);
+    lsf.toggleInterface("update", false);
+    return;
+  }
+
+  if (isAssignee && isReviewStage) {
+    lsf.toggleInterface("review", true);
+    lsf.toggleInterface("submit", false);
+    lsf.toggleInterface("update", false);
+    return;
+  }
+
+  if (isAssignee && isAnnotateStage) {
+    lsf.toggleInterface("review", false);
+    lsf.toggleInterface("submit", true);
+    lsf.toggleInterface("update", true);
+    return;
+  }
+
+  // Explorer / wrong stage: no workflow review chrome (Quick View may still use canBeReviewed for others' work)
+  lsf.toggleInterface("review", false);
+}
+
 const errorHandlerAllowSpecialErrors = (result) => {
   const isPaused =
     result?.status === 403 &&
@@ -221,7 +290,7 @@ export class LSFWrapper {
     const commentClassificationConfig = dm.store.project.comment_classification_config;
 
     const lsfProperties = {
-      user: options.user,
+      user: options.user ?? window.APP_SETTINGS?.user,
       config: this.lsfConfig,
       task: taskToLSFormat(this.task),
       description: this.instruction,
@@ -458,13 +527,50 @@ export class LSFWrapper {
 
     this.lsf.assignTask(task);
     this.lsf.initializeStore(lsfTask);
-    this.setAnnotation(annotationID, fromHistory || isRejectedQueue, selectPrediction);
-    this.setLoading(false);
 
-    if (isFF(FF_FIT_1304_STRICT_OVERLAP) && this.overlapReached) {
-      // Show informational message if overlap is reached (only when feature flag is enabled)
-      this.showOverlapReachedMessage();
+    const finishSetTask = () => {
+      this.setAnnotation(annotationID, fromHistory || isRejectedQueue, selectPrediction);
+      this.setLoading(false);
+
+      if (isFF(FF_FIT_1304_STRICT_OVERLAP) && this.overlapReached) {
+        this.showOverlapReachedMessage();
+      }
+    };
+
+    void this.applyWorkflowEditorMode(task).finally(finishSetTask);
+  }
+
+  /**
+   * Load workflow for this task (from snapshot `source`, then optional GET) and toggle LSF interfaces.
+   * Does not depend on `store.project.task_workflow_enabled` (DM `/project` may omit it while `/projects/:id` has it).
+   */
+  async applyWorkflowEditorMode(task) {
+    if (!this.lsf) return;
+
+    let workflow = parseWorkflowFromTask(task);
+
+    if (!workflow && task?.id) {
+      const detail = await this.datamanager.apiCall(
+        "taskWorkflowDetail",
+        { taskID: task.id },
+        {},
+        { errorHandler: errorHandlerSwallowWorkflow },
+      );
+      if (detail && !detail.error) {
+        const w = detail.workflow ?? detail;
+        if (w && typeof w === "object" && w.stage != null) {
+          workflow = w;
+        }
+      }
     }
+
+    const uid = resolveCurrentUserId(this.lsf);
+    if (!workflow) {
+      applyWorkflowEditorInterfaces(this.lsf, null, uid);
+      return;
+    }
+
+    applyWorkflowEditorInterfaces(this.lsf, workflow, uid);
   }
 
   /**

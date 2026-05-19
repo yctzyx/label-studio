@@ -35,7 +35,8 @@ function teamRowsToMembersByRole(rows) {
       teams: ["组织成员"],
       status: "enabled",
       allocationPercent: Number(row.allocation_percent ?? 0),
-      extractedPercent: 0,
+      assignedTaskCount: Number(row.assigned_task_count ?? 0),
+      completedTaskCount: Number(row.completed_task_count ?? 0),
     });
   }
   return m;
@@ -228,6 +229,9 @@ export const ProjectTeamWorkflowPage = () => {
   const [selectedLeft, setSelectedLeft] = useState(() => new Set());
   const [selectedRight, setSelectedRight] = useState(() => new Set());
   const [modalRight, setModalRight] = useState([]);
+  const [projectTaskCount, setProjectTaskCount] = useState(null);
+  const [projectAnnotationCompletedCount, setProjectAnnotationCompletedCount] = useState(null);
+
   /** 按组织分组：{ orgId, title, users[] }，人员仅挂在所属组织下（同一用户可在多个组织各出现一次） */
   const [orgGroups, setOrgGroups] = useState([]);
   const [orgUsersLoading, setOrgUsersLoading] = useState(false);
@@ -252,11 +256,17 @@ export const ProjectTeamWorkflowPage = () => {
         params: { pk: projectId },
       });
       const rows = Array.isArray(res) ? res : res?.results ?? [];
+      const total = Array.isArray(res) ? undefined : res?.project_task_count;
+      const annotated = Array.isArray(res) ? undefined : res?.project_annotation_completed_count;
+      setProjectTaskCount(typeof total === "number" ? total : null);
+      setProjectAnnotationCompletedCount(typeof annotated === "number" ? annotated : null);
       setMembersByRole(teamRowsToMembersByRole(rows));
     } catch (e) {
       console.error(e);
       toast.show({ message: e?.message || "加载项目人员失败", type: ToastType.alertError });
       setMembersByRole(emptyMembers());
+      setProjectTaskCount(null);
+      setProjectAnnotationCompletedCount(null);
     } finally {
       setTeamLoading(false);
     }
@@ -496,11 +506,12 @@ export const ProjectTeamWorkflowPage = () => {
       if (res == null) return;
       const created = res?.created ?? 0;
       toast.show({ message: `分发完成，新建 ${created} 条任务工作流`, type: ToastType.info });
+      await loadTeam();
     } catch (e) {
       console.error(e);
       toast.show({ message: e?.message || "分发失败（请至少配置一名标注人员及比例）", type: ToastType.alertError });
     }
-  }, [callApi, projectId, toast]);
+  }, [callApi, loadTeam, projectId, toast]);
 
   const onReset = useCallback(() => {
     const current = membersByRole[role] ?? [];
@@ -510,7 +521,6 @@ export const ProjectTeamWorkflowPage = () => {
       [role]: (prev[role] ?? []).map((m, idx) => ({
         ...m,
         allocationPercent: role === "label" ? evenPercents[idx] ?? 0 : 0,
-        extractedPercent: 0,
       })),
     }));
     toast.show({ message: "已本地按人数均分比例，请点击保存", type: ToastType.info });
@@ -574,6 +584,13 @@ export const ProjectTeamWorkflowPage = () => {
     setAllocPage((p) => Math.min(p, allocTotalPages));
   }, [allocTotalPages]);
 
+  /** 仅标注角色支持比例与分发弹窗；切换 Tab 时关闭以免残留 */
+  useEffect(() => {
+    if (role !== "label") {
+      setAllocModalOpen(false);
+    }
+  }, [role]);
+
   const roleLabel = ROLES.find((r) => r.key === role)?.label ?? "";
 
   return (
@@ -583,7 +600,7 @@ export const ProjectTeamWorkflowPage = () => {
         <div className={root.elem("steps").toClassName()}>
           <span>人员管理</span>
           <span style={{ opacity: 0.5, margin: "0 6px" }}>·</span>
-          <span>比例分配</span>
+          <span>工作流</span>
           <span style={{ marginLeft: 12, fontSize: 12 }}>项目 ID: {projectId}</span>
         </div>
       </header>
@@ -593,19 +610,28 @@ export const ProjectTeamWorkflowPage = () => {
           <div className={root.elem("workflow-notice-title").toClassName()}>任务流转与配置时机</div>
           <ul className={root.elem("workflow-notice-list").toClassName()}>
             <li>
-              默认顺序为：<strong>标注</strong>
-              {` → `}
-              <strong>审核</strong>（已配置审核人员时）
-              {` → `}
-              <strong>验收</strong>（已配置验收人员时）
-              {` → `}
-              <strong>完成</strong>。是否进入某环节，取决于在对应动作发生时（标注提交、审核通过等）项目中<strong>是否已有该角色人员</strong>，系统不会事后追溯补配。
+              <strong>流程：</strong>
+              一般为 <strong>标注</strong> → <strong>审核</strong> → <strong>验收</strong> → <strong>完成</strong>。
+              若项目未配置审核或验收人员，系统在到达该环节时<strong>自动跳过</strong>（例如无审核时标注提交后可进入验收或直接结束）。
             </li>
             <li>
-              <strong>验收人员建议在首次点击「分发任务」之前配好</strong>；至少须在<strong>第一条任务尚未因「无验收配置」而结束前</strong>完成配置。若审核通过时仍无任何验收人员，任务会<strong>直接标记完成</strong>，验收员在「我的任务」中<strong>不会</strong>看到该任务。
+              <strong>何时按什么配置走：</strong>
+              每次提交、通过或驳回，都只按<strong>当时的</strong>团队成员决定下一步；已结束或已跳过的环节<strong>不会</strong>对旧任务追溯重跑。
             </li>
             <li>
-              <strong>未配置验收的后果：</strong>有审核、无验收时，审核通过后流程结束；无审核、无验收时，标注达标后结束；仅有审核、事后才补验收——<strong>已在当时被结束的历史任务不会自动进入验收队列</strong>，仅新产生的流转会按新配置执行。
+              <strong>任务怎么到人：</strong>
+              「分发」主要面向<strong>标注</strong>，并按您在标注 Tab 填写的<strong>比例</strong>分摊。
+              <strong>审核、验收</strong>不按比例预分；任务进入该环节后，系统在<strong>本环节人员名单内轮流指派</strong>当前处理人。
+            </li>
+            <li>
+              <strong>验收要趁早配：</strong>
+              若业务必须经过验收，请在任务<strong>第一次应当进入验收之前</strong>就配好验收人员。
+              若那一刻仍无人，任务会<strong>直接结束</strong>，验收列表里不会出现该任务；事后即使补配验收人员，这批<strong>已结束的任务也不会自动回到验收</strong>。
+            </li>
+            <li>
+              <strong>移除成员：</strong>
+              移除<strong>标注人员</strong>会释放其尚未完成的标注任务，可再次「分发」。
+              移除<strong>审核或验收人员</strong>时，系统对其<strong>当前正在处理</strong>的任务做<strong>转派或退回</strong>（细则见<strong>标注人员</strong> Tab 下「比例分配」弹窗说明）。
             </li>
           </ul>
         </aside>
@@ -634,54 +660,47 @@ export const ProjectTeamWorkflowPage = () => {
         {!teamLoading && (
           <>
             <div className={root.elem("toolbar").toClassName()}>
-              <button type="button" className={root.elem("btn").mod({ primary: true }).toClassName()} onClick={openModal}>
-                添加人员
-              </button>
-              <button
-                type="button"
-                className={root.elem("btn").mod({ outline: true }).toClassName()}
-                onClick={async () => {
-                  setAllocPage(1);
-                  setAllocModalOpen(true);
-                  await autoEvenLabelIfLegacyAllHundred();
-                }}
-              >
-                比例分配
-              </button>
-              <button
-                type="button"
-                className={root.elem("btn").mod({ batch: true }).toClassName()}
-                disabled
-                title="暂未支持行内勾选，敬请期待"
-              >
-                批量启用
-              </button>
-              <button
-                type="button"
-                className={root.elem("btn").mod({ batch: true }).toClassName()}
-                disabled
-                title="暂未支持行内勾选，敬请期待"
-              >
-                批量禁用
-              </button>
-              <button type="button" className={root.elem("btn").mod({ batch: true }).toClassName()} disabled title="暂未支持行内勾选，敬请期待">
-                批量删除
-              </button>
+              <div className={root.elem("toolbar-start").toClassName()}>
+                <button type="button" className={root.elem("btn").mod({ primary: true }).toClassName()} onClick={openModal}>
+                  添加人员
+                </button>
+                {role === "label" && (
+                  <button
+                    type="button"
+                    className={root.elem("btn").mod({ outline: true }).toClassName()}
+                    onClick={async () => {
+                      setAllocPage(1);
+                      setAllocModalOpen(true);
+                      await autoEvenLabelIfLegacyAllHundred();
+                    }}
+                  >
+                    比例分配
+                  </button>
+                )}
+                <span
+                  className={root.elem("toolbar-task-total").toClassName()}
+                  title="总任务数为项目中全部任务；已标注为已提交标注（进入审核或之后环节）的任务数，不含尚未分发或仍在标注中的任务"
+                >
+                  总任务：{projectTaskCount ?? "—"} / 已标注：{projectAnnotationCompletedCount ?? "—"}
+                </span>
+              </div>
             </div>
 
             <div className={root.elem("table-wrap").toClassName()}>
-              <table className={root.elem("table").mod({ striped: true }).toClassName()}>
+              <table className={root.elem("table").mod({ striped: true, cols5: role === "label" }).toClassName()}>
               <thead>
                 <tr>
                   <th>用户名</th>
                   <th>所属团队</th>
+                  <th>已分配任务数</th>
+                  {role === "label" && <th title="该标注人已提交标注的任务数（已进入审核或之后环节）">已完成任务数</th>}
                   <th>状态</th>
                 </tr>
               </thead>
               <tbody>
                 {currentMembers.length === 0 ? (
                   <tr>
-                    <td colSpan={3}>
+                    <td colSpan={role === "label" ? 5 : 4}>
                       <div className={root.elem("empty").toClassName()}>暂无人员，请点击「添加人员」</div>
                     </td>
                   </tr>
@@ -689,14 +708,21 @@ export const ProjectTeamWorkflowPage = () => {
                   currentMembers.map((m) => (
                     <tr key={`${m.userId}-${m.allocationId}`}>
                       <td>
-                        {m.username}
-                        <span className={root.elem("muted-inline").toClassName()}>({m.displayName})</span>
+                        <span className={root.elem("cell-username").toClassName()} title={m.displayName}>
+                          {m.username}
+                        </span>
                       </td>
                       <td>
                         <div className={root.elem("teams").toClassName()} title={m.teams.join("、")}>
                           {m.teams.join("、")}
                         </div>
                       </td>
+                      <td>
+                        {role === "admin"
+                          ? "—"
+                          : m.assignedTaskCount}
+                      </td>
+                      {role === "label" && <td>{m.completedTaskCount}</td>}
                       <td>
                         <span
                           className={root
@@ -745,6 +771,58 @@ export const ProjectTeamWorkflowPage = () => {
               <p className={root.elem("step2-hint").toClassName()}>
                 当前角色：<strong>{roleLabel}</strong> · 共 {currentMembers.length} 人
               </p>
+              <div className={root.elem("alloc-rules").toClassName()}>
+                <div className={root.elem("alloc-rules-title").toClassName()}>分配逻辑说明</div>
+                {role === "label" && (
+                  <ul className={root.elem("alloc-rules-list").toClassName()}>
+                    <li>
+                      点击<strong>本弹窗底部「分发」</strong>时，系统会为<strong>尚未生成任务工作流</strong>的任务批量创建{" "}
+                      <code>task_workflow</code>，并把每条任务指派给一名<strong>标注责任人</strong>（
+                      <code>annotate_user</code>）。
+                    </li>
+                    <li>
+                      本列表中的<strong>分配比例</strong>为权重：不要求各人相加恰好 100%，但所有标注人员的比例之和必须<strong>大于 0</strong>
+                      ，否则无法分发。
+                    </li>
+                    <li>
+                      后端按<strong>最大余额法</strong>将任务总数拆成整数份：按比例近似分摊任务数量，保证每人分到整数条任务且总和等于待分发任务数。
+                    </li>
+                    <li>
+                      仅处理还没有工作流记录的任务，已分发过的任务不会被重复拆分；若在<strong>人员列表或本弹窗</strong>中<strong>移除标注人员</strong>，其名下仍处于<strong>标注阶段</strong>的工作流会被删除，对应任务可再次被「分发」分配给其他人。
+                    </li>
+                  </ul>
+                )}
+                {role === "review" && (
+                  <ul className={root.elem("alloc-rules-list").toClassName()}>
+                    <li>
+                      标注提交并进入审核环节后，系统在<strong>审核人员池</strong>内按<strong>轮询（Round-robin）</strong>指派当前处理人；列表中的<strong>分配比例</strong>不参与该轮询逻辑，可用于管理备注或后续扩展。
+                    </li>
+                    <li>
+                      池中人员顺序与后端查询的用户 ID 排序一致；多名审核员依次接单。
+                    </li>
+                    <li>
+                      若<strong>移除</strong>某位审核人员：当前由 TA 处理的审核任务会<strong>轮询转给其他审核员</strong>；若已无任何审核员，任务将<strong>退回标注阶段</strong>交给原标注责任人。
+                    </li>
+                  </ul>
+                )}
+                {role === "accept" && (
+                  <ul className={root.elem("alloc-rules-list").toClassName()}>
+                    <li>
+                      审核通过后进入验收环节时，系统在<strong>验收人员池</strong>内同样按<strong>轮询</strong>指派验收人；本页的<strong>分配比例</strong>不参与自动指派。
+                    </li>
+                    <li>
+                      若<strong>移除</strong>某位验收人员：当前由 TA 处理的验收任务会<strong>转给其他验收员</strong>；若无验收员但有审核员则<strong>退回审核</strong>；若仅剩标注链路则<strong>退回标注阶段</strong>。
+                    </li>
+                  </ul>
+                )}
+                {role === "admin" && (
+                  <ul className={root.elem("alloc-rules-list").toClassName()}>
+                    <li>
+                      <strong>项目管理员</strong>用于权限与管理人员名单；管理员角色上的<strong>分配比例</strong>不参与任务分发或审核/验收轮询。
+                    </li>
+                  </ul>
+                )}
+              </div>
               <div className={root.elem("panel-actions").toClassName()}>
                 <button
                   type="button"
@@ -767,14 +845,13 @@ export const ProjectTeamWorkflowPage = () => {
                     <tr>
                       <th>用户名</th>
                       <th>分配比例</th>
-                      <th>已提取比例</th>
                       <th>操作</th>
                     </tr>
                   </thead>
                   <tbody>
                     {allocSlice.length === 0 ? (
                       <tr>
-                        <td colSpan={4}>
+                        <td colSpan={3}>
                           <div className={root.elem("empty").toClassName()}>暂无数据，请先在列表中添加人员</div>
                         </td>
                       </tr>
@@ -795,7 +872,6 @@ export const ProjectTeamWorkflowPage = () => {
                             />
                             %
                           </td>
-                          <td>{m.extractedPercent.toFixed(2)}%</td>
                           <td>
                             <button
                               type="button"

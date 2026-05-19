@@ -387,11 +387,15 @@ const _Annotation = types
     get canBeReviewed() {
       const store = self.store;
 
+      const annotatorEmail = self.user?.email?.trim()?.toLowerCase();
+      const viewerEmail = store.user?.email?.trim()?.toLowerCase();
+
       return (
         isFF(FF_REVIEWER_FLOW) &&
         // not a current user — we can only review others' annotations
-        self.user?.email &&
-        store.user?.email !== self.user?.email &&
+        !!annotatorEmail &&
+        !!viewerEmail &&
+        viewerEmail !== annotatorEmail &&
         // we have this only in LSE
         getEnv(self).events.hasEvent("acceptAnnotation") &&
         // Quick View — we don't have View All in Label Stream

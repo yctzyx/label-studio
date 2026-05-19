@@ -93,18 +93,21 @@ export const Controls = controlsInjector<{ annotation: MSTAnnotation }>(
 
         const selected = store.annotationStore?.selected;
 
-        if (addedCommentThisSession) {
-          selected?.submissionInProgress();
-          callback();
-        } else if (commentText) {
-          e.preventDefault();
-          selected?.submissionInProgress();
-          await commentFormSubmit();
-          callback();
-        } else {
-          store.commentStore.setTooltipMessage(errorMessage);
+        try {
+          if (addedCommentThisSession) {
+            selected?.submissionInProgress();
+            await Promise.resolve(callback());
+          } else if (commentText) {
+            e.preventDefault();
+            selected?.submissionInProgress();
+            await commentFormSubmit();
+            await Promise.resolve(callback());
+          } else {
+            store.commentStore.setTooltipMessage(errorMessage);
+          }
+        } finally {
+          setIsInProgress(false);
         }
-        setIsInProgress(false);
       },
       [
         store.rejectAnnotation,
@@ -113,6 +116,44 @@ export const Controls = controlsInjector<{ annotation: MSTAnnotation }>(
         store.commentStore.commentFormSubmit,
         store.commentStore.addedCommentThisSession,
         isInProgress,
+      ],
+    );
+
+    /** 驳回：已在评论分支内执行 commentFormSubmit 时勿重复提交 */
+    const handleRejectWithComments = useCallback(
+      async (e: React.MouseEvent, errorMessage: string) => {
+        const { addedCommentThisSession, currentComment, commentFormSubmit } = store.commentStore;
+        const comment = currentComment[annotation.id];
+        const commentText = (comment?.text ?? comment)?.trim();
+
+        if (isInProgress) return;
+        setIsInProgress(true);
+
+        const selected = store.annotationStore?.selected;
+
+        try {
+          if (addedCommentThisSession) {
+            selected?.submissionInProgress();
+            await store.rejectAnnotation({});
+          } else if (commentText) {
+            e.preventDefault();
+            selected?.submissionInProgress();
+            await commentFormSubmit();
+            await store.rejectAnnotation({ skipCommentSubmit: true });
+          } else {
+            store.commentStore.setTooltipMessage(errorMessage);
+          }
+        } finally {
+          setIsInProgress(false);
+        }
+      },
+      [
+        store.rejectAnnotation,
+        store.commentStore.currentComment,
+        store.commentStore.commentFormSubmit,
+        store.commentStore.addedCommentThisSession,
+        isInProgress,
+        annotation.id,
       ],
     );
 
@@ -168,11 +209,14 @@ export const Controls = controlsInjector<{ annotation: MSTAnnotation }>(
           const selected = store.annotationStore?.selected;
 
           if (store.hasInterface("comments:reject")) {
-            handleActionWithComments(e, action, "驳回前请先填写评论");
+            if (hasCustomReject) {
+              await handleActionWithComments(e, action, "驳回前请先填写评论");
+            } else {
+              await handleRejectWithComments(e, "驳回前请先填写评论");
+            }
           } else {
             selected?.submissionInProgress();
-            await store.commentStore.commentFormSubmit();
-            action();
+            await store.rejectAnnotation({});
           }
         };
 
