@@ -551,21 +551,21 @@ export const ImportPage = ({
                     title={t("import.listCardTitle")}
                     className={scn("w-full flex-1 flex flex-col min-h-0", importClass.elem("panel-card").toClassName())}
                     contentClassName={scn(
-                      importClass.elem("table-scroll"),
+                      importClass.elem("table-scroll").toClassName(),
                       importClass.elem("list-card-body").toClassName(),
                       "flex-1 min-h-0",
                     )}
                     flushContent
                     headerClassName={importClass.elem("panel-card-heading").toClassName()}
                   >
-                    <table className={scn("w-full", importClass.elem("data-table"))}>
-                      <thead className="sticky top-0 z-[1] text-left text-body-small">
+                    <table className={scn("w-full", importClass.elem("data-table").toClassName())}>
+                      <thead className="sticky top-0 z-[1] text-left">
                         <tr>
-                          <th className="p-2 font-medium w-[120px]">{t("import.colSource")}</th>
-                          <th className="p-2 font-medium">{t("import.colName")}</th>
-                          <th className="p-2 font-medium min-w-[120px]">{t("import.colDetail")}</th>
-                          <th className="p-2 font-medium w-[100px]">{t("import.colSizeOrStatus")}</th>
-                          <th className="p-2 font-medium min-w-[140px] text-right">{t("import.colAction")}</th>
+                          <th className="w-[120px]">{t("import.colSource")}</th>
+                          <th>{t("import.colName")}</th>
+                          <th className="min-w-[120px]">{t("import.colDetail")}</th>
+                          <th className="w-[100px]">{t("import.colSizeOrStatus")}</th>
+                          <th className="min-w-[140px] text-right">{t("import.colAction")}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -580,23 +580,23 @@ export const ImportPage = ({
                         )}
                         {showParentRow && parentDatasetSelection && (
                           <tr key={`parent-ds-${parentDatasetSelection.datasetId}`}>
-                            <td className="p-2 align-middle">
+                            <td className="align-middle">
                               <Badge variant="info" className="h-5 text-xs rounded-sm whitespace-nowrap">
                                 {t("import.parentDataset.badge")}
                               </Badge>
                             </td>
-                            <td className="p-2 align-middle max-w-[200px]">
+                            <td className="align-middle max-w-[200px]">
                               <Typography variant="body" size="small" className="truncate">
                                 {parentDatasetSelection.datasetName}
                               </Typography>
                             </td>
-                            <td className="p-2 align-middle max-w-[280px] break-all text-body-small text-neutral-content-subtle">
+                            <td className="align-middle max-w-[280px] break-all text-body-small text-neutral-content-subtle">
                               {parentDatasetSelection.path}
                             </td>
-                            <td className="p-2 align-middle text-neutral-content-subtler text-body-small">
+                            <td className="align-middle text-neutral-content-subtler text-body-small">
                               {parentDatasetSelection.dataSetTypeLabel ?? parentDatasetSelection.dataSetType ?? "—"}
                             </td>
-                            <td className="p-2 align-middle text-right">
+                            <td className="align-middle text-right">
                               <div className={importClass.elem("parent-row-actions").toClassName()}>
                                 <Button
                                   size="small"
@@ -627,21 +627,21 @@ export const ImportPage = ({
                         )}
                         {showSampleRow && sample && (
                           <tr key={sample.url}>
-                            <td className="p-2 align-middle">
+                            <td className="align-middle">
                               <Badge variant="info" className="h-5 text-xs rounded-sm whitespace-nowrap">
                                 {t("import.sampleBadge")}
                               </Badge>
                             </td>
-                            <td className="p-2 align-middle max-w-[200px]">
+                            <td className="align-middle max-w-[200px]">
                               <Typography variant="body" size="small" className="truncate">
                                 {sample.title}
                               </Typography>
                             </td>
-                            <td className="p-2 align-middle text-body-small text-neutral-content-subtle">
+                            <td className="align-middle text-body-small text-neutral-content-subtle">
                               {sample.description}
                             </td>
-                            <td className="p-2 align-middle text-neutral-content-subtler text-body-small">—</td>
-                            <td className="p-2 align-middle text-right">
+                            <td className="align-middle text-neutral-content-subtler text-body-small">—</td>
+                            <td className="align-middle text-right">
                               <Button
                                 size="smaller"
                                 variant="negative"
@@ -664,18 +664,18 @@ export const ImportPage = ({
                               key={file.file}
                               className={newlyUploadedFiles.has(file.id) ? importClass.elem("upload-flash") : ""}
                             >
-                              <td className="p-2 align-middle">
+                              <td className="align-middle">
                                 <span className="text-body-small text-neutral-content">{t("import.sourceLocal")}</span>
                               </td>
-                              <td className={`${importClass.elem("file-name")} p-2 align-middle max-w-[240px]`}>
+                              <td className={`${importClass.elem("file-name")} align-middle max-w-[240px]`}>
                                 <Tooltip title={file.file}>
                                   <Typography variant="body" size="small" className="truncate">
                                     {truncatedFilename}
                                   </Typography>
                                 </Tooltip>
                               </td>
-                              <td className="p-2 align-middle text-neutral-content-subtler text-body-small">—</td>
-                              <td className={`${importClass.elem("file-size")} p-2 align-middle`}>
+                              <td className="align-middle text-neutral-content-subtler text-body-small">—</td>
+                              <td className={`${importClass.elem("file-size")} align-middle`}>
                                 <div className="flex flex-col gap-1 items-start">
                                   <span className={importClass.elem("file-status")} />
                                   <Typography
@@ -687,7 +687,7 @@ export const ImportPage = ({
                                   </Typography>
                                 </div>
                               </td>
-                              <td className="p-2 align-middle text-right text-neutral-content-subtler text-body-small">
+                              <td className="align-middle text-right text-neutral-content-subtler text-body-small">
                                 —
                               </td>
                             </tr>
@@ -702,21 +702,21 @@ export const ImportPage = ({
                           );
                           return (
                             <tr key={`${idx}-${file.name}`}>
-                              <td className="p-2 align-middle">
+                              <td className="align-middle">
                                 <span className="text-body-small text-neutral-content">{t("import.sourceLocal")}</span>
                               </td>
-                              <td className={`${importClass.elem("file-name")} p-2 align-middle max-w-[240px]`}>
+                              <td className={`${importClass.elem("file-name")} align-middle max-w-[240px]`}>
                                 <Tooltip title={file.name}>
                                   <Typography variant="body" size="small" className="truncate">
                                     {truncatedFilename}
                                   </Typography>
                                 </Tooltip>
                               </td>
-                              <td className="p-2 align-middle text-neutral-content-subtler text-body-small">—</td>
-                              <td className={`${importClass.elem("file-size")} p-2 align-middle`}>
+                              <td className="align-middle text-neutral-content-subtler text-body-small">—</td>
+                              <td className={`${importClass.elem("file-size")} align-middle`}>
                                 <span className={importClass.elem("file-status").mod({ uploading: true })} />
                               </td>
-                              <td className="p-2 align-middle text-right text-neutral-content-subtler text-body-small">
+                              <td className="align-middle text-right text-neutral-content-subtler text-body-small">
                                 —
                               </td>
                             </tr>

@@ -54,7 +54,7 @@ export function buttonVariant(
   {
     variant = "primary",
     look = "filled",
-    size = "medium",
+    size = "small",
     align = "default",
     waiting = false,
   }: {
@@ -142,7 +142,7 @@ const Button = forwardRef(
       className = "",
       variant = "primary",
       look = "filled",
-      size = "medium",
+      size = "small",
       waiting = false,
       align = "default",
       waitingClickable = false,

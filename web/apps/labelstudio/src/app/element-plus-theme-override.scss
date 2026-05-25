@@ -1,0 +1,359 @@
+// Element Plus theme override for wujie embed mode.
+// Maps Label Studio's design tokens to Element Plus's design system so
+// the embedded app visually blends with the parent element-plus application.
+// Only applied under html.ls-embed — standalone LS is unaffected.
+//
+// Reference:
+//   - Color:   https://element-plus.org/en-US/component/color.html
+//   - Border:  https://element-plus.org/en-US/component/border.html
+//
+// Element Plus base palette:
+//   primary  #409EFF   success  #67C23A   warning  #E6A23C
+//   danger   #F56C6C   info     #909399
+// Element Plus typography:
+//   font-family: "Helvetica Neue", Helvetica, "PingFang SC", "Hiragino Sans GB",
+//                "Microsoft YaHei", Arial, sans-serif
+//   font-size base = 14px;  line-height base = 1.5
+// Element Plus border-radius:
+//   base 4px;  small 2px;  round 20px;  circle 100%
+
+html:global(.ls-embed) {
+  // =====================================================================
+  //  COLOR PALETTE
+  // =====================================================================
+
+  // Palette: grape → Element Plus primary (#409EFF)
+  --color-grape-000: #ecf5ff; // el primary light-9
+  --color-grape-100: #d9ecff; // light-8
+  --color-grape-200: #c6e2ff; // light-7
+  --color-grape-300: #a0cfff; // light-5
+  --color-grape-400: #79bbff; // light-3
+  --color-grape-500: #409eff; // base
+  --color-grape-600: #337ecc; // dark-2
+  --color-grape-700: #2666a3;
+  --color-grape-800: #1a4d7a;
+  --color-grape-900: #0d3352;
+  --color-grape-950: #061a29;
+
+  // Palette: sand → Element Plus neutral grey
+  --color-sand-000: #ffffff; // --el-bg-color
+  --color-sand-100: #fafafa; // --el-fill-color-lighter
+  --color-sand-200: #f5f7fa; // --el-fill-color-light
+  --color-sand-300: #ebeef5; // --el-border-color-lighter
+  --color-sand-400: #dcdfe6; // --el-border-color
+  --color-sand-500: #a8abb2; // --el-text-color-placeholder
+  --color-sand-600: #909399; // --el-text-color-secondary / --el-color-info
+  --color-sand-700: #606266; // --el-text-color-regular
+  --color-sand-800: #303133; // --el-text-color-primary
+  --color-sand-850: #232427;
+  --color-sand-900: #1d1e1f;
+  --color-sand-950: #0f1011;
+
+  // Palette: persimmon → Element Plus danger (#F56C6C)
+  --color-persimmon-000: #fef0f0;
+  --color-persimmon-100: #fde2e2;
+  --color-persimmon-200: #fcd3d3;
+  --color-persimmon-300: #fab6b6;
+  --color-persimmon-400: #f89898;
+  --color-persimmon-500: #f56c6c;
+  --color-persimmon-600: #c45656;
+  --color-persimmon-700: #934141;
+  --color-persimmon-800: #622b2b;
+  --color-persimmon-900: #311515;
+  --color-persimmon-950: #190a0a;
+
+  // Palette: kale → Element Plus success (#67C23A)
+  --color-kale-000: #f0f9eb;
+  --color-kale-100: #e1f3d8;
+  --color-kale-200: #d1edc4;
+  --color-kale-300: #b3e19d;
+  --color-kale-400: #95d475;
+  --color-kale-500: #67c23a;
+  --color-kale-600: #529b2e;
+  --color-kale-700: #3e7423;
+  --color-kale-800: #294e17;
+  --color-kale-900: #14270c;
+  --color-kale-950: #0a1406;
+
+  // Palette: canteloupe → Element Plus warning (#E6A23C)
+  --color-canteloupe-000: #fdf6ec;
+  --color-canteloupe-100: #faecd8;
+  --color-canteloupe-200: #f8e3c5;
+  --color-canteloupe-300: #f3d19e;
+  --color-canteloupe-400: #eebe77;
+  --color-canteloupe-500: #e6a23c;
+  --color-canteloupe-600: #b88230;
+  --color-canteloupe-700: #8a6124;
+  --color-canteloupe-800: #5c4118;
+  --color-canteloupe-900: #2e200c;
+  --color-canteloupe-950: #171006;
+
+  // Palette: blueberry → Element Plus info (#909399)
+  --color-blueberry-000: #f4f4f5;
+  --color-blueberry-100: #e9e9eb;
+  --color-blueberry-200: #dedfe0;
+  --color-blueberry-300: #c8c9cc;
+  --color-blueberry-400: #b1b3b8;
+  --color-blueberry-500: #909399;
+  --color-blueberry-600: #73767a;
+  --color-blueberry-700: #56595c;
+  --color-blueberry-800: #3a3b3d;
+  --color-blueberry-900: #1d1e1f;
+  --color-blueberry-950: #0e0f0f;
+
+  // Palette: mango → gold (kept for accent uses)
+  --color-mango-000: #fff8e8;
+  --color-mango-100: #fff1cf;
+  --color-mango-200: #ffe6a8;
+  --color-mango-300: #ffd778;
+  --color-mango-400: #f7c64c;
+  --color-mango-500: #f0b429;
+  --color-mango-600: #c0901f;
+  --color-mango-700: #906c17;
+  --color-mango-800: #604810;
+  --color-mango-900: #302408;
+  --color-mango-950: #181204;
+
+  // Palette: kiwi → lime
+  --color-kiwi-000: #f4faec;
+  --color-kiwi-100: #e7f4d4;
+  --color-kiwi-200: #d6ecb8;
+  --color-kiwi-300: #bcdf8e;
+  --color-kiwi-400: #a3d266;
+  --color-kiwi-500: #85c540;
+  --color-kiwi-600: #6a9d33;
+  --color-kiwi-700: #4f7626;
+  --color-kiwi-800: #354f1a;
+  --color-kiwi-900: #1a280d;
+  --color-kiwi-950: #0d1406;
+
+  // Palette: plum → magenta/pink
+  --color-plum-000: #fdf0f5;
+  --color-plum-100: #fbe1ea;
+  --color-plum-200: #f7c3d6;
+  --color-plum-300: #f199ba;
+  --color-plum-400: #e96f9d;
+  --color-plum-500: #db4980;
+  --color-plum-600: #af3a66;
+  --color-plum-700: #832c4d;
+  --color-plum-800: #571d33;
+  --color-plum-900: #2c0f1a;
+  --color-plum-950: #16070d;
+
+  // Palette: fig → purple
+  --color-fig-000: #f4eef9;
+  --color-fig-100: #e8dcf3;
+  --color-fig-200: #d1b9e7;
+  --color-fig-300: #b08fd4;
+  --color-fig-400: #9669c3;
+  --color-fig-500: #7d49b0;
+  --color-fig-600: #643b8d;
+  --color-fig-700: #4b2c6a;
+  --color-fig-800: #321d47;
+  --color-fig-900: #190f23;
+  --color-fig-950: #0c0712;
+
+  // =====================================================================
+  //  SEMANTIC COLOR TOKENS — directly override (bypass var() chain)
+  // =====================================================================
+
+  // Primary — Element Plus #409EFF
+  --color-primary-surface: #409eff;
+  --color-primary-surface-raw: 64 158 255;
+  --color-primary-surface-hover: #79bbff;
+  --color-primary-surface-hover-raw: 121 187 255;
+  --color-primary-surface-active: #337ecc;
+  --color-primary-surface-active-raw: 51 126 204;
+  --color-primary-surface-content: #ffffff;
+  --color-primary-surface-content-raw: 255 255 255;
+  --color-primary-surface-content-subtle: #d9ecff;
+  --color-primary-surface-content-subtle-raw: 217 236 255;
+  --color-primary-surface-icon: #d9ecff;
+  --color-primary-surface-icon-raw: 217 236 255;
+  --color-primary-content: #409eff;
+  --color-primary-content-raw: 64 158 255;
+  --color-primary-content-hover: #79bbff;
+  --color-primary-content-hover-raw: 121 187 255;
+  --color-primary-content-subtle: #409eff;
+  --color-primary-content-subtle-raw: 64 158 255;
+  --color-primary-icon: #409eff;
+  --color-primary-icon-raw: 64 158 255;
+  --color-primary-background: #ecf5ff;
+  --color-primary-background-raw: 236 245 255;
+  --color-primary-emphasis: #d9ecff;
+  --color-primary-emphasis-raw: 217 236 255;
+  --color-primary-emphasis-subtle: #ecf5ff;
+  --color-primary-emphasis-subtle-raw: 236 245 255;
+  --color-primary-border: #409eff;
+  --color-primary-border-raw: 64 158 255;
+  --color-primary-border-subtle: #409eff;
+  --color-primary-border-subtle-raw: 64 158 255;
+  --color-primary-border-subtler: #a0cfff;
+  --color-primary-border-subtler-raw: 160 207 255;
+  --color-primary-border-subtlest: #c6e2ff;
+  --color-primary-border-subtlest-raw: 198 226 255;
+  --color-primary-border-bold: #337ecc;
+  --color-primary-border-bold-raw: 51 126 204;
+  --color-primary-focus-outline: #c6e2ff;
+  --color-primary-focus-outline-raw: 198 226 255;
+  --color-primary-shadow: #2666a3;
+  --color-primary-shadow-raw: 38 102 163;
+
+  // Negative / Danger — Element Plus #F56C6C
+  --color-negative-surface: #f56c6c;
+  --color-negative-surface-raw: 245 108 108;
+  --color-negative-surface-hover: #f89898;
+  --color-negative-surface-hover-raw: 248 152 152;
+  --color-negative-surface-active: #c45656;
+  --color-negative-surface-active-raw: 196 86 86;
+  --color-negative-surface-content: #ffffff;
+  --color-negative-surface-content-raw: 255 255 255;
+  --color-negative-surface-content-subtle: #fde2e2;
+  --color-negative-surface-content-subtle-raw: 253 226 226;
+  --color-negative-surface-icon: #fde2e2;
+  --color-negative-surface-icon-raw: 253 226 226;
+  --color-negative-content: #c45656;
+  --color-negative-content-hover: #f56c6c;
+  --color-negative-content-subtle: #f56c6c;
+  --color-negative-icon: #f56c6c;
+  --color-negative-background: #fef0f0;
+  --color-negative-background-raw: 254 240 240;
+  --color-negative-emphasis: #fde2e2;
+  --color-negative-emphasis-subtle: #fef0f0;
+  --color-negative-border: #c45656;
+  --color-negative-border-subtle: #f56c6c;
+  --color-negative-border-subtler: #fab6b6;
+  --color-negative-border-subtlest: #fcd3d3;
+  --color-negative-border-bold: #934141;
+  --color-negative-focus-outline: #fcd3d3;
+  --color-negative-focus-outline-raw: 252 211 211;
+
+  // Positive / Success — Element Plus #67C23A
+  --color-positive-surface: #67c23a;
+  --color-positive-surface-raw: 103 194 58;
+  --color-positive-surface-hover: #95d475;
+  --color-positive-surface-hover-raw: 149 212 117;
+  --color-positive-surface-active: #529b2e;
+  --color-positive-surface-active-raw: 82 155 46;
+  --color-positive-surface-content: #ffffff;
+  --color-positive-surface-content-raw: 255 255 255;
+  --color-positive-surface-content-subtle: #e1f3d8;
+  --color-positive-surface-content-subtle-raw: 225 243 216;
+  --color-positive-surface-icon: #e1f3d8;
+  --color-positive-surface-icon-raw: 225 243 216;
+  --color-positive-content: #529b2e;
+  --color-positive-content-hover: #67c23a;
+  --color-positive-content-subtle: #67c23a;
+  --color-positive-icon: #67c23a;
+  --color-positive-background: #f0f9eb;
+  --color-positive-background-raw: 240 249 235;
+  --color-positive-emphasis: #e1f3d8;
+  --color-positive-emphasis-subtle: #f0f9eb;
+  --color-positive-border: #529b2e;
+  --color-positive-border-subtle: #67c23a;
+  --color-positive-border-subtler: #b3e19d;
+  --color-positive-border-subtlest: #d1edc4;
+  --color-positive-border-bold: #3e7423;
+  --color-positive-focus-outline: #d1edc4;
+  --color-positive-focus-outline-raw: 209 237 196;
+
+  // Warning — Element Plus #E6A23C
+  --color-warning-surface: #e6a23c;
+  --color-warning-surface-raw: 230 162 60;
+  --color-warning-surface-hover: #eebe77;
+  --color-warning-surface-hover-raw: 238 190 119;
+  --color-warning-surface-active: #b88230;
+  --color-warning-surface-active-raw: 184 130 48;
+  --color-warning-surface-content: #ffffff;
+  --color-warning-surface-content-raw: 255 255 255;
+  --color-warning-surface-content-subtle: #faecd8;
+  --color-warning-surface-content-subtle-raw: 250 236 216;
+  --color-warning-surface-icon: #faecd8;
+  --color-warning-surface-icon-raw: 250 236 216;
+  --color-warning-content: #b88230;
+  --color-warning-content-hover: #e6a23c;
+  --color-warning-content-subtle: #e6a23c;
+  --color-warning-icon: #e6a23c;
+  --color-warning-background: #fdf6ec;
+  --color-warning-background-raw: 253 246 236;
+  --color-warning-emphasis: #faecd8;
+  --color-warning-emphasis-subtle: #fdf6ec;
+  --color-warning-border: #b88230;
+  --color-warning-border-subtle: #e6a23c;
+  --color-warning-border-subtler: #f3d19e;
+  --color-warning-border-subtlest: #f8e3c5;
+  --color-warning-border-bold: #8a6124;
+  --color-warning-focus-outline: #f8e3c5;
+  --color-warning-focus-outline-raw: 248 227 197;
+
+  // Neutral — Element Plus text / border / fill
+  --color-neutral-surface-raw: 245 247 250; // fill-color-light
+  --color-neutral-surface-hover-raw: 255 255 255;
+  --color-neutral-surface-active-raw: 235 238 245; // border-color-lighter
+  --color-neutral-surface-inset-raw: 245 247 250;
+  --color-neutral-content-raw: 48 49 51; // text-color-primary
+  --color-neutral-background-raw: 255 255 255;
+  --color-neutral-background-bold-raw: 255 255 255;
+  --color-neutral-shadow-raw: 0 0 0; // el shadows use rgba(0,0,0,...)
+  --color-neutral-inverted-surface-raw: 48 49 51;
+  --color-neutral-inverted-surface-hover-raw: 96 98 102;
+  --color-neutral-inverted-surface-active-raw: 144 147 153;
+  --color-neutral-inverted-background-raw: 48 49 51;
+
+  // Legacy raw values (referenced directly by some scss)
+  --accent_color-raw: 64 158 255;
+  --grape_500-raw: 64 158 255;
+
+  // =====================================================================
+  //  TYPOGRAPHY — Element Plus font stack & weights
+  // =====================================================================
+
+  // Element Plus default font stack (Chinese-friendly system fonts)
+  --font-family-base: "Helvetica Neue", Helvetica, "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", Arial, sans-serif;
+  --font-family-body: "Helvetica Neue", Helvetica, "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", Arial, sans-serif;
+  --font-family-headings: "Helvetica Neue", Helvetica, "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", Arial, sans-serif;
+  --font-family-mono: SFMono-Regular, Menlo, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  --font-family-monospace: SFMono-Regular, Menlo, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+
+  // Element Plus uses 500 for emphasis; LS already does too. Re-affirm semibold
+  // is rendered as medium-weight (500) since 600 looks "too bold" beside el text.
+  --font-weight-semibold: 500;
+
+  // Element Plus uses 0 letter-spacing throughout (Chinese text doesn't benefit
+  // from tracking). Override LS's typography tracking so headings/labels look flat.
+  --letter-spacing-densest: 0;
+  --letter-spacing-denser: 0;
+  --letter-spacing-dense: 0;
+  --letter-spacing-base: 0;
+  --letter-spacing-wide: 0;
+  --letter-spacing-wider: 0;
+  --letter-spacing-widest: 0;
+
+  // =====================================================================
+  //  BORDER RADIUS — Element Plus is flatter than LS (default 4px)
+  //   --el-border-radius-base:  4px
+  //   --el-border-radius-small: 2px
+  //   --el-border-radius-round: 20px
+  // =====================================================================
+  --corner-radius-2: 2px; // el small
+  --corner-radius-4: 4px; // el base
+  --corner-radius-8: 4px; // flatten LS-8 to el base
+  --corner-radius-12: 6px;
+  --corner-radius-16: 8px;
+  --corner-radius-18: 8px;
+  --corner-radius-24: 12px;
+
+  // Semantic radius — also flattened
+  --corner-radius-smallest: 2px;
+  --corner-radius-smaller: 4px;
+  --corner-radius-small: 4px;
+  --corner-radius-medium: 4px;
+  --corner-radius-large: 6px;
+  --corner-radius-larger: 8px;
+  --corner-radius-largest: 12px;
+}

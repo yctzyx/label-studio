@@ -10,6 +10,8 @@
   max-width: 100%;
   overflow: hidden;
   box-sizing: border-box;
+  background-color: #fff;
+  border-radius: 4px;
 
   &__content {
     flex: 1;
@@ -41,11 +43,11 @@
     display: flex;
     flex-direction: column;
     min-height: 0;
-    background: #f5f7fb;
+    // background: #f5f7fb;
     width: 100%;
     max-width: 100%;
     margin: 0;
-    padding: 16px;
+    padding-right: 16px;
     box-sizing: border-box;
   }
 
@@ -78,10 +80,13 @@
     min-height: 0;
     box-sizing: border-box;
     background: #fff;
-    border: 1px solid #e8edf5;
-    border-radius: 12px;
+    // border: 1px solid #e8edf5;
+    // border-radius: 12px;
     padding: 16px;
-    box-shadow: 0 6px 20px rgb(20 40 90 / 5%);
+    // box-shadow: 0 6px 20px rgb(20 40 90 / 5%);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
   }
 
   &__sidebar-section {
@@ -89,6 +94,14 @@
       margin-top: 20px;
       padding-top: 16px;
       border-top: 1px solid #f0f0f0;
+    }
+
+    /* 最后一个 section（标签列表）占满剩余空间并允许内部滚动 */
+    &:last-child {
+      flex: 1 1 0%;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
     }
   }
 
@@ -157,7 +170,13 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
-    /* 不设 max-height，标签全部展开，避免侧栏内滚动条 */
+    flex: 1 1 0%;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: thin;
+
+    /* 给滚动条留一点空间，避免遮住 tag 文字 */
+    padding-right: 2px;
   }
 
   &__tag-pill {
@@ -314,17 +333,10 @@
   }
 
   &__empty-filter {
-    text-align: center;
-    padding: 48px 24px;
-    background: #fff;
-    border: 1px dashed #d9d9d9;
-    border-radius: 8px;
-    color: #8c8c8c;
-    font-size: 14px;
-
-    p {
-      margin: 0 0 12px;
-    }
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100%;
   }
 
   &__link {

@@ -1,4 +1,5 @@
 @import '../themes/default/variables';
+@import './element-plus-theme-override';
 
 body {
   --header-height: 48px;
@@ -12,14 +13,14 @@ body {
   background: var(--color-neutral-background);
   width: 100vw;
   max-width: 100%;
-  min-height: 100vh;
+  min-height: 100%;
   scrollbar-color: var(--color-neutral-border-bold) var(--color-neutral-background);
 }
 
 .app-wrapper {
   width: 100vw;
   max-width: 100%;
-  min-height: 100vh;
+  min-height: 100%;
 }
 
 .global-error {
@@ -112,6 +113,7 @@ html.ls-embed .app-wrapper {
   width: 100%;
   max-width: 100%;
   min-height: 0;
+  height: 100%;
   overflow: hidden;
   overscroll-behavior: none;
 }
@@ -123,4 +125,5 @@ html.ls-embed .app-wrapper {
   min-height: 0;
   min-width: 0;
   width: 100%;
+  height: 100%;
 }

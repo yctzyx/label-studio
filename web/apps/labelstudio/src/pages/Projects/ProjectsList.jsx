@@ -2,9 +2,14 @@ import { format } from "date-fns";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link, useHistory } from "react-router-dom";
-import { IconCheck, IconFolderOpen, IconMinus, IconSparks } from "@humansignal/icons";
+import {
+  IconCheck,
+  IconFolderOpen,
+  IconMinus,
+  IconSparks,
+} from "@humansignal/icons";
 import { Button, Tooltip, buttonVariant } from "@humansignal/ui";
-import { PidataStylePagination } from "../../components";
+import { PidataStylePagination, EmptyData } from "../../components";
 import { cn } from "../../utils/bem";
 import { ProjectStateChip } from "@humansignal/app-common";
 import { useAPI } from "../../providers/ApiProvider";
@@ -37,7 +42,9 @@ const DEFAULT_TEMPLATE_GROUPS = [
 
 /** 标注项目标签侧栏排除的分组（与 groups.txt 中 Community Contributions 对应） */
 function filterSidebarTemplateGroups(groups) {
-  return groups.filter((g) => String(g).trim().toLowerCase() !== "community contributions");
+  return groups.filter(
+    (g) => String(g).trim().toLowerCase() !== "community contributions",
+  );
 }
 
 function pseudoTypeKey(project) {
@@ -72,19 +79,30 @@ function creatorDisplayLabel(createdBy, unknownUserText) {
   return unknownUserText;
 }
 
-export const ProjectsList = ({ projects, currentPage, totalItems, loadNextPage, pageSize, onCreateProject }) => {
+export const ProjectsList = ({
+  projects,
+  currentPage,
+  totalItems,
+  loadNextPage,
+  pageSize,
+  onCreateProject,
+}) => {
   const { t } = useTranslation();
   const api = useAPI();
   const [nameQuery, setNameQuery] = useState("");
   const [appliedQuery, setAppliedQuery] = useState("");
   const [typeKey, setTypeKey] = useState("all");
   const [tagKey, setTagKey] = useState("all");
-  const [templateGroups, setTemplateGroups] = useState(() => filterSidebarTemplateGroups([...DEFAULT_TEMPLATE_GROUPS]));
+  const [templateGroups, setTemplateGroups] = useState(() =>
+    filterSidebarTemplateGroups([...DEFAULT_TEMPLATE_GROUPS]),
+  );
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const res = await api.callApi("configTemplates", { errorFilter: () => true });
+      const res = await api.callApi("configTemplates", {
+        errorFilter: () => true,
+      });
       if (cancelled || !res?.groups?.length) return;
       setTemplateGroups(filterSidebarTemplateGroups(res.groups));
     })();
@@ -99,16 +117,29 @@ export const ProjectsList = ({ projects, currentPage, totalItems, loadNextPage, 
   }, [templateGroups, tagKey]);
 
   const tagFilters = useMemo(() => {
-    return [{ key: "all", labelKey: "All tags" }, ...templateGroups.map((g) => ({ key: g, labelKey: g }))];
+    return [
+      { key: "all", labelKey: "All tags" },
+      ...templateGroups.map((g) => ({ key: g, labelKey: g })),
+    ];
   }, [templateGroups]);
 
   const filteredProjects = useMemo(() => {
-    const q = appliedQuery.trim().toLowerCase();
     return projects.filter((project) => {
-      const title = (project.title ?? "").toLowerCase();
-      if (q && !title.includes(q)) return false;
+      if (
+        appliedQuery &&
+        !String(project.title ?? "")
+          .toLowerCase()
+          .includes(appliedQuery.toLowerCase())
+      ) {
+        return false;
+      }
       if (typeKey !== "all" && pseudoTypeKey(project) !== typeKey) return false;
-      if (tagKey !== "all" && (project.template_group ?? "").trim() !== tagKey) return false;
+      if (
+        tagKey !== "all" &&
+        String(project.template_group ?? "").trim() !== tagKey
+      ) {
+        return false;
+      }
       return true;
     });
   }, [projects, appliedQuery, typeKey, tagKey]);
@@ -127,10 +158,25 @@ export const ProjectsList = ({ projects, currentPage, totalItems, loadNextPage, 
   return (
     <div className={cn("projects-page").elem("studio").toClassName()}>
       <div className={cn("projects-page").elem("studio-layout").toClassName()}>
-        <aside className={cn("projects-page").elem("sidebar").toClassName()} aria-label={t("Project filters")}>
-          <div className={cn("projects-page").elem("sidebar-section").toClassName()}>
-            <div className={cn("projects-page").elem("sidebar-heading").toClassName()}>{t("Data type")}</div>
-            <div className={cn("projects-page").elem("chip-grid").toClassName()}>
+        <aside
+          className={cn("projects-page").elem("sidebar").toClassName()}
+          aria-label={t("Project filters")}
+        >
+          <div
+            className={cn("projects-page")
+              .elem("sidebar-section")
+              .toClassName()}
+          >
+            <div
+              className={cn("projects-page")
+                .elem("sidebar-heading")
+                .toClassName()}
+            >
+              {t("Data type")}
+            </div>
+            <div
+              className={cn("projects-page").elem("chip-grid").toClassName()}
+            >
               {TYPE_FILTERS.map(({ key, labelKey }) => (
                 <button
                   key={key}
@@ -146,8 +192,18 @@ export const ProjectsList = ({ projects, currentPage, totalItems, loadNextPage, 
               ))}
             </div>
           </div>
-          <div className={cn("projects-page").elem("sidebar-section").toClassName()}>
-            <div className={cn("projects-page").elem("sidebar-heading").toClassName()}>{t("Tags")}</div>
+          <div
+            className={cn("projects-page")
+              .elem("sidebar-section")
+              .toClassName()}
+          >
+            <div
+              className={cn("projects-page")
+                .elem("sidebar-heading")
+                .toClassName()}
+            >
+              {t("Tags")}
+            </div>
             <div className={cn("projects-page").elem("tag-list").toClassName()}>
               {tagFilters.map(({ key, labelKey }) => (
                 <button
@@ -168,11 +224,21 @@ export const ProjectsList = ({ projects, currentPage, totalItems, loadNextPage, 
 
         <div className={cn("projects-page").elem("studio-main").toClassName()}>
           <div className={cn("projects-page").elem("toolbar").toClassName()}>
-            <div className={cn("projects-page").elem("toolbar-search").toClassName()}>
-              <div className={cn("projects-page").elem("toolbar-inline").toClassName()}>
+            <div
+              className={cn("projects-page")
+                .elem("toolbar-search")
+                .toClassName()}
+            >
+              <div
+                className={cn("projects-page")
+                  .elem("toolbar-inline")
+                  .toClassName()}
+              >
                 <input
                   id="projects-search-name"
-                  className={cn("projects-page").elem("search-input").toClassName()}
+                  className={cn("projects-page")
+                    .elem("search-input")
+                    .toClassName()}
                   value={nameQuery}
                   onChange={(e) => setNameQuery(e.target.value)}
                   placeholder={t("Search projects placeholder")}
@@ -180,11 +246,25 @@ export const ProjectsList = ({ projects, currentPage, totalItems, loadNextPage, 
                     if (e.key === "Enter") onSearch();
                   }}
                 />
-                <div className={cn("projects-page").elem("toolbar-actions").toClassName()}>
-                  <Button type="button" size="small" look="outlined" variant="primary" onClick={onSearch}>
+                <div
+                  className={cn("projects-page")
+                    .elem("toolbar-actions")
+                    .toClassName()}
+                >
+                  <Button
+                    type="button"
+                    look="outlined"
+                    variant="primary"
+                    onClick={onSearch}
+                  >
                     {t("Search")}
                   </Button>
-                  <Button type="button" size="small" look="outlined" variant="neutral" onClick={onResetFilters}>
+                  <Button
+                    type="button"
+                    look="outlined"
+                    variant="neutral"
+                    onClick={onResetFilters}
+                  >
                     {t("Reset")}
                   </Button>
                 </div>
@@ -193,6 +273,7 @@ export const ProjectsList = ({ projects, currentPage, totalItems, loadNextPage, 
             <Button
               type="button"
               variant="primary"
+              size="smaller"
               className={cn("projects-page").elem("create-wide").toClassName()}
               onClick={onCreateProject}
             >
@@ -200,24 +281,33 @@ export const ProjectsList = ({ projects, currentPage, totalItems, loadNextPage, 
             </Button>
           </div>
 
-          <div className={cn("projects-page").elem("studio-scroll").toClassName()}>
+          <div
+            className={cn("projects-page").elem("studio-scroll").toClassName()}
+          >
             {filteredProjects.length === 0 ? (
-              <div className={cn("projects-page").elem("empty-filter").toClassName()}>
-                <p>{t("No projects match filters")}</p>
-                <Button type="button" look="outlined" size="small" onClick={onResetFilters}>
-                  {t("Reset")}
-                </Button>
+              <div
+                className={cn("projects-page")
+                  .elem("empty-filter")
+                  .toClassName()}
+              >
+                <EmptyData />
               </div>
             ) : (
               <div className={cn("projects-page").elem("grid").toClassName()}>
                 {filteredProjects.map((project) => (
-                  <ProjectCard key={project.id} project={project} typeLabel={studioBadgeLabel(t, project)} />
+                  <ProjectCard
+                    key={project.id}
+                    project={project}
+                    typeLabel={studioBadgeLabel(t, project)}
+                  />
                 ))}
               </div>
             )}
           </div>
 
-          {totalItems > 0 && (Math.ceil(totalItems / pageSize) > 1 || totalItems >= PROJECTS_PAGINATION_FORCE_MIN) ? (
+          {totalItems > 0 &&
+          (Math.ceil(totalItems / pageSize) > 1 ||
+            totalItems >= PROJECTS_PAGINATION_FORCE_MIN) ? (
             <div className={cn("projects-page").elem("pages").toClassName()}>
               <PidataStylePagination
                 totalItems={totalItems}
@@ -241,8 +331,12 @@ export const EmptyProjectsList = ({ openModal }) => {
   return (
     <div className={cn("empty-projects-page").toClassName()}>
       <div className={cn("empty-projects-page").elem("panel").toClassName()}>
-        <div className={cn("empty-projects-page").elem("icon-wrap").toClassName()}>
-          <IconFolderOpen className={cn("empty-projects-page").elem("icon").toClassName()} />
+        <div
+          className={cn("empty-projects-page").elem("icon-wrap").toClassName()}
+        >
+          <IconFolderOpen
+            className={cn("empty-projects-page").elem("icon").toClassName()}
+          />
         </div>
         <h1 className={cn("empty-projects-page").elem("header").toClassName()}>
           {t("Heidi doesn't see any projects here!")}
@@ -268,18 +362,27 @@ const ProjectCard = ({ project, typeLabel }) => {
   const history = useHistory();
   const pc = cn("project-card");
 
-  const createdByLabel = creatorDisplayLabel(project.created_by, t("Unknown user"));
+  const createdByLabel = creatorDisplayLabel(
+    project.created_by,
+    t("Unknown user"),
+  );
 
-  const isWorkflow = project.task_workflow_enabled === true || project.taskWorkflowEnabled === true;
-  const isManager = project.can_manage_team === true || project.canManageTeam === true;
+  const isWorkflow =
+    project.task_workflow_enabled === true ||
+    project.taskWorkflowEnabled === true;
+  const isManager =
+    project.can_manage_team === true || project.canManageTeam === true;
 
-  const stageCounts = project.workflow_stage_counts ?? project.workflowStageCounts ?? {};
+  const stageCounts =
+    project.workflow_stage_counts ?? project.workflowStageCounts ?? {};
   const reviewCount = Number(stageCounts.review ?? 0);
   const acceptCount = Number(stageCounts.accept ?? 0);
   const doneCount = Number(stageCounts.done ?? 0);
   const totalTasks = Number(project.task_number ?? 0);
 
-  const labeledCount = isWorkflow ? reviewCount + acceptCount + doneCount : Number(project.finished_task_number ?? 0);
+  const labeledCount = isWorkflow
+    ? reviewCount + acceptCount + doneCount
+    : Number(project.finished_task_number ?? 0);
   const reviewedCount = acceptCount + doneCount;
 
   const openProjectData = () => {
@@ -305,9 +408,15 @@ const ProjectCard = ({ project, typeLabel }) => {
       >
         <div className={cn("project-card").elem("studio-top").toClassName()}>
           <div className={cn("project-card").elem("title-row").toClassName()}>
-            <div className={cn("project-card").elem("title-wrap").toClassName()}>
+            <div
+              className={cn("project-card").elem("title-wrap").toClassName()}
+            >
               <Tooltip title={project.title ?? t("New project")}>
-                <h3 className={cn("project-card").elem("studio-title").toClassName()}>
+                <h3
+                  className={cn("project-card")
+                    .elem("studio-title")
+                    .toClassName()}
+                >
                   {project.title ?? t("New project")}
                 </h3>
               </Tooltip>
@@ -317,7 +426,11 @@ const ProjectCard = ({ project, typeLabel }) => {
                 <>
                   <Link
                     className={cn(
-                      buttonVariant({ size: "small", look: "string", variant: "primary" }),
+                      buttonVariant({
+                        size: "small",
+                        look: "string",
+                        variant: "primary",
+                      }),
                       pc.elem("action-btn").toClassName(),
                     )}
                     to={`/projects/${project.id}/settings`}
@@ -328,7 +441,11 @@ const ProjectCard = ({ project, typeLabel }) => {
                   </Link>
                   <Link
                     className={cn(
-                      buttonVariant({ size: "small", look: "string", variant: "primary" }),
+                      buttonVariant({
+                        size: "small",
+                        look: "string",
+                        variant: "primary",
+                      }),
                       pc.elem("action-btn").toClassName(),
                     )}
                     to={`/projects/${project.id}/team-workflow`}
@@ -341,7 +458,11 @@ const ProjectCard = ({ project, typeLabel }) => {
               )}
               <Link
                 className={cn(
-                  buttonVariant({ size: "small", look: "string", variant: "primary" }),
+                  buttonVariant({
+                    size: "small",
+                    look: "string",
+                    variant: "primary",
+                  }),
                   pc.elem("action-btn").toClassName(),
                 )}
                 to={
@@ -358,49 +479,112 @@ const ProjectCard = ({ project, typeLabel }) => {
               </Link>
             </div>
           </div>
-          <div className={cn("project-card").elem("subtitle").toClassName()}>{t("Annotation center")}</div>
+          <div className={cn("project-card").elem("subtitle").toClassName()}>
+            {t("Annotation center")}
+          </div>
           <div className={cn("project-card").elem("badges").toClassName()}>
-            <span className={cn("project-card").elem("badge").toClassName()}>{typeLabel}</span>
+            <span className={cn("project-card").elem("badge").toClassName()}>
+              {typeLabel}
+            </span>
             {project.state && (
-              <span className={cn("project-card").elem("state-inline").toClassName()}>
-                <ProjectStateChip state={project.state} projectId={project.id} interactive={false} />
+              <span
+                className={cn("project-card")
+                  .elem("state-inline")
+                  .toClassName()}
+              >
+                <ProjectStateChip
+                  state={project.state}
+                  projectId={project.id}
+                  interactive={false}
+                />
               </span>
             )}
           </div>
         </div>
 
         <p className={cn("project-card").elem("studio-desc").toClassName()}>
-          {project.description?.trim() ? project.description : t("Optional description of your project")}
+          {project.description?.trim()
+            ? project.description
+            : t("Optional description of your project")}
         </p>
 
         <div className={cn("project-card").elem("studio-stats").toClassName()}>
-          <div className={cn("project-card").elem("progress-list").toClassName()}>
-            <div className={cn("project-card").elem("progress-row").toClassName()}>
-              <span className={cn("project-card").elem("progress-label").toClassName()}>{t("Labeling progress")}</span>
-              <span className={cn("project-card").elem("progress-value").toClassName()}>
+          <div
+            className={cn("project-card").elem("progress-list").toClassName()}
+          >
+            <div
+              className={cn("project-card").elem("progress-row").toClassName()}
+            >
+              <span
+                className={cn("project-card")
+                  .elem("progress-label")
+                  .toClassName()}
+              >
+                {t("Labeling progress")}
+              </span>
+              <span
+                className={cn("project-card")
+                  .elem("progress-value")
+                  .toClassName()}
+              >
                 {labeledCount} / {totalTasks}
               </span>
             </div>
             {isWorkflow && (
-              <div className={cn("project-card").elem("progress-row").toClassName()}>
-                <span className={cn("project-card").elem("progress-label").toClassName()}>{t("Review progress")}</span>
-                <span className={cn("project-card").elem("progress-value").toClassName()}>
+              <div
+                className={cn("project-card")
+                  .elem("progress-row")
+                  .toClassName()}
+              >
+                <span
+                  className={cn("project-card")
+                    .elem("progress-label")
+                    .toClassName()}
+                >
+                  {t("Review progress")}
+                </span>
+                <span
+                  className={cn("project-card")
+                    .elem("progress-value")
+                    .toClassName()}
+                >
                   {reviewedCount} / {totalTasks}
                 </span>
               </div>
             )}
           </div>
           <div className={cn("project-card").elem("detail").toClassName()}>
-            <div className={cn("project-card").elem("detail-item").mod({ type: "completed" }).toClassName()}>
-              <IconCheck className={cn("project-card").elem("icon").toClassName()} />
+            <div
+              className={cn("project-card")
+                .elem("detail-item")
+                .mod({ type: "completed" })
+                .toClassName()}
+            >
+              <IconCheck
+                className={cn("project-card").elem("icon").toClassName()}
+              />
               {project.total_annotations_number}
             </div>
-            <div className={cn("project-card").elem("detail-item").mod({ type: "rejected" }).toClassName()}>
-              <IconMinus className={cn("project-card").elem("icon").toClassName()} />
+            <div
+              className={cn("project-card")
+                .elem("detail-item")
+                .mod({ type: "rejected" })
+                .toClassName()}
+            >
+              <IconMinus
+                className={cn("project-card").elem("icon").toClassName()}
+              />
               {project.skipped_annotations_number}
             </div>
-            <div className={cn("project-card").elem("detail-item").mod({ type: "predictions" }).toClassName()}>
-              <IconSparks className={cn("project-card").elem("icon").toClassName()} />
+            <div
+              className={cn("project-card")
+                .elem("detail-item")
+                .mod({ type: "predictions" })
+                .toClassName()}
+            >
+              <IconSparks
+                className={cn("project-card").elem("icon").toClassName()}
+              />
               {project.total_predictions_number}
             </div>
           </div>
@@ -408,7 +592,8 @@ const ProjectCard = ({ project, typeLabel }) => {
 
         <div className={cn("project-card").elem("studio-footer").toClassName()}>
           <span className={cn("project-card").elem("meta").toClassName()}>
-            {createdByLabel} {t("created at")} {format(new Date(project.created_at), "yyyy-MM-dd HH:mm:ss")}
+            {createdByLabel} {t("created at")}{" "}
+            {format(new Date(project.created_at), "yyyy-MM-dd HH:mm:ss")}
           </span>
         </div>
       </article>

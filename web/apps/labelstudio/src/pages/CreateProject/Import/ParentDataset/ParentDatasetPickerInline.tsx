@@ -1,13 +1,16 @@
 import { Button, Typography } from "@humansignal/ui";
-import { cn } from "@humansignal/shad/utils";
+import { cn as clsx } from "@humansignal/shad/utils";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import "./ParentDatasetPickerInline.scss";
 import { fetchParentDatasources, fetchParentDatasets } from "./fetchParentDataset";
 import { getLabelStudioApiGateway } from "./getParentPlatformApiBase";
 import type { ParentDatasetRow, ParentDatasetSelection, ParentDatasourceRow } from "./types";
+import { cn } from "../../../../utils/bem";
 
 const PAGE_SIZE = 20;
+
+const pickerClass = cn("parent-ds-picker");
 
 type Props = {
   projectId?: number | null;
@@ -115,18 +118,18 @@ export function ParentDatasetPickerInline({ projectId, committedSelection, onCle
   const maxPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
-    <div className="parent-ds-picker flex flex-col gap-3">
+    <div className={clsx(pickerClass.toClassName(), "flex flex-col gap-3")}>
       <div>
-        <Typography variant="title" size="small" className="parent-ds-picker__intro-title font-medium">
+        <Typography variant="title" size="small" className={clsx(pickerClass.elem("intro-title").toClassName(), "font-medium")}>
           {t("import.parentDataset.inlineTitle")}
         </Typography>
-        <Typography size="small" className="parent-ds-picker__intro-muted mt-1 max-w-[720px] leading-relaxed">
+        <Typography size="small" className={clsx(pickerClass.elem("intro-muted").toClassName(), "mt-1 max-w-[720px] leading-relaxed")}>
           {t("import.parentDataset.modalSubtitle")}
         </Typography>
       </div>
 
       {committedSelection ? (
-        <div className="parent-ds-picker__committed flex flex-wrap items-start justify-between gap-2 px-3 py-2">
+        <div className={clsx(pickerClass.elem("committed").toClassName(), "flex flex-wrap items-start justify-between gap-2 px-3 py-2")}>
           <div className="min-w-0">
             <Typography size="small" className="text-neutral-content-subtle">
               {t("import.parentDataset.inlineCommitted")}
@@ -160,7 +163,7 @@ export function ParentDatasetPickerInline({ projectId, committedSelection, onCle
         </label>
         <select
           id="parent-ds-source-filter"
-          className="parent-ds-picker__source-select"
+          className={pickerClass.elem("source-select").toClassName()}
           value={sourceFilter}
           onChange={(e) => setSourceFilter(e.target.value)}
           disabled={!baseOk || loading}
@@ -175,21 +178,21 @@ export function ParentDatasetPickerInline({ projectId, committedSelection, onCle
         </select>
       </div>
 
-      <div className="parent-ds-picker__table-wrap">
-        <table className="parent-ds-picker__table">
+      <div className={pickerClass.elem("table-wrap").toClassName()}>
+        <table className={pickerClass.elem("table").toClassName()}>
           <thead>
             <tr>
               <th>{t("import.parentDataset.colName")}</th>
               <th>{t("import.parentDataset.colSource")}</th>
               <th>{t("import.parentDataset.colPath")}</th>
               <th>{t("import.parentDataset.colType")}</th>
-              <th className="parent-ds-picker__col-action">{t("import.parentDataset.colAction")}</th>
+              {/* <th className={pickerClass.elem("col-action").toClassName()}>{t("import.parentDataset.colAction")}</th> */}
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={5} className="parent-ds-picker__muted-cell">
+                <td colSpan={5} className={pickerClass.elem("muted-cell").toClassName()}>
                   {t("import.parentDataset.loading")}
                 </td>
               </tr>
@@ -200,7 +203,7 @@ export function ParentDatasetPickerInline({ projectId, committedSelection, onCle
                 return (
                   <tr
                     key={row.id}
-                    className={cn("parent-ds-picker__row", isActive && "parent-ds-picker__row_selected")}
+                    className={pickerClass.elem("row").mod({ selected: isActive }).toClassName()}
                     onClick={() => onPickRow(row)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
@@ -212,19 +215,19 @@ export function ParentDatasetPickerInline({ projectId, committedSelection, onCle
                     role="button"
                     tabIndex={0}
                   >
-                    <td className="parent-ds-picker__cell-name">{row.dataSetName}</td>
+                    <td className={pickerClass.elem("cell-name").toClassName()}>{row.dataSetName}</td>
                     <td>
                       {row.sourceName?.trim()
                         ? row.sourceName
                         : (sourceNameById.get(row.sourceId) ?? (row.sourceId ? String(row.sourceId) : "—"))}
                     </td>
-                    <td className="parent-ds-picker__cell-path">{row.path}</td>
+                    <td className={pickerClass.elem("cell-path").toClassName()}>{row.path}</td>
                     <td>{row.dataSetTypeLabel ?? row.dataSetType ?? "—"}</td>
-                    <td className="parent-ds-picker__cell-actions">
+                    {/* <td className={pickerClass.elem("cell-actions").toClassName()}>
                       <Button
                         size="smaller"
                         look={isActive ? "primary" : "outlined"}
-                        className={cn(!isActive && "parent-ds-picker__pick-outline")}
+                        className={clsx(!isActive && pickerClass.elem("pick-outline").toClassName())}
                         onClick={(e) => {
                           e.stopPropagation();
                           onPickRow(row);
@@ -232,13 +235,13 @@ export function ParentDatasetPickerInline({ projectId, committedSelection, onCle
                       >
                         {t("import.parentDataset.choose")}
                       </Button>
-                    </td>
+                    </td> */}
                   </tr>
                 );
               })}
             {!loading && displayRows.length === 0 ? (
               <tr>
-                <td colSpan={5} className="parent-ds-picker__muted-cell">
+                <td colSpan={5} className={pickerClass.elem("muted-cell").toClassName()}>
                   {t("import.parentDataset.empty")}
                 </td>
               </tr>
@@ -248,14 +251,14 @@ export function ParentDatasetPickerInline({ projectId, committedSelection, onCle
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Typography size="small" className="parent-ds-picker__page-meta">
+        <Typography size="small" className={pickerClass.elem("page-meta").toClassName()}>
           {t("import.parentDataset.pageInfo", { page, totalPages: maxPage, total })}
         </Typography>
         <div className="flex gap-2">
           <Button
             size="smaller"
             look="outlined"
-            className="parent-ds-picker__page-btn"
+            className={pickerClass.elem("page-btn").toClassName()}
             disabled={page <= 1 || loading}
             onClick={() => void loadDatasets(page - 1)}
           >
@@ -264,7 +267,7 @@ export function ParentDatasetPickerInline({ projectId, committedSelection, onCle
           <Button
             size="smaller"
             look="outlined"
-            className="parent-ds-picker__page-btn"
+            className={pickerClass.elem("page-btn").toClassName()}
             disabled={page >= maxPage || loading}
             onClick={() => void loadDatasets(page + 1)}
           >
@@ -273,17 +276,17 @@ export function ParentDatasetPickerInline({ projectId, committedSelection, onCle
         </div>
       </div>
 
-      <div className="parent-ds-picker__footer-bar flex flex-wrap items-center justify-between gap-3 pt-3">
-        <Typography size="small" className="parent-ds-picker__intro-muted min-w-0 font-normal">
+      <div className={clsx(pickerClass.elem("footer-bar").toClassName(), "flex flex-wrap items-center justify-between gap-3 pt-3")}>
+        <Typography size="small" className={clsx(pickerClass.elem("intro-muted").toClassName(), "min-w-0 font-normal")}>
           {selected
             ? t("import.parentDataset.footerSelected", { name: selected.dataSetName })
             : t("import.parentDataset.footerHint")}
         </Typography>
-        <div className="parent-ds-picker__footer-actions flex gap-2 shrink-0">
+        <div className={clsx(pickerClass.elem("footer-actions").toClassName(), "flex gap-2 shrink-0")}>
           <Button
             look="outlined"
             type="button"
-            className="parent-ds-picker__btn-outline-soft"
+            className={pickerClass.elem("btn-outline-soft").toClassName()}
             onClick={handleCancelPending}
             disabled={!selected}
           >
@@ -292,7 +295,7 @@ export function ParentDatasetPickerInline({ projectId, committedSelection, onCle
           <Button
             look="primary"
             type="button"
-            className="parent-ds-picker__btn-primary-solid"
+            className={pickerClass.elem("btn-primary-solid").toClassName()}
             disabled={!selected}
             onClick={handleApply}
           >
