@@ -304,9 +304,25 @@ $pi-bg-header: #fafafa;
     border-radius: 4px;
     font-size: 12px;
 
-    &_progress {
+    &_annotating {
       color: $pi-primary;
       background: #ecf5ff;
+    }
+
+    &_rejected {
+      color: #e6a23c;
+      background: #fdf6ec;
+      border: 1px solid #f5dab1;
+    }
+
+    &_in_review {
+      color: #9b59b6;
+      background: #f9f0fc;
+    }
+
+    &_in_accept {
+      color: #00897b;
+      background: #e0f2f1;
     }
 
     &_done {

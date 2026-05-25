@@ -86,6 +86,15 @@ $pi-text-secondary: #909399;
       color: var(--ptw-text);
       font-weight: 600;
     }
+
+    code {
+      font-size: 12px;
+      padding: 1px 5px;
+      border-radius: 3px;
+      background: rgba(0, 0, 0, 0.06);
+      font-family: ui-monospace, monospace;
+      color: var(--ptw-text);
+    }
   }
 
   /* 分段控件：仅整体外框圆角，选中项白底 + 蓝框 + 蓝字 */
@@ -130,8 +139,23 @@ $pi-text-secondary: #909399;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 8px;
+    gap: 12px;
     margin-bottom: 16px;
+  }
+
+  &__toolbar-start {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &__toolbar-task-total {
+    margin-left: 4px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--ptw-text);
+    white-space: nowrap;
   }
 
   &__btn {
@@ -167,18 +191,6 @@ $pi-text-secondary: #909399;
       &:hover:not(:disabled) {
         border-color: var(--ptw-primary);
         color: var(--ptw-primary);
-      }
-    }
-
-    /* 批量操作：未启用时与 Element plain disabled 接近 */
-    &_batch {
-      background: #ffffff;
-      color: #c0c4cc;
-      border-color: #ebeef5;
-      cursor: not-allowed;
-
-      &:disabled {
-        opacity: 1;
       }
     }
   }
@@ -227,6 +239,7 @@ $pi-text-secondary: #909399;
 
   &__table {
     width: 100%;
+    table-layout: fixed;
     border-collapse: collapse;
     font-size: 13px;
     background: var(--ptw-bg);
@@ -237,6 +250,10 @@ $pi-text-secondary: #909399;
       padding: 10px 12px;
       text-align: left;
       border: 1px solid $pi-table-border;
+      vertical-align: middle;
+      width: 25%;
+      box-sizing: border-box;
+      word-break: break-word;
     }
 
     th {
@@ -251,6 +268,13 @@ $pi-text-secondary: #909399;
 
     &_striped tbody tr:nth-child(even) {
       background: #fafafa;
+    }
+
+    &_cols5 {
+      th,
+      td {
+        width: 20%;
+      }
     }
 
     tbody tr:hover {
@@ -283,7 +307,15 @@ $pi-text-secondary: #909399;
   }
 
   &__teams {
-    max-width: 420px;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__cell-username {
+    display: block;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -563,6 +595,39 @@ $pi-text-secondary: #909399;
     flex-direction: column;
     gap: 12px;
     box-sizing: border-box;
+  }
+
+  &__alloc-rules {
+    margin: 0;
+    padding: 10px 12px;
+    border-radius: 6px;
+    border: 1px solid $pi-border-light;
+    background: #fafbfc;
+    font-size: 13px;
+    line-height: 1.55;
+    color: $pi-text;
+  }
+
+  &__alloc-rules-title {
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--ptw-text);
+  }
+
+  &__alloc-rules-list {
+    margin: 0;
+    padding-left: 1.25em;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  &__alloc-rules-list code {
+    font-size: 12px;
+    padding: 1px 4px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.06);
+    font-family: ui-monospace, monospace;
   }
 
   &__modal-head {

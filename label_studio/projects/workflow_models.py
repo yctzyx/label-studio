@@ -80,6 +80,10 @@ class TaskWorkflow(models.Model):
         related_name='+',
         help_text='Who must act at the current stage (null when done)',
     )
+    returned_to_annotation = models.BooleanField(
+        default=False,
+        help_text='True after review/accept rejection sent task back to annotator; cleared when annotator resubmits',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -238,6 +238,7 @@ class BaseTaskSerializer(FlexFieldsModelSerializer):
         return {
             'stage': wf.stage,
             'current_assignee_id': wf.current_assignee_id,
+            'returned_to_annotation': bool(getattr(wf, 'returned_to_annotation', False)),
         }
 
     def project(self, task=None):

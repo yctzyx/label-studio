@@ -63,8 +63,7 @@ export const AcceptButton = memo(
         disabled={disabled}
         onClick={async () => {
           annotation.submissionInProgress();
-          await store.commentStore.commentFormSubmit();
-          store.acceptAnnotation();
+          await store.acceptAnnotation();
         }}
         data-testid="bottombar-accept-button"
       >

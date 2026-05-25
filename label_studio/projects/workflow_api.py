@@ -2,20 +2,23 @@
 
 from core.permissions import ViewClassPermission, all_permissions
 from django.contrib.auth import get_user_model
+from django.db import transaction
+from django.db.models import Count
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from projects.access import apply_project_team_visibility, user_can_manage_project
 from projects.models import Project
-from projects.workflow_models import ProjectTeamAllocation, ProjectTeamRole
+from projects.workflow_models import ProjectTeamAllocation, ProjectTeamRole, TaskWorkflow, TaskWorkflowStage
 from projects.workflow_services import (
     accept_decision,
     distribute_tasks_for_project,
     queryset_my_tasks,
+    release_workflows_after_team_allocation_removed,
     review_decision,
     submit_annotation_after_labeling,
 )
 from rest_framework import serializers, status
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from tasks.models import Task
@@ -75,7 +78,73 @@ class ProjectTeamAllocationListCreateAPI(APIView):
         _ensure_project_manager(request, project)
         qs = ProjectTeamAllocation.objects.filter(project=project).select_related('user')
         ser = TeamAllocationSerializer(qs, many=True)
-        return Response(ser.data)
+        data = list(ser.data)
+
+        project_task_count = Task.objects.filter(project=project).count()
+
+        label_counts = {
+            row['annotate_user_id']: row['c']
+            for row in TaskWorkflow.objects.filter(project=project)
+            .values('annotate_user_id')
+            .annotate(c=Count('task_id'))
+            if row['annotate_user_id'] is not None
+        }
+        review_counts = {
+            row['current_assignee_id']: row['c']
+            for row in TaskWorkflow.objects.filter(
+                project=project,
+                stage=TaskWorkflowStage.REVIEW,
+                current_assignee_id__isnull=False,
+            )
+            .values('current_assignee_id')
+            .annotate(c=Count('task_id'))
+        }
+        accept_counts = {
+            row['current_assignee_id']: row['c']
+            for row in TaskWorkflow.objects.filter(
+                project=project,
+                stage=TaskWorkflowStage.ACCEPT,
+                current_assignee_id__isnull=False,
+            )
+            .values('current_assignee_id')
+            .annotate(c=Count('task_id'))
+        }
+        # 标注人已提交标注（工作流已离开 annotate）：按 annotate_user 汇总
+        label_completed_counts = {
+            row['annotate_user_id']: row['c']
+            for row in TaskWorkflow.objects.filter(project=project)
+            .exclude(stage=TaskWorkflowStage.ANNOTATE)
+            .values('annotate_user_id')
+            .annotate(c=Count('task_id'))
+            if row['annotate_user_id'] is not None
+        }
+        project_annotation_completed_count = TaskWorkflow.objects.filter(project=project).exclude(
+            stage=TaskWorkflowStage.ANNOTATE
+        ).count()
+
+        for row in data:
+            uid = row['user_id']
+            role = row['role']
+            if role == ProjectTeamRole.LABEL:
+                row['assigned_task_count'] = label_counts.get(uid, 0)
+                row['completed_task_count'] = label_completed_counts.get(uid, 0)
+            elif role == ProjectTeamRole.REVIEW:
+                row['assigned_task_count'] = review_counts.get(uid, 0)
+                row['completed_task_count'] = 0
+            elif role == ProjectTeamRole.ACCEPT:
+                row['assigned_task_count'] = accept_counts.get(uid, 0)
+                row['completed_task_count'] = 0
+            else:
+                row['assigned_task_count'] = 0
+                row['completed_task_count'] = 0
+
+        return Response(
+            {
+                'results': data,
+                'project_task_count': project_task_count,
+                'project_annotation_completed_count': project_annotation_completed_count,
+            }
+        )
 
     def post(self, request, pk):
         project = _visible_org_project(request, pk)
@@ -103,7 +172,11 @@ class ProjectTeamAllocationDeleteAPI(APIView):
         project = _visible_org_project(request, pk)
         _ensure_project_manager(request, project)
         row = get_object_or_404(ProjectTeamAllocation, pk=allocation_id, project=project)
-        row.delete()
+        removed_user_id = row.user_id
+        removed_role = row.role
+        with transaction.atomic():
+            row.delete()
+            release_workflows_after_team_allocation_removed(project, removed_user_id, removed_role)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -123,6 +196,17 @@ class ProjectWorkflowMyTasksAPI(APIView):
     @extend_schema(
         parameters=[
             OpenApiParameter(name='stage', required=True, enum=['annotate', 'review', 'accept']),
+            OpenApiParameter(
+                name='search',
+                required=False,
+                description='Filter by task id substring and/or task data text',
+            ),
+            OpenApiParameter(
+                name='status',
+                required=False,
+                enum=['annotating', 'rejected', 'in_review', 'in_accept', 'done'],
+                description='Pipeline UI status (workflow-enabled projects)',
+            ),
         ],
     )
     def get(self, request, pk):
@@ -130,7 +214,18 @@ class ProjectWorkflowMyTasksAPI(APIView):
         stage = request.query_params.get('stage')
         if not stage:
             return Response({'detail': 'stage is required (annotate|review|accept)'}, status=400)
-        qs = queryset_my_tasks(project, request.user, stage)
+        search = (request.query_params.get('search') or '').strip()
+        status_filter = (request.query_params.get('status') or '').strip()
+        try:
+            qs = queryset_my_tasks(
+                project,
+                request.user,
+                stage,
+                search=search or None,
+                status=status_filter or None,
+            )
+        except ValidationError as err:
+            return Response({'detail': err.detail}, status=status.HTTP_400_BAD_REQUEST)
         page = TaskSerializer(qs[:100], many=True, context={'request': request})
         return Response({'results': page.data, 'count': qs.count()})
 

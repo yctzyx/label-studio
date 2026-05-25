@@ -34,13 +34,36 @@ function formatDate(iso) {
   }
 }
 
-/** 团队工作流下「整单完成」应以 workflow.stage==='done' 为准；is_labeled 只表示 overlap 已满，驳回后仍可能为 true */
-function isTaskPipelineDone(task, taskWorkflowEnabled) {
-  if (!taskWorkflowEnabled) return !!task.is_labeled;
-  const st = task.workflow?.stage;
-  if (st) return st === "done";
-  return !!task.is_labeled;
+/** 列表展示用流水线状态（与后端筛选一致） */
+function getMyTaskPipelineStatus(task, taskWorkflowEnabled) {
+  if (!taskWorkflowEnabled) {
+    return task.is_labeled ? "done" : "annotating";
+  }
+  const wf = task.workflow;
+  const st = wf?.stage;
+  if (!st) return "annotating";
+  if (st === "done") return "done";
+  if (st === "review") return "in_review";
+  if (st === "accept") return "in_accept";
+  if (st === "annotate") {
+    return wf.returned_to_annotation ? "rejected" : "annotating";
+  }
+  return "annotating";
 }
+
+const PIPELINE_STATUS_I18N = {
+  annotating: "myTasks.statusAnnotating",
+  rejected: "myTasks.statusRejected",
+  in_review: "myTasks.statusInReview",
+  in_accept: "myTasks.statusInAccept",
+  done: "myTasks.statusDone",
+};
+
+const STAGE_STATUS_OPTIONS = {
+  annotate: ["annotating", "rejected", "in_review", "in_accept", "done"],
+  review: ["in_review"],
+  accept: ["in_accept"],
+};
 
 export const MyTasksPage = () => {
   const { t } = useTranslation();
@@ -57,10 +80,13 @@ export const MyTasksPage = () => {
   const [rows, setRows] = useState([]);
   const [error, setError] = useState(null);
 
-  const [nameQuery, setNameQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [nameDraft, setNameDraft] = useState("");
+  const [statusDraft, setStatusDraft] = useState("");
+  /** 点击「查询」后才用于列表筛选（与输入框草稿分离） */
+  const [nameApplied, setNameApplied] = useState("");
+  const [statusApplied, setStatusApplied] = useState("");
+  /** 每次点「查询」「重置」递增，保证条件未变也会重新请求（等同刷新） */
+  const [listRefreshKey, setListRefreshKey] = useState(0);
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -117,8 +143,12 @@ export const MyTasksPage = () => {
     setLoading(true);
     setError(null);
     try {
+      const params = { pk, stage };
+      if (nameApplied) params.search = nameApplied;
+      if (statusApplied) params.status = statusApplied;
+
       const res = await api.callApi("projectWorkflowMyTasks", {
-        params: { pk, stage },
+        params,
         suppressError: true,
       });
       if (!res || res.error) {
@@ -148,56 +178,44 @@ export const MyTasksPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [api, stage, selectedProjectId, selectedProject]);
+  }, [api, stage, selectedProjectId, selectedProject, nameApplied, statusApplied, listRefreshKey]);
 
   useEffect(() => {
     loadTasks();
   }, [loadTasks]);
 
-  const filtered = useMemo(() => {
-    return rows.filter(({ task, taskWorkflowEnabled }) => {
-      const done = isTaskPipelineDone(task, taskWorkflowEnabled);
-      if (statusFilter === "progress" && done) return false;
-      if (statusFilter === "done" && !done) return false;
-      const created = task.created_at ? new Date(task.created_at) : null;
-      if (dateFrom && created) {
-        const from = new Date(`${dateFrom}T00:00:00`);
-        if (created < from) return false;
-      }
-      if (dateTo && created) {
-        const to = new Date(`${dateTo}T23:59:59`);
-        if (created > to) return false;
-      }
-      if (nameQuery.trim()) {
-        const q = nameQuery.trim().toLowerCase();
-        const idMatch = String(task.id).includes(q);
-        const name = taskDisplayName(task).toLowerCase();
-        if (!idMatch && !name.includes(q)) return false;
-      }
-      return true;
-    });
-  }, [rows, statusFilter, dateFrom, dateTo, nameQuery]);
-
-  const total = filtered.length;
+  const total = rows.length;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const safePage = Math.min(page, totalPages);
   const pageSlice = useMemo(() => {
     const p = Math.min(page, totalPages);
     const start = (p - 1) * pageSize;
-    return filtered.slice(start, start + pageSize);
-  }, [filtered, page, pageSize, totalPages]);
+    return rows.slice(start, start + pageSize);
+  }, [rows, page, pageSize, totalPages]);
 
   useEffect(() => {
     setPage(1);
-  }, [stage, nameQuery, statusFilter, dateFrom, dateTo, pageSize, selectedProjectId]);
+  }, [pageSize]);
 
-  const resetFilters = () => {
-    setNameQuery("");
-    setStatusFilter("");
-    setDateFrom("");
-    setDateTo("");
+  const resetSearchState = useCallback(() => {
+    setNameDraft("");
+    setStatusDraft("");
+    setNameApplied("");
+    setStatusApplied("");
     setPage(1);
-  };
+  }, []);
+
+  const applySearch = useCallback(() => {
+    setNameApplied(nameDraft.trim());
+    setStatusApplied(statusDraft);
+    setPage(1);
+    setListRefreshKey((k) => k + 1);
+  }, [nameDraft, statusDraft]);
+
+  const resetFilters = useCallback(() => {
+    resetSearchState();
+    setListRefreshKey((k) => k + 1);
+  }, [resetSearchState]);
 
   const actionLabel = (() => {
     if (stage === "annotate") return t("myTasks.actionLabel");
@@ -205,9 +223,20 @@ export const MyTasksPage = () => {
     return t("myTasks.actionAccept");
   })();
 
-  const dataHref = (projectId, taskId, st) => {
+  const workflowHint = (() => {
+    if (stage === "review") return t("myTasks.reviewTodoHint");
+    if (stage === "accept") return t("myTasks.acceptTodoHint");
+    return "";
+  })();
+
+  const statusOptions = STAGE_STATUS_OPTIONS[stage] ?? STAGE_STATUS_OPTIONS.annotate;
+
+  const dataHref = (projectId, taskId, pageStage, workflowStage) => {
     const base = `/projects/${projectId}/data`;
-    if (st === "annotate") return `${base}?labeling=1&task=${taskId}`;
+    const ws = workflowStage ?? "";
+    if (pageStage === "annotate" && ws === "annotate") {
+      return `${base}?task=${taskId}`;
+    }
     return `${base}?task=${taskId}`;
   };
 
@@ -231,6 +260,10 @@ export const MyTasksPage = () => {
     return out;
   }, [totalPages, safePage]);
 
+  /** 标注员列表不展示累计进度 / 我已标注 / 任务描述 */
+  const annotatorSimplifiedTable = stage === "annotate";
+  const tableColCount = annotatorSimplifiedTable ? 5 : 8;
+
   return (
     <div className={root.toClassName()}>
       <div className={root.elem("content").toClassName()}>
@@ -241,7 +274,10 @@ export const MyTasksPage = () => {
               <select
                 id="mt-project"
                 value={selectedProjectId}
-                onChange={(e) => setSelectedProjectId(e.target.value)}
+                onChange={(e) => {
+                  setSelectedProjectId(e.target.value);
+                  resetSearchState();
+                }}
                 disabled={projectsLoading}
                 aria-label={t("myTasks.projectSelect")}
               >
@@ -273,16 +309,20 @@ export const MyTasksPage = () => {
                 role="tab"
                 aria-selected={stage === key}
                 className={root.elem("tab").mod({ active: stage === key }).toClassName()}
-                onClick={() => setStage(key)}
+                onClick={() => {
+                  if (stage === key) return;
+                  setStage(key);
+                  resetSearchState();
+                }}
               >
                 {t(`myTasks.tab.${tab}`)}
               </button>
             ))}
           </div>
 
-          {stage === "accept" ? (
+          {stage === "review" || stage === "accept" ? (
             <div className={root.elem("workflow-hint").toClassName()} role="note">
-              {t("myTasks.acceptEmptyHint")}
+              {workflowHint}
             </div>
           ) : null}
 
@@ -292,7 +332,10 @@ export const MyTasksPage = () => {
               <div
                 className={root.elem("search-form").toClassName()}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") setPage(1);
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    applySearch();
+                  }
                 }}
               >
                 <div className={root.elem("field").toClassName()}>
@@ -301,36 +344,31 @@ export const MyTasksPage = () => {
                     id="mt-name"
                     type="text"
                     placeholder={t("myTasks.taskNamePlaceholder")}
-                    value={nameQuery}
-                    onChange={(e) => setNameQuery(e.target.value)}
+                    value={nameDraft}
+                    onChange={(e) => setNameDraft(e.target.value)}
                     maxLength={128}
                     autoComplete="off"
                   />
                 </div>
                 <div className={root.elem("field").toClassName()}>
-                  <label htmlFor="mt-from">{t("myTasks.createdFrom")}</label>
-                  <input id="mt-from" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-                </div>
-                <div className={root.elem("field").toClassName()}>
-                  <label htmlFor="mt-to">{t("myTasks.createdTo")}</label>
-                  <input id="mt-to" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-                </div>
-                <div className={root.elem("field").toClassName()}>
                   <label htmlFor="mt-status">{t("myTasks.taskStatus")}</label>
                   <select
                     id="mt-status"
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
+                    value={statusDraft}
+                    onChange={(e) => setStatusDraft(e.target.value)}
                     aria-label={t("myTasks.taskStatus")}
                   >
                     <option value="">{t("myTasks.statusAll")}</option>
-                    <option value="progress">{t("myTasks.statusProgress")}</option>
-                    <option value="done">{t("myTasks.statusDone")}</option>
+                    {statusOptions.map((status) => (
+                      <option key={status} value={status}>
+                        {t(PIPELINE_STATUS_I18N[status])}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
               <div className={root.elem("search-container-buttons").toClassName()}>
-                <button type="button" className={root.elem("btn-search").toClassName()} onClick={() => setPage(1)}>
+                <button type="button" className={root.elem("btn-search").toClassName()} onClick={applySearch}>
                   {t("myTasks.search")}
                 </button>
                 <button type="button" className={root.elem("btn-reset").toClassName()} onClick={resetFilters}>
@@ -357,9 +395,13 @@ export const MyTasksPage = () => {
                     <tr>
                       <th>{t("myTasks.col.taskName")}</th>
                       <th>{t("myTasks.col.taskType")}</th>
-                      <th>{t("myTasks.col.progress")}</th>
-                      <th>{t("myTasks.col.myAnn")}</th>
-                      <th>{t("myTasks.col.desc")}</th>
+                      {!annotatorSimplifiedTable ? (
+                        <>
+                          <th>{t("myTasks.col.progress")}</th>
+                          <th>{t("myTasks.col.myAnn")}</th>
+                          <th>{t("myTasks.col.desc")}</th>
+                        </>
+                      ) : null}
                       <th>{t("myTasks.col.created")}</th>
                       <th>{t("myTasks.col.status")}</th>
                       <th>{t("myTasks.col.action")}</th>
@@ -368,47 +410,59 @@ export const MyTasksPage = () => {
                   <tbody>
                     {pageSlice.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className={root.elem("empty").toClassName()}>
+                        <td colSpan={tableColCount} className={root.elem("empty").toClassName()}>
                           {t("myTasks.empty")}
                         </td>
                       </tr>
                     ) : (
                       pageSlice.map(({ task, projectId, projectTitle, taskWorkflowEnabled }) => {
-                        const ann = Array.isArray(task.annotations)
-                          ? task.annotations.filter((a) => a && !a.was_cancelled).length
-                          : Number(task.total_annotations ?? 0);
-                        const pipelineDone = isTaskPipelineDone(task, taskWorkflowEnabled);
-                        const progress = pipelineDone ? "1/1" : "0/1";
+                        const pipelineStatus = getMyTaskPipelineStatus(task, taskWorkflowEnabled);
+                        const wfStage = task.workflow?.stage;
+                        const pipelineComplete = pipelineStatus === "done";
                         return (
                           <tr key={`${projectId}-${task.id}`}>
                             <td>
                               <Link
                                 className={root.elem("link-action").toClassName()}
-                                to={dataHref(projectId, task.id, stage)}
+                                to={dataHref(projectId, task.id, stage, wfStage)}
                                 data-external
                               >
                                 {taskDisplayName(task)}
                               </Link>
                             </td>
                             <td>{projectTitle || "—"}</td>
-                            <td>{progress}</td>
-                            <td>{ann}</td>
-                            <td>{(task.meta?.description || "").slice(0, 48) || "—"}</td>
+                            {!annotatorSimplifiedTable ? (
+                              <>
+                                <td>{pipelineComplete ? "1/1" : "0/1"}</td>
+                                <td>
+                                  {Array.isArray(task.annotations)
+                                    ? task.annotations.filter((a) => a && !a.was_cancelled).length
+                                    : Number(task.total_annotations ?? 0)}
+                                </td>
+                                <td>{(task.meta?.description || "").slice(0, 48) || "—"}</td>
+                              </>
+                            ) : null}
                             <td>{formatDate(task.created_at)}</td>
                             <td>
                               <span
                                 className={root
                                   .elem("status")
-                                  .mod({ progress: !pipelineDone, done: pipelineDone })
+                                  .mod({
+                                    annotating: pipelineStatus === "annotating",
+                                    rejected: pipelineStatus === "rejected",
+                                    in_review: pipelineStatus === "in_review",
+                                    in_accept: pipelineStatus === "in_accept",
+                                    done: pipelineStatus === "done",
+                                  })
                                   .toClassName()}
                               >
-                                {pipelineDone ? t("myTasks.statusDone") : t("myTasks.statusProgress")}
+                                {t(PIPELINE_STATUS_I18N[pipelineStatus] ?? PIPELINE_STATUS_I18N.annotating)}
                               </span>
                             </td>
                             <td>
                               <Link
                                 className={root.elem("link-action").toClassName()}
-                                to={dataHref(projectId, task.id, stage)}
+                                to={dataHref(projectId, task.id, stage, wfStage)}
                                 data-external
                               >
                                 {actionLabel}

@@ -603,23 +603,32 @@ export default types
     }
 
     // Set `isSubmitting` flag to block [Submit] and related buttons during request
-    // to prevent from sending duplicating requests.
-    // Better to return request's Promise from SDK to make this work perfect.
+    // to prevent duplicate requests. Waits for the full async handler (no arbitrary timeout
+    // that re-enables buttons while the network call is still in flight).
     function handleSubmittingFlag(fn, defaultMessage = "Error during submit") {
-      if (self.isSubmitting) return;
+      if (self.isSubmitting) return Promise.resolve();
       self.setFlags({ isSubmitting: true });
-      const res = fn();
+      let res;
+      try {
+        res = fn();
+      } catch (err) {
+        self.setFlags({ isSubmitting: false });
+        showModal(err?.message || err || defaultMessage);
+        console.error(err);
+        return Promise.resolve();
+      }
 
       self.commentStore.setAddedCommentThisSession(false);
 
-      // Wait for request, max 5s to not make disabled forever broken button;
-      // but block for at least 0.2s to prevent from double clicking.
-      Promise.race([Promise.all([res, delay(200)]), delay(5000)])
+      const pending = Promise.all([Promise.resolve(res), delay(200)]);
+      return pending
         .catch((err) => {
           showModal(err?.message || err || defaultMessage);
           console.error(err);
         })
-        .then(() => self.setFlags({ isSubmitting: false }));
+        .finally(() => {
+          self.setFlags({ isSubmitting: false });
+        });
     }
 
     function incrementQueuePosition(number = 1) {
@@ -716,9 +725,8 @@ export default types
     }
 
     function acceptAnnotation() {
-      if (self.isSubmitting) return;
-
-      handleSubmittingFlag(async () => {
+      return handleSubmittingFlag(async () => {
+        await self.commentStore.commentFormSubmit();
         const entity = self.annotationStore.selected;
 
         entity.beforeSend();
@@ -739,10 +747,11 @@ export default types
       }, "Error during accept, try again");
     }
 
-    function rejectAnnotation({ comment = null }) {
-      if (self.isSubmitting) return;
-
-      handleSubmittingFlag(async () => {
+    function rejectAnnotation({ comment = null, skipCommentSubmit = false } = {}) {
+      return handleSubmittingFlag(async () => {
+        if (!skipCommentSubmit) {
+          await self.commentStore.commentFormSubmit();
+        }
         const entity = self.annotationStore.selected;
 
         entity.beforeSend();
@@ -763,10 +772,10 @@ export default types
     }
 
     function handleCustomButton(button) {
-      if (self.isSubmitting) return;
+      if (self.isSubmitting) return Promise.resolve();
       const buttonName = button.name;
 
-      handleSubmittingFlag(async () => {
+      return handleSubmittingFlag(async () => {
         const entity = self.annotationStore.selected;
 
         entity.beforeSend();

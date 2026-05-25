@@ -499,14 +499,14 @@ export const TabStore = types
 
       yield self.selected?.save();
 
-      if (labeling) {
-        getRoot(self).startLabelStream({
-          pushState: false,
-        });
-      } else if (isDefined(taskID)) {
+      if (isDefined(taskID)) {
         const task = { id: Number.parseInt(taskID) };
 
         getRoot(self).startLabeling(task, {
+          pushState: false,
+        });
+      } else if (labeling) {
+        getRoot(self).startLabelStream({
           pushState: false,
         });
       }

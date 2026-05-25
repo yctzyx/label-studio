@@ -50,26 +50,65 @@ export const Controls = controlsInjector(
 
         if (isInProgress) return;
         setIsInProgress(true);
-        if (!inputRef.current || addedCommentThisSession) {
-          callback();
-        } else if ((currentComment ?? "").trim()) {
-          e.preventDefault();
-          await commentFormSubmit();
-          callback();
-        } else {
-          const commentsInput = inputRef.current;
+        try {
+          if (!inputRef.current || addedCommentThisSession) {
+            await Promise.resolve(callback());
+          } else if ((currentComment ?? "").trim()) {
+            e.preventDefault();
+            await commentFormSubmit();
+            await Promise.resolve(callback());
+          } else {
+            const commentsInput = inputRef.current;
 
-          store.commentStore.setTooltipMessage(tooltipMessage);
-          commentsInput.scrollIntoView({
-            behavior: "smooth",
-          });
-          commentsInput.focus({ preventScroll: true });
+            store.commentStore.setTooltipMessage(tooltipMessage);
+            commentsInput.scrollIntoView({
+              behavior: "smooth",
+            });
+            commentsInput.focus({ preventScroll: true });
+          }
+        } finally {
+          setIsInProgress(false);
         }
-        setIsInProgress(false);
       },
       [
         store.rejectAnnotation,
         store.skipTask,
+        store.commentStore.currentComment,
+        store.commentStore.inputRef,
+        store.commentStore.commentFormSubmit,
+        store.commentStore.addedCommentThisSession,
+        isInProgress,
+      ],
+    );
+
+    const rejectButtonHandler = useCallback(
+      async (e) => {
+        const { addedCommentThisSession, currentComment, commentFormSubmit, inputRef } = store.commentStore;
+
+        if (isInProgress) return;
+        setIsInProgress(true);
+        try {
+          if (!inputRef.current || addedCommentThisSession) {
+            await store.rejectAnnotation({});
+          } else if ((currentComment ?? "").trim()) {
+            e.preventDefault();
+            await commentFormSubmit();
+            await store.rejectAnnotation({ skipCommentSubmit: true });
+          } else {
+            const commentsInput = inputRef.current;
+
+            store.commentStore.setTooltipMessage("Please enter a comment before rejecting");
+            commentsInput.scrollIntoView({
+              behavior: "smooth",
+            });
+            commentsInput.focus({ preventScroll: true });
+          }
+        } finally {
+          setIsInProgress(false);
+        }
+      },
+      [
+        store.rejectAnnotation,
         store.commentStore.currentComment,
         store.commentStore.inputRef,
         store.commentStore.commentFormSubmit,
@@ -87,11 +126,9 @@ export const Controls = controlsInjector(
             look="danger"
             onClick={async (e) => {
               if (store.hasInterface("comments:reject") ?? true) {
-                buttonHandler(e, () => store.rejectAnnotation({}), "Please enter a comment before rejecting");
+                await rejectButtonHandler(e);
               } else {
-                console.log("rejecting");
-                await store.commentStore.commentFormSubmit();
-                store.rejectAnnotation({});
+                await store.rejectAnnotation({});
               }
             }}
           >
@@ -99,7 +136,7 @@ export const Controls = controlsInjector(
           </Button>
         </ButtonTooltip>
       );
-    }, [disabled, store]);
+    }, [disabled, store, rejectButtonHandler]);
 
     if (isReview) {
       buttons.push(RejectButton);
@@ -111,8 +148,7 @@ export const Controls = controlsInjector(
             disabled={disabled}
             look="primary"
             onClick={async () => {
-              await store.commentStore.commentFormSubmit();
-              store.acceptAnnotation();
+              await store.acceptAnnotation();
             }}
           >
             {history.canUndo || annotation.versions.draft ? "Fix + Accept" : "Accept"}
