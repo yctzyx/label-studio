@@ -388,8 +388,7 @@
   "myTasks.actionReview": "去审核",
   "myTasks.actionAccept": "去验收",
   "myTasks.reviewTodoHint": "审核待办队列仅展示当前审核责任人为您的任务。审核通过后，任务将流转至验收环节或已完成状态，并从本队列移除。",
-  "myTasks.acceptTodoHint": "当前为验收待办队列：仅显示“当前轮到我验收”的任务。若列表为空，请确认项目已配置验收人员；历史已完成任务不会回流到此列表。",
-
+  "myTasks.acceptTodoHint": "验收待办队列仅展示当前验收责任人为您的任务。验收通过后，任务将流转至已完成状态，并从本队列移除。",
   "Model Settings": "模型设置",
   "Predictions Settings": "预测设置",
   "Cloud Storage Settings": "云存储设置",
@@ -427,7 +426,7 @@
   "Send Test Request": "发送测试请求",
   "Start Training": "开始训练",
   "Machine learning model options": "机器学习模型选项",
-  "Created": "创建于",
+  "Created": "创建时间",
   "Delete ML Backend": "删除 ML 后端",
   "This action cannot be undone. Are you sure?": "此操作不可撤销，确定继续吗？",
   "Disconnected": "已断开",
@@ -435,7 +434,6 @@
   "Error": "错误",
   "Training": "训练中",
   "Predicting": "预测中",
-
   "Predictions List": "预测列表",
   "predictions.listIntro": "以下为项目中的可用预测列表，每张卡片对应一个模型版本。导入预测的方式请",
   "see the documentation": "参阅文档",
@@ -445,7 +443,6 @@
   "Delete Predictions": "删除预测",
   "Model version undefined help": "模型版本未定义，通常表示导入预测时缺少 model_version 字段。",
   "Last prediction created": "最近一条预测创建于",
-
   "Source Cloud Storage": "源云存储",
   "Target Cloud Storage": "目标云存储",
   "Add Source Storage": "添加源存储",
@@ -474,7 +471,6 @@
   "storage_status_help_tooltip": "已初始化：已添加存储但尚未同步；可用于开始解析 URI 链接。\n排队中：同步任务在队列中尚未开始。\n进行中：同步任务正在执行。\n失败：同步已停止并出现错误。\n已完成（含错误）：同步完成但部分任务校验失败。\n已完成：同步成功完成。",
   "(View Logs)": "（查看日志）",
   "Annotations": "标注",
-  "Tasks": "任务",
   "Last Sync": "上次同步",
   "Not synced yet": "尚未同步",
   "tasks_added_help": "上次同步新增 {{count}} 个任务。",
@@ -488,8 +484,6 @@
   "Container": "容器",
   "Path": "路径",
   "Host": "主机",
-
-  "Webhooks": "网络钩子",
   "webhooks.list_description": "配置 Webhook 以订阅特定事件；事件触发时，{{appName}} 会向已配置的 URL 发送 HTTP POST 请求。",
   "Add your first webhook": "添加您的第一个网络钩子",
   "webhooks.empty_description": "配置 Webhook 以订阅特定事件；事件触发时，{{appName}} 会向已配置的 URL 发送 HTTP POST 请求。",
@@ -518,7 +512,6 @@
   "Are you sure you want to delete the webhook? This action cannot be undone.": "确定要删除该网络钩子吗？此操作无法撤销。",
   "Cancel webhook deletion": "取消删除",
   "Confirm webhook deletion": "确认删除",
-
   "To proceed, type \"{{word}}\" in the field below:": "请在下方输入「{{word}}」以继续：",
   "danger.reset_cache_message": "即将重置项目「{{name}}」的缓存。此操作无法撤销。",
   "danger.drop_tabs_message": "即将清除项目「{{name}}」在数据管理器中的所有标签页。此操作无法撤销。",
@@ -534,7 +527,6 @@
   "If the Data Manager is not loading, dropping all Data Manager tabs can help.": "若数据管理器无法加载，可尝试清除其所有标签页。",
   "Deleting a project removes all tasks, annotations, and project data from the database.": "删除项目将移除数据库中该项目的全部任务、标注及相关数据。",
   "Perform these actions at your own risk. Actions you take on this page can't be reverted. Make sure your data is backed up.": "以下操作风险自负，且通常不可恢复。执行前请确认数据已备份。",
-
   "Name": "名称",
   "Enter a name": "输入名称",
   "Backend URL": "后端 URL",
@@ -551,7 +543,6 @@
   "Failed to save ML backend.": "保存 ML 后端失败。",
   "Failed to add new ML backend.": "新增 ML 后端失败。",
   "validators.field_required": "{{field}} 为必填项",
-
   "My Account": "我的账户",
   "Personal Info": "个人信息",
   "Hotkeys": "快捷键",
@@ -564,9 +555,7 @@
   "Personal Access Token": "个人访问令牌",
   "Legacy Token": "旧版令牌",
   "Access Token": "访问令牌",
-
   "Authenticate with our API using your personal access token.": "使用个人访问令牌对 API 请求进行认证。",
-
   "User ID": "用户 ID",
   "Registration date": "注册时间",
   "Annotations Submitted": "已提交的标注",
@@ -574,7 +563,6 @@
   "My role": "我的角色",
   "Organization ID": "组织 ID",
   "Organization owner": "组织所有者",
-  "Created": "创建时间",
   "membership.role.OW": "所有者",
   "membership.role.DI": "已停用",
   "membership.role.AD": "管理员",
@@ -582,7 +570,6 @@
   "membership.role.AN": "标注员",
   "membership.role.RE": "审核员",
   "membership.role.NO": "待激活",
-
   "Upload Image": "上传图片",
   "First Name": "名",
   "Last Name": "姓",
@@ -590,10 +577,8 @@
   "Phone": "电话",
   "Error updating avatar": "更新头像失败",
   "Error updating user": "更新用户信息失败",
-
   "Example CURL Request": "示例 CURL 请求",
   "Revoke": "作废",
-
   "jwt.revoke.title": "作废令牌",
   "jwt.revoke.body": "确定要删除该访问令牌吗？任何使用该令牌的应用都需要重新获取令牌才能访问 {{appName}}。",
   "jwt.revoke.confirm": "作废",
@@ -608,7 +593,6 @@
   "jwt.tokenExpiryDate": "令牌过期时间",
   "jwt.callout.title": "请安全保管访问令牌",
   "jwt.callout.body": "请勿与他人分享密钥。如发现泄露，应立即作废并重新创建令牌。",
-
   "Import": "导入",
   "Export": "导出",
   "Reset to Defaults": "恢复默认",
@@ -625,7 +609,6 @@
   "No hotkeys in this section": "此分区暂无快捷键",
   "Annotation Actions": "标注操作",
   "Shortcuts for common annotation tasks like submit, skip, undo and redo": "提交、跳过、撤销与重做等常用标注快捷键",
-  "Data Manager": "数据管理器",
   "Shortcuts for navigating and managing tasks in Project's Data Manager": "在项目的「数据管理器」中导航与管理任务的快捷键",
   "Region Management": "标注区域管理",
   "Shortcuts for creating, selecting and manipulating annotation regions": "创建、选择与编辑标注区域的快捷键",
@@ -641,7 +624,6 @@
   "Shortcuts for navigating between images in multi-image tasks": "多图任务中切换图像的快捷键",
   "Paragraph Navigation": "段落导航",
   "Shortcuts for navigating phrases and regions in paragraph/dialogue view": "在段落 / 对话视图中跳转短语与区域的快捷键",
-
   "Import Hotkeys": "导入快捷键",
   "Paste your exported hotkeys JSON below. This will replace your current hotkeys. Make sure the JSON contains an array of hotkey objects with the required fields.": "在下方粘贴导出的快捷键 JSON，将替换当前快捷键。JSON 必须为快捷键对象数组，且包含必填字段。",
   "Hotkeys JSON": "快捷键 JSON",
@@ -654,7 +636,6 @@
   "import.error.noHotkeys": "导入数据中未包含任何快捷键",
   "import.error.hotkeyIndexPrefix": "第 {{index}} 项快捷键：",
   "import.error.unknown": "未知错误",
-
   "Press keys now...": "请按下按键…",
   "Click to set shortcut": "点击以设置快捷键",
   "Apply": "应用",
@@ -662,10 +643,8 @@
   "Disable": "关闭",
   "Enable": "开启",
   "Click to record keyboard shortcut": "点击以录制快捷键",
-
   "Customize": "自定义",
   "hotkeys.help.viewShortcuts": "查看全部可用快捷键。",
-
   "Submit Annotation": "提交标注",
   "Submit the current annotation": "提交当前标注结果",
   "Skip Task": "跳过任务",
@@ -806,6 +785,8 @@
   "Navigate to the next region within current phrase": "在当前短语内跳到下一个区域",
   "Previous Region in Phrase": "短语内上一区域",
   "Navigate to the previous region within current phrase": "在当前短语内跳到上一个区域",
-
-  "Unknown error": "未知错误"
+  "Unknown error": "未知错误",
+  "myTasks.streamLabel": "开始标注",
+  "myTasks.streamReview": "开始审核",
+  "myTasks.streamAccept": "开始验收"
 }

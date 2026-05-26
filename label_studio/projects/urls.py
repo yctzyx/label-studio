@@ -77,6 +77,11 @@ _api_urlpatterns = [
         workflow_api.ProjectWorkflowMyTasksAPI.as_view(),
         name='project-workflow-my-tasks',
     ),
+    path(
+        '<int:pk>/workflow/stream-next/',
+        workflow_api.ProjectWorkflowStreamNextAPI.as_view(),
+        name='project-workflow-stream-next',
+    ),
 ]
 
 _api_urlpatterns_templates = [

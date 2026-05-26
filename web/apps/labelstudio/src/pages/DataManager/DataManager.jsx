@@ -28,6 +28,11 @@ const initializeDataManager = async (root, props, params, runtimeUser) => {
 
   const { ...settings } = root.dataset;
 
+  // Workflow stream mode: when ?stream_stage=annotate|review|accept is present,
+  // DM will use the workflow-specific next-task endpoint filtered by stage + assignee.
+  const urlParams = new URLSearchParams(window.location.search);
+  const streamStage = urlParams.get("stream_stage") || null;
+
   const dmConfig = {
     root,
     projectId: params.id,
@@ -48,13 +53,15 @@ const initializeDataManager = async (root, props, params, runtimeUser) => {
     },
     labelStudio: {
       keymap: window.APP_SETTINGS.editor_keymap,
-      // In embed mode APP_SETTINGS.user can be a mock shell user (e.g. id=0).
-      // Prefer runtime whoami user resolved via authenticated API.
       user: runtimeUser ?? window.APP_SETTINGS?.user,
     },
     ...props,
     ...settings,
   };
+
+  if (streamStage) {
+    dmConfig.workflowStreamStage = streamStage;
+  }
 
   return new window.DataManager(dmConfig);
 };

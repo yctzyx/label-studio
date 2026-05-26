@@ -104,8 +104,9 @@ export const CreateProject = ({ onClose }) => {
   // name intentionally skipped from deps:
   // this should trigger only once when we got project loaded
   React.useEffect(() => {
-    project && !name && setName(project.title);
-  }, [project]);
+    if (!project || name) return;
+    setName(project.title ?? "");
+  }, [project, name]);
 
   const projectBody = React.useMemo(
     () => ({

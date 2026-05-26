@@ -182,11 +182,22 @@ export const create = (columns) => {
       }),
 
       loadNextTask: flow(function* ({ select = true } = {}) {
-        const taskData = yield self.root.invokeAction("next_task", {
-          reload: false,
-        });
+        const sdk = getRoot(self).SDK;
+        const streamStage = sdk?.workflowStreamStage;
+        let taskData;
 
-        if (taskData?.$meta?.status === 404) {
+        if (streamStage) {
+          taskData = yield getRoot(self).apiCall("workflowStreamNext", {
+            projectId: sdk.projectId,
+            stage: streamStage,
+          });
+        } else {
+          taskData = yield self.root.invokeAction("next_task", {
+            reload: false,
+          });
+        }
+
+        if (taskData?.$meta?.status === 404 || taskData?.status === 404) {
           getRoot(self).SDK.invoke("labelStreamFinished");
           return null;
         }

@@ -232,12 +232,14 @@ export class LSFWrapper {
     }
 
     if (this.labelStream) {
+      const wfStreamStage = this.datamanager?.workflowStreamStage;
+      const isWorkflowReviewStream = wfStreamStage === "review" || wfStreamStage === "accept";
       interfaces.push("infobar");
       if (!window.APP_SETTINGS.label_stream_navigation_disabled) interfaces.push("topbar:prevnext");
       if (FF_DEV_2186 && this.project.review_settings?.require_comment_on_reject) {
         interfaces.push("comments:update");
       }
-      if (this.project.show_skip_button) {
+      if (this.project.show_skip_button && !isWorkflowReviewStream) {
         interfaces.push("skip");
       }
     } else {
@@ -666,11 +668,16 @@ export class LSFWrapper {
     const showPredictions = this.project.show_collab_predictions === true;
 
     if (this.labelStream) {
+      const wfStreamStage = this.datamanager?.workflowStreamStage;
+      const isReviewStream = wfStreamStage === "review" || wfStreamStage === "accept";
+
       if (first?.draftId) {
-        // not submitted draft, most likely from previous labeling session
         annotation = first;
       } else if (isDefined(annotationID) && selectAnnotation) {
         annotation = this.annotations.find(({ pk }) => pk === annotationID);
+      } else if (isReviewStream && this.annotations.length > 0) {
+        // In review/accept stream, select the annotator's existing annotation for review
+        annotation = first;
       } else if (showPredictions && this.predictions.length > 0 && !this.isInteractivePreannotations) {
         annotation = cs.addAnnotationFromPrediction(this.predictions[0]);
       } else {

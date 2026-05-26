@@ -106,6 +106,9 @@ export const APIConfig = {
       method: "post",
     },
 
+    /** Task workflow: stream next task filtered by stage + current assignee */
+    workflowStreamNext: "/../projects/:projectId/workflow/stream-next/",
+
     /** Delete annotation */
     deleteAnnotation: {
       path: "/../annotations/:annotationID",

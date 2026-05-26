@@ -16,6 +16,7 @@ from projects.workflow_services import (
     release_workflows_after_team_allocation_removed,
     review_decision,
     submit_annotation_after_labeling,
+    workflow_stream_next_task,
 )
 from rest_framework import serializers, status
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -303,3 +304,44 @@ class TaskWorkflowDetailAPI(APIView):
                 }
             }
         )
+
+
+class ProjectWorkflowStreamNextAPI(APIView):
+    """Workflow stream mode: return the next task for the current user filtered by stage."""
+
+    permission_required = ViewClassPermission(GET=all_permissions.tasks_view)
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(name='stage', required=True, enum=['annotate', 'review', 'accept']),
+        ],
+    )
+    def get(self, request, pk):
+        project = _visible_org_project(request, pk)
+        stage = request.query_params.get('stage')
+        if not stage:
+            return Response({'detail': 'stage is required (annotate|review|accept)'}, status=400)
+        try:
+            task = workflow_stream_next_task(project, request.user, stage)
+        except ValidationError as err:
+            return Response({'detail': err.detail}, status=status.HTTP_400_BAD_REQUEST)
+        if task is None:
+            return Response({'detail': 'No tasks available'}, status=status.HTTP_404_NOT_FOUND)
+
+        from tasks.serializers import (
+            NextTaskSerializer,
+            TaskWithAnnotationsAndPredictionsAndDraftsSerializer,
+        )
+
+        context = {'request': request, 'project': project, 'resolve_uri': True}
+        is_review_stage = stage in ('review', 'accept')
+
+        if is_review_stage:
+            # Reviewers / accepters need to see the annotator's submitted annotations
+            data = TaskWithAnnotationsAndPredictionsAndDraftsSerializer(task, context=context).data
+        else:
+            context['annotations'] = False
+            data = NextTaskSerializer(task, context=context).data
+
+        data['queue'] = f'workflow_stream_{stage}'
+        return Response(data)

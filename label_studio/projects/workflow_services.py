@@ -420,3 +420,35 @@ def queryset_my_tasks(project, user, stage: str, *, search: str | None = None, s
             qs = qs.none()
 
     return qs
+
+
+def workflow_stream_next_task(project, user, stage: str):
+    """Get the next task for workflow stream mode (one at a time, ordered by task id).
+
+    stage: annotate | review | accept
+    Returns Task or None.
+    """
+    from tasks.models import Task
+
+    if stage == 'annotate':
+        qs = Task.objects.filter(
+            project=project,
+            workflow__stage=TaskWorkflowStage.ANNOTATE,
+            workflow__current_assignee_id=user.id,
+        ).select_related('workflow', 'project').order_by('id')
+    elif stage == 'review':
+        qs = Task.objects.filter(
+            project=project,
+            workflow__stage=TaskWorkflowStage.REVIEW,
+            workflow__current_assignee_id=user.id,
+        ).select_related('workflow', 'project').order_by('id')
+    elif stage == 'accept':
+        qs = Task.objects.filter(
+            project=project,
+            workflow__stage=TaskWorkflowStage.ACCEPT,
+            workflow__current_assignee_id=user.id,
+        ).select_related('workflow', 'project').order_by('id')
+    else:
+        raise ValidationError('Invalid stream stage (annotate|review|accept)')
+
+    return qs.first()

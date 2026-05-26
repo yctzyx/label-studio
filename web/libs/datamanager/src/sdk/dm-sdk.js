@@ -164,6 +164,7 @@ export class DataManager {
     this.apiTransform = config.apiTransform ?? {};
     this.preload = config.preload ?? {};
     this.role = config.role ?? null;
+    this.workflowStreamStage = config.workflowStreamStage ?? null;
     this.interfaces = objectToMap({
       tabs: true,
       toolbar: true,

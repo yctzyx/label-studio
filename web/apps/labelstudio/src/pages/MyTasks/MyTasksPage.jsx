@@ -376,6 +376,35 @@ export const MyTasksPage = () => {
                 </button>
               </div>
             </div>
+            <div className={root.elem("stream-bar").toClassName()}>
+              {stage === "annotate" ? (
+                <Link
+                  className={root.elem("btn-stream").toClassName()}
+                  to={`/projects/${selectedProjectId}/data?labeling=1&stream_stage=annotate`}
+                  data-external
+                >
+                  + {t("myTasks.streamLabel")}
+                </Link>
+              ) : null}
+              {stage === "review" ? (
+                <Link
+                  className={root.elem("btn-stream").toClassName()}
+                  to={`/projects/${selectedProjectId}/data?labeling=1&stream_stage=review`}
+                  data-external
+                >
+                  + {t("myTasks.streamReview")}
+                </Link>
+              ) : null}
+              {stage === "accept" ? (
+                <Link
+                  className={root.elem("btn-stream").toClassName()}
+                  to={`/projects/${selectedProjectId}/data?labeling=1&stream_stage=accept`}
+                  data-external
+                >
+                  + {t("myTasks.streamAccept")}
+                </Link>
+              ) : null}
+            </div>
           </div>
           ) : null}
 

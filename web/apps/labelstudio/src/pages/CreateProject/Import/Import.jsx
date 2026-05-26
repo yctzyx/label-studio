@@ -187,7 +187,6 @@ export const ImportPage = ({
     if (action.ids) {
       const ids = unique([...state.ids, ...action.ids]);
 
-      onFileListUpdate?.(ids);
       return { ...state, ids };
     }
     return state;
@@ -198,6 +197,10 @@ export const ImportPage = ({
     uploading: [],
     ids: [],
   });
+
+  useEffect(() => {
+    onFileListUpdate?.(files.ids);
+  }, [files.ids, onFileListUpdate]);
   /** 当前「添加数据」方式：本地上传 | 父平台 | 示例 */
   const [dataSourceTab, setDataSourceTab] = useState("local");
 
