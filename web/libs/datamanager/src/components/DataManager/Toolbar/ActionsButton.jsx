@@ -171,6 +171,109 @@ const updatePredictionProgressModal = () => {
   });
 };
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const pollPredictionRetrievalJob = async (store, jobId, selectedCount) => {
+  const projectId = store.project?.id;
+  if (!projectId || !jobId) {
+    throw new Error("缺少预标注任务 ID");
+  }
+
+  while (true) {
+    await sleep(2000);
+    const raw = await store.apiCall(
+      "predictionRetrievalStatus",
+      { project: projectId, job_id: jobId },
+      null,
+      {
+        errorHandler: () => true,
+      },
+    );
+    const payload = raw?.response ?? raw;
+    if (raw?.error || payload?.detail) {
+      const httpStatus = raw?.status ?? payload?.status;
+      if (httpStatus >= 400 || raw?.error) {
+        setPredictionProgressState({
+          status: "failed",
+          selectedCount,
+          detail: "",
+          error: payload?.detail || raw?.error || "查询预标注进度失败。",
+        });
+        updatePredictionProgressModal();
+        return;
+      }
+    }
+    const status = payload?.status;
+    const total = payload?.total ?? selectedCount;
+    const completed = payload?.completed ?? 0;
+
+    if (status === "queued" || status === "running") {
+      setPredictionProgressState({
+        status: "running",
+        selectedCount,
+        detail: payload?.detail || `已完成 ${completed}/${total} 条任务`,
+        error: "",
+      });
+      updatePredictionProgressModal();
+      continue;
+    }
+
+    if (status === "completed") {
+      const created = payload?.predictions_created ?? 0;
+      if (created === 0) {
+        setPredictionProgressState({
+          status: "failed",
+          selectedCount,
+          detail: "",
+          error: payload?.detail || "未生成任何预测结果。",
+        });
+      } else {
+        setPredictionProgressState({
+          status: "done",
+          selectedCount,
+          detail: payload?.detail || `已成功为 ${created} 条任务获取预测结果。`,
+          error: "",
+        });
+        await store.currentView?.reload();
+        await store.fetchProject();
+        store.currentView?.clearSelection();
+      }
+      updatePredictionProgressModal();
+      return;
+    }
+
+    if (status === "failed") {
+      setPredictionProgressState({
+        status: "failed",
+        selectedCount,
+        detail: "",
+        error: payload?.error || payload?.detail || "获取预测结果失败。",
+      });
+      updatePredictionProgressModal();
+      return;
+    }
+  }
+};
+
+const resolvePredictionActionError = (result) => {
+  if (!result) return "请求失败，请查看后端日志。";
+  const payload = result?.response ?? result;
+  const httpStatus = result?.status ?? payload?.status;
+  const responseCode = payload?.response_code;
+  const detail = payload?.detail;
+
+  if (result?.error) {
+    return detail || result.error || "请求失败，请查看后端日志。";
+  }
+  if ((httpStatus && httpStatus >= 400) || (responseCode && responseCode >= 400)) {
+    return detail || "获取预测结果失败。";
+  }
+  if (payload?.predictions_created === 0) {
+    return detail || "未生成任何预测结果。";
+  }
+  return null;
+};
+
 const showPredictionProgress = ({ action, store, body }) => {
   const selectedCount = store.currentView?.selectedCount ?? 0;
 
@@ -182,15 +285,37 @@ const showPredictionProgress = ({ action, store, body }) => {
   });
   openPredictionProgressModal();
 
-  Promise.resolve(store.invokeAction(action.id, { body }))
-    .then((result) => {
+  Promise.resolve(store.invokeAction(action.id, { body, reload: false }))
+    .then(async (result) => {
+      const payload = result?.response ?? result;
+      const jobId = payload?.job_id ?? result?.job_id;
+      if (payload?.async && jobId) {
+        await pollPredictionRetrievalJob(store, jobId, selectedCount);
+        return;
+      }
+
+      const errorMessage = resolvePredictionActionError(result);
+      if (errorMessage) {
+        setPredictionProgressState({
+          status: "failed",
+          selectedCount,
+          detail: "",
+          error: errorMessage,
+        });
+        updatePredictionProgressModal();
+        return;
+      }
+
       setPredictionProgressState({
         status: "done",
         selectedCount,
-        detail: result?.detail || `已处理 ${result?.processed_items ?? selectedCount} 条任务。`,
+        detail: payload?.detail || `已处理 ${payload?.processed_items ?? selectedCount} 条任务。`,
         error: "",
       });
       updatePredictionProgressModal();
+      await store.currentView?.reload();
+      await store.fetchProject();
+      store.currentView?.clearSelection();
     })
     .catch((error) => {
       setPredictionProgressState({

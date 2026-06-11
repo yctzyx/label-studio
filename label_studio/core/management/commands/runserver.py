@@ -32,6 +32,7 @@ class Command(BaseRunserverCommand):
         """在启动服务器前执行 Nacos 注册"""
         self._register_nacos()
         self._start_pub_directory_scheduler()
+        self._start_parent_dataset_scheduler()
         super().inner_run(*args, **options)
 
     def _register_nacos(self):
@@ -68,3 +69,12 @@ class Command(BaseRunserverCommand):
             start_pub_directory_scheduler_once()
         except Exception as e:
             logger.warning('[PubDirectorySync] scheduler startup failed: %s', e, exc_info=True)
+
+    def _start_parent_dataset_scheduler(self):
+        """启动数据集元数据同步定时任务（默认每 60 秒）。"""
+        try:
+            from parent_integration.parent_dataset_scheduler import start_parent_dataset_scheduler_once
+
+            start_parent_dataset_scheduler_once()
+        except Exception as e:
+            logger.warning('[ParentDatasetSync] scheduler startup failed: %s', e, exc_info=True)

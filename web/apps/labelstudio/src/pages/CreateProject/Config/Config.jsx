@@ -875,6 +875,11 @@ export const ConfigPage = ({
     }
   }, []);
 
+  React.useEffect(() => {
+    const group = String(project?.template_group ?? "").trim();
+    if (group) setSelectedGroup(group);
+  }, [project?.template_group, setSelectedGroup]);
+
   if (!show) return null;
 
   return (

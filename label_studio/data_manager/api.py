@@ -717,6 +717,28 @@ class ProjectActionsAPI(APIView):
         return Response(result, status=code)
 
 
+class PredictionRetrievalJobAPI(APIView):
+    """GET /api/dm/prediction-retrieval/?project=<id>&job_id=<id> — 查询批量预标注任务进度。"""
+
+    permission_required = ViewClassPermission(GET=all_permissions.projects_view)
+
+    def get(self, request):
+        from ml.prediction_retrieval_runner import get_prediction_retrieval_job
+
+        pk = int_from_request(request.GET, 'project', 0)
+        job_id = (request.GET.get('job_id') or '').strip()
+        if not job_id:
+            return Response({'detail': '缺少 job_id 参数'}, status=400)
+
+        project = generics.get_object_or_404(Project, pk=pk)
+        self.check_object_permissions(request, project)
+
+        job = get_prediction_retrieval_job(project.pk, job_id)
+        if job is None:
+            return Response({'detail': '任务不存在或已过期'}, status=404)
+        return Response(job)
+
+
 @method_decorator(
     name='get',
     decorator=extend_schema(

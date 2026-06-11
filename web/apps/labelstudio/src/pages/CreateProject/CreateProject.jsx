@@ -13,8 +13,30 @@ import { ImportPage } from "./Import/Import";
 import { useImportPage } from "./Import/useImportPage";
 import { useDraftProject } from "./utils/useDraftProject";
 import { Input, TextArea } from "../../components/Form";
+import {
+  DEFAULT_TEMPLATE_GROUPS,
+  PROJECT_TYPE_FILTERS,
+  filterSidebarTemplateGroups,
+} from "../Projects/projectTaxonomy";
 
-const ProjectName = ({ name, setName, onSaveName, onSubmit, error, description, setDescription, show = true }) => {
+const taxonomyClass = cn("project-taxonomy");
+
+const ProjectName = ({
+  name,
+  setName,
+  onSaveName,
+  onSubmit,
+  error,
+  description,
+  setDescription,
+  dataTypeCategory,
+  onDataTypeChange,
+  templateGroup,
+  onTemplateGroupChange,
+  templateGroups,
+  metaError,
+  show = true,
+}) => {
   const { t } = useTranslation();
   if (!show) return null;
   return (
@@ -39,6 +61,40 @@ const ProjectName = ({ name, setName, onSaveName, onSubmit, error, description, 
         />
         {error && <span className="-mt-1 text-negative-content">{error}</span>}
       </div>
+
+      <div className={taxonomyClass.elem("section").toClassName()}>
+        <div className={taxonomyClass.elem("heading").toClassName()}>{t("Data type")}</div>
+        <div className={taxonomyClass.elem("chip-grid").toClassName()}>
+          {PROJECT_TYPE_FILTERS.map(({ key, labelKey }) => (
+            <button
+              key={key}
+              type="button"
+              className={taxonomyClass.elem("chip").mod({ active: dataTypeCategory === key }).toClassName()}
+              onClick={() => onDataTypeChange(key)}
+            >
+              {t(labelKey)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className={taxonomyClass.elem("section").toClassName()}>
+        <div className={taxonomyClass.elem("heading").toClassName()}>{t("Tags")}</div>
+        <div className={taxonomyClass.elem("tag-list").toClassName()}>
+          {templateGroups.map((group) => (
+            <button
+              key={group}
+              type="button"
+              className={taxonomyClass.elem("tag-pill").mod({ active: templateGroup === group }).toClassName()}
+              onClick={() => onTemplateGroupChange(group)}
+            >
+              {t(group, { defaultValue: group })}
+            </button>
+          ))}
+        </div>
+        {metaError && <span className="text-negative-content text-body-small">{metaError}</span>}
+      </div>
+
       <div className="project-name__description-field w-full min-w-0 flex flex-col gap-2">
         <label className="w-full" htmlFor="project_description">
           {t("Description")}
@@ -47,7 +103,7 @@ const ProjectName = ({ name, setName, onSaveName, onSubmit, error, description, 
           name="description"
           id="project_description"
           placeholder={t("Optional description of your project")}
-          rows={16}
+          rows={8}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           className="project-description w-full"
@@ -68,7 +124,13 @@ export const CreateProject = ({ onClose }) => {
 
   const [name, setName] = React.useState("");
   const [error, setError] = React.useState();
+  const [metaError, setMetaError] = React.useState();
   const [description, setDescription] = React.useState("");
+  const [dataTypeCategory, setDataTypeCategory] = React.useState("general");
+  const [templateGroup, setTemplateGroup] = React.useState("");
+  const [templateGroups, setTemplateGroups] = React.useState(() =>
+    filterSidebarTemplateGroups([...DEFAULT_TEMPLATE_GROUPS]),
+  );
   const [sample, setSample] = React.useState(null);
 
   const setStep = React.useCallback((step) => {
@@ -85,6 +147,18 @@ export const CreateProject = ({ onClose }) => {
     setError(null);
   }, [name]);
 
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const res = await api.callApi("configTemplates", { errorFilter: () => true });
+      if (cancelled || !res?.groups?.length) return;
+      setTemplateGroups(filterSidebarTemplateGroups(res.groups));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [api]);
+
   const { columns, uploading, uploadDisabled, hasImportData, finishUpload, pageProps, uploadSample } = useImportPage(
     project,
     sample,
@@ -94,31 +168,59 @@ export const CreateProject = ({ onClose }) => {
   const tabClass = rootClass.elem("tab");
   const steps = React.useMemo(
     () => ({
-      name: <span className={tabClass.mod({ disabled: !!error })}>{t("Project Name")}</span>,
+      name: <span className={tabClass.mod({ disabled: !!error || !!metaError })}>{t("Project Name")}</span>,
       import: <span className={tabClass.mod({ disabled: uploadDisabled })}>{t("Data Import")}</span>,
       config: t("Labeling Setup"),
     }),
-    [t, error, uploadDisabled, tabClass],
+    [t, error, metaError, uploadDisabled, tabClass],
   );
 
-  // name intentionally skipped from deps:
-  // this should trigger only once when we got project loaded
+  const step1SyncedFromProject = React.useRef(false);
+
   React.useEffect(() => {
-    if (!project || name) return;
+    if (!project || step1SyncedFromProject.current) return;
     setName(project.title ?? "");
-  }, [project, name]);
+    setDataTypeCategory(project.data_type_category || "general");
+    setTemplateGroup(String(project.template_group ?? "").trim());
+    step1SyncedFromProject.current = true;
+  }, [project]);
+
+  const persistProjectMeta = React.useCallback(
+    async (patch) => {
+      if (!project) return false;
+
+      const res = await api.callApi("updateProject", {
+        params: { pk: project.id },
+        body: patch,
+        errorFilter: () => true,
+      });
+
+      if (res === null || res?.error) return false;
+
+      updateProject({ ...project, ...patch });
+      return true;
+    },
+    [api, project, updateProject],
+  );
 
   const projectBody = React.useMemo(
     () => ({
       title: name,
       description,
       label_config: project?.label_config ?? "<View></View>",
+      data_type_category: dataTypeCategory,
+      template_group: templateGroup,
     }),
-    [name, description, project?.label_config],
+    [name, description, project?.label_config, dataTypeCategory, templateGroup],
   );
 
   const onCreate = React.useCallback(async () => {
-    // First, persist project with label_config so import/reimport validates against it
+    if (!templateGroup.trim()) {
+      setMetaError(t("validators.field_required", { field: t("Tags") }));
+      setStep("name");
+      return;
+    }
+
     const response = await api.callApi("updateProject", {
       params: {
         pk: project.id,
@@ -141,24 +243,57 @@ export const CreateProject = ({ onClose }) => {
     setWaitingStatus(false);
 
     history.push(`/projects/${response.id}/data`);
-  }, [project, projectBody, finishUpload]);
+  }, [project, projectBody, finishUpload, templateGroup, t, setStep]);
 
   const onSaveName = async () => {
-    if (error) return;
+    if (error || !project) return;
+
+    const trimmed = name.trim();
+
+    if (!trimmed) {
+      setError(t("validators.field_required", { field: t("Project Name") }));
+      return;
+    }
+
+    if (trimmed === project.title) return;
+
     const res = await api.callApi("updateProjectRaw", {
       params: {
         pk: project.id,
       },
       body: {
-        title: name,
+        title: trimmed,
       },
     });
 
-    if (res.ok) return;
+    if (res.ok) {
+      updateProject({ ...project, title: trimmed });
+      if (trimmed !== name) setName(trimmed);
+      return;
+    }
+
     const err = await res.json();
 
     setError(err.validation_errors?.title);
   };
+
+  const onDataTypeChange = React.useCallback(
+    async (key) => {
+      setDataTypeCategory(key);
+      setMetaError(null);
+      await persistProjectMeta({ data_type_category: key });
+    },
+    [persistProjectMeta],
+  );
+
+  const onTemplateGroupChange = React.useCallback(
+    async (group) => {
+      setTemplateGroup(group);
+      setMetaError(null);
+      await persistProjectMeta({ template_group: group });
+    },
+    [persistProjectMeta],
+  );
 
   const onDelete = React.useCallback(() => {
     const performClose = async () => {
@@ -200,7 +335,7 @@ export const CreateProject = ({ onClose }) => {
               onClick={onCreate}
               waiting={waiting || uploading}
               waitingClickable={false}
-              disabled={!project || uploadDisabled || error || !hasImportData}
+              disabled={!project || uploadDisabled || error || metaError || !hasImportData || !templateGroup.trim()}
             >
               {t("Save")}
             </Button>
@@ -210,10 +345,16 @@ export const CreateProject = ({ onClose }) => {
           name={name}
           setName={setName}
           error={error}
+          metaError={metaError}
           onSaveName={onSaveName}
           onSubmit={onCreate}
           description={description}
           setDescription={setDescription}
+          dataTypeCategory={dataTypeCategory}
+          onDataTypeChange={onDataTypeChange}
+          templateGroup={templateGroup}
+          onTemplateGroupChange={onTemplateGroupChange}
+          templateGroups={templateGroups}
           show={step === "name"}
         />
         <ImportPage
@@ -231,10 +372,12 @@ export const CreateProject = ({ onClose }) => {
           }}
           onTemplateGroupChange={(group) => {
             if (!project) return;
-            updateProject({ ...project, template_group: group });
+            const nextGroup = group ?? "";
+            setTemplateGroup(nextGroup);
+            updateProject({ ...project, template_group: nextGroup });
             void api.callApi("updateProject", {
               params: { pk: project.id },
-              body: { template_group: group },
+              body: { template_group: nextGroup },
               errorFilter: () => true,
             });
           }}

@@ -57,6 +57,17 @@
     }
   }
 
+  &__navigation-prefix {
+    flex-shrink: 0;
+    padding: 12px 12px 8px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  &__back {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
   &__content {
     flex: 1;
     min-width: 0;

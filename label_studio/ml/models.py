@@ -10,8 +10,10 @@ from django.db.models import Count, JSONField, Q
 from django.db.models.signals import post_save, pre_delete
 from django.dispatch import receiver
 from django.utils.translation import gettext_lazy as _
+from core.utils.params import get_env
 from ml.api_connector import PREDICT_URL, TIMEOUT_PREDICT, MLApi
 from projects.models import Project
+from tasks.models import Task
 from tasks.serializers import PredictionSerializer, TaskSimpleSerializer
 from webhooks.serializers import Webhook, WebhookSerializer
 
@@ -346,8 +348,6 @@ class MLBackend(models.Model):
             return
 
         if isinstance(tasks, list):
-            from tasks.models import Task
-
             tasks = Task.objects.filter(id__in=[task.id for task in tasks])
 
         # Preannotation is idempotent for product workflows: once a task has any prediction,
@@ -356,8 +356,19 @@ class MLBackend(models.Model):
         if not tasks.exists():
             logger.debug(f'All tasks already have predictions, skip ML backend {self}')
             return model_version
-        tasks_ser = TaskSimpleSerializer(tasks, many=True).data
-        predictions = self._get_predictions_from_ml_backend(tasks_ser)
+
+        task_ids = list(tasks.values_list('id', flat=True))
+        batch_size = max(1, int(get_env('ML_PREDICT_BATCH_SIZE', 1)))
+        predictions: List[Dict] = []
+        for offset in range(0, len(task_ids), batch_size):
+            chunk_ids = task_ids[offset : offset + batch_size]
+            chunk_qs = Task.objects.filter(id__in=chunk_ids)
+            tasks_ser = TaskSimpleSerializer(chunk_qs, many=True).data
+            predictions.extend(self._get_predictions_from_ml_backend(tasks_ser))
+
+        if not predictions:
+            return model_version
+
         with conditional_atomic(predicate=db_is_not_sqlite):
             prediction_ser = PredictionSerializer(data=predictions, many=True)
             prediction_ser.is_valid(raise_exception=True)

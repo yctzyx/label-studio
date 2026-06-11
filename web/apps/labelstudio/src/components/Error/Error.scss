@@ -45,13 +45,6 @@
     font-family: var(--font-mono);
   }
 
-  &__version {
-    font-size: 14px;
-    font-weight: 600;
-    margin: 0.5rem 0;
-    color: var(--color-neutral-content-subtlest);
-  }
-
   &__validation {
     padding: 0;
     margin: 0.5rem 1rem;
@@ -70,19 +63,8 @@
 
   &__actions {
     display: flex;
+    justify-content: flex-end;
     margin: 1rem;
-  }
-
-  &__slack {
-    margin-right: auto;
-    display: flex;
-    align-items: center;
-
-    img {
-      height: 16px;
-      width: 16px;
-      margin-right: 8px;
-    }
   }
 
   &_kind_paused {

@@ -29,8 +29,10 @@ export const API_CONFIG = {
     projects: "/projects",
     project: "/projects/:pk",
     updateProject: "PATCH:/projects/:pk",
-    /** 父平台数据集：按桶前缀列举 S3 对象并生成任务 */
+    /** 父平台数据集：按桶前缀列举 S3 对象并生成任务（异步，返回 job_id） */
     syncParentDataset: "POST:/projects/:pk/parent-dataset/sync",
+    /** 父平台数据集同步进度 */
+    syncParentDatasetStatus: "GET:/projects/:pk/parent-dataset/sync",
     createProject: "POST:/projects",
     deleteProject: "DELETE:/projects/:pk",
     projectResetCache: "POST:/projects/:pk/summary/reset",

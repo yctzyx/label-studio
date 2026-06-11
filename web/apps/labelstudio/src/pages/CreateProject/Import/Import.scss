@@ -329,6 +329,53 @@ $pidata-row-hover: $el-table-row-hover;
     padding-bottom: 0 !important;
   }
 
+  &__parent-sync-progress {
+    padding: 4px 4px 0;
+    max-width: 520px;
+    margin-left: auto;
+
+    &__track {
+      position: relative;
+      height: 6px;
+      overflow: hidden;
+      border-radius: 3px;
+      background: var(--color-neutral-background, #f0f2f5);
+    }
+
+    &__fill {
+      height: 100%;
+      border-radius: inherit;
+      background: #{$pidata-primary};
+      transition: width 0.35s ease;
+
+      &_indeterminate {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: -35%;
+        width: 35% !important;
+        animation: parent-sync-progress-slide 1.2s ease-in-out infinite;
+      }
+    }
+
+    &__text {
+      margin-top: 8px;
+      color: var(--color-neutral-content-subtler, #909399);
+      line-height: 1.4;
+      word-break: break-word;
+    }
+  }
+
+  @keyframes parent-sync-progress-slide {
+    0% {
+      left: -35%;
+    }
+
+    100% {
+      left: 100%;
+    }
+  }
+
   &__parent-delete-btn {
     box-sizing: border-box;
     min-width: 36px !important;

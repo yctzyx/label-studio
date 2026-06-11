@@ -86,7 +86,7 @@ def _parse_config_json(raw: str | None) -> dict:
 
 
 def resolve_s3_endpoint(db: DataDatabase) -> str:
-    """从 config_json、环境变量或 database_ip + 端口推断 S3 endpoint URL。"""
+    """从 config_json、环境变量或 data_database.database_ip + database_port 推断 S3 endpoint URL。"""
     cfg = _parse_config_json(db.config_json)
     for key in ('s3_endpoint', 'endpoint', 'endpoint_url', 'minio_endpoint', 's3Endpoint'):
         v = cfg.get(key)
@@ -102,7 +102,8 @@ def resolve_s3_endpoint(db: DataDatabase) -> str:
     host = (db.database_ip or '').strip()
     if not host:
         return ''
-    port = get_env('PARENT_PLATFORM_S3_PORT', '9000')
+    # 优先使用父平台 data_database.database_port（如 9018），避免误用 MinIO 默认 9000
+    port = (db.database_port or '').strip() or get_env('PARENT_PLATFORM_S3_PORT', '9000')
     use_ssl = get_env('PARENT_PLATFORM_S3_USE_SSL', 'false').lower() in ('1', 'true', 'yes')
     scheme = 'https' if use_ssl else 'http'
     return f'{scheme}://{host}:{port}'
@@ -188,8 +189,9 @@ def iter_object_keys(
     prefix: str,
     type_code: int,
     max_keys: int,
+    on_key=None,
 ) -> list[str]:
-    """列举对象 key，按扩展名过滤，最多 max_keys 条。"""
+    """列举对象 key，按扩展名过滤，最多 max_keys 条。on_key(key, count) 可选进度回调。"""
     keys: list[str] = []
     paginator = client.get_paginator('list_objects_v2')
     kwargs = {'Bucket': bucket, 'Prefix': prefix}
@@ -201,6 +203,8 @@ def iter_object_keys(
             if not _ext_allowed(key, type_code):
                 continue
             keys.append(key)
+            if on_key:
+                on_key(key, len(keys))
             if len(keys) >= max_keys:
                 return keys
     return keys

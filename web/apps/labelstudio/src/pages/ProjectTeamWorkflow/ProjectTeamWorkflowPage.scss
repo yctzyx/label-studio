@@ -32,6 +32,17 @@ $pi-text-secondary: #909399;
     margin-bottom: 16px;
   }
 
+  &__header-start {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+
+  &__back-btn {
+    flex-shrink: 0;
+  }
+
   &__title {
     font-size: 18px;
     font-weight: 600;

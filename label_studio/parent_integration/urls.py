@@ -10,4 +10,9 @@ urlpatterns = [
         api.PubDirectorySyncAPI.as_view(),
         name='parent-integration-sync-pub-directory',
     ),
+    path(
+        'api/parent-integration/sync-parent-dataset/',
+        api.ParentDatasetSyncAPI.as_view(),
+        name='parent-integration-sync-parent-dataset',
+    ),
 ]

@@ -1,3 +1,4 @@
+import base64
 import logging
 import json
 import difflib
@@ -437,6 +438,82 @@ class OpenAIInteractive(LabelStudioMLBase):
             return data
         return self.preload_task_data(task, data)
 
+    def _label_studio_base_url(self) -> str:
+        return (os.getenv('LABEL_STUDIO_URL') or '').rstrip('/')
+
+    def get_label_studio_access_token(self):
+        """优先使用环境变量；SDK 客户端未配置 api_key 时勿返回空值挡住 env。"""
+        token = (
+            os.getenv('LABEL_STUDIO_API_KEY')
+            or os.getenv('LABEL_STUDIO_ACCESS_TOKEN')
+        )
+        if token:
+            return token
+        return super().get_label_studio_access_token()
+
+    def _label_studio_auth_headers(self) -> Dict[str, str]:
+        token = self.get_label_studio_access_token()
+        if not token:
+            return {}
+        # 组织启用 JWT 后 Legacy Token 会 403；JWT 一般以 eyJ 开头
+        if token.startswith('eyJ'):
+            return {'Authorization': f'Bearer {token}'}
+        return {'Authorization': f'Token {token}'}
+
+    def _resolve_vision_image_url(self, image_url: str) -> str:
+        """
+        视觉模型（如 MiniMax）要求 image_url 为 http(s):// 或 data:...;base64。
+        父平台同步任务常为 /api/projects/.../parent-dataset/object 相对路径，此处拉图并转 base64。
+        """
+        if not image_url or not isinstance(image_url, str):
+            raise ValueError('任务缺少图片 URL')
+        if image_url.startswith('data:'):
+            return image_url
+
+        base = self._label_studio_base_url()
+        headers: Dict[str, str] = {}
+
+        if image_url.startswith('/'):
+            if not base:
+                raise ValueError(
+                    '图片为 Label Studio 相对路径，请配置环境变量 LABEL_STUDIO_URL（Docker 内可用 host.docker.internal）'
+                )
+            fetch_url = f'{base}{image_url}'
+            headers = self._label_studio_auth_headers()
+        elif image_url.startswith(('http://', 'https://')):
+            fetch_url = image_url
+            if base and fetch_url.startswith(base):
+                headers = self._label_studio_auth_headers()
+        else:
+            raise ValueError(f'不支持的图片 URL 格式: {image_url[:120]}')
+
+        logger.info('Fetching image for vision model: %s', fetch_url[:200])
+        resp = requests.get(fetch_url, headers=headers, timeout=120)
+        if resp.status_code == 403:
+            detail = ''
+            try:
+                detail = (resp.json() or {}).get('detail', '')
+            except Exception:
+                pass
+            if 'legacy token' in str(detail).lower():
+                raise ValueError(
+                    'Label Studio 已禁用 Legacy Token，无法在 ML 后端拉图。'
+                    '请在 Label Studio 账户设置中创建 JWT API Token，写入 LABEL_STUDIO_API_KEY；'
+                    '或升级 Label Studio 以在预测时自动内联父平台图片。'
+                ) from None
+            raise ValueError(
+                f'拉图鉴权失败 (403)：请确认 LABEL_STUDIO_API_KEY 对项目有访问权限。{detail}'.strip()
+            ) from None
+        resp.raise_for_status()
+
+        content_type = (resp.headers.get('Content-Type') or 'image/jpeg').split(';')[0].strip().lower()
+        if not content_type.startswith('image/'):
+            content_type = 'image/jpeg'
+        encoded = base64.b64encode(resp.content).decode('ascii')
+        data_url = f'data:{content_type};base64,{encoded}'
+        logger.info('Resolved vision image to data URL (%s bytes)', len(resp.content))
+        return data_url
+
     def _generate_normalized_prompt(self, text: str, prompt: str, task_data: Dict, labels: Optional[List[str]]) -> str:
         """
         """
@@ -485,7 +562,8 @@ class OpenAIInteractive(LabelStudioMLBase):
 
         if is_vision:
             # Multimodal: send the image directly to a vision model instead of OCR
-            image_url = task_data.get(object_tag.value_name)
+            raw_image_url = task_data.get(object_tag.value_name)
+            image_url = self._resolve_vision_image_url(raw_image_url)
             norm_prompt = self._generate_normalized_prompt('', prompt, task_data, labels=labels)
             messages = [{
                 'role': 'user',
@@ -526,9 +604,10 @@ class OpenAIInteractive(LabelStudioMLBase):
         )
 
         if is_vision:
-            image_url = task_data.get(object_tag.value_name)
-            image_preview = image_url[:10] if isinstance(image_url, str) else image_url
+            raw_image_url = task_data.get(object_tag.value_name)
+            image_preview = raw_image_url[:10] if isinstance(raw_image_url, str) else raw_image_url
             logger.info("Choices JSON image_url=%s", image_preview)
+            image_url = self._resolve_vision_image_url(raw_image_url)
             messages = [{
                 'role': 'user',
                 'content': [
@@ -661,9 +740,10 @@ class OpenAIInteractive(LabelStudioMLBase):
         )
 
         if is_vision:
-            image_url = task_data.get(object_tag.value_name)
-            image_preview = image_url[:10] if isinstance(image_url, str) else image_url
+            raw_image_url = task_data.get(object_tag.value_name)
+            image_preview = raw_image_url[:10] if isinstance(raw_image_url, str) else raw_image_url
             logger.info("Anti-fraud JSON image_url=%s", image_preview)
+            image_url = self._resolve_vision_image_url(raw_image_url)
             messages = [{
                 "role": "user",
                 "content": [

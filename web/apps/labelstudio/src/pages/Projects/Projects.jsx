@@ -63,6 +63,7 @@ export const ProjectsPage = () => {
       "assignment_settings",
       "state",
       "template_group",
+      "data_type_category",
     ].join(",");
 
     const data = await api.callApi("projects", {
@@ -93,6 +94,7 @@ export const ProjectsPage = () => {
             "task_workflow_enabled",
             "workflow_stage_counts",
             "template_group",
+            "data_type_category",
           ].join(","),
           page_size: pageSize,
         },

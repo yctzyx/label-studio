@@ -13,48 +13,21 @@ import { PidataStylePagination, EmptyData } from "../../components";
 import { cn } from "../../utils/bem";
 import { ProjectStateChip } from "@humansignal/app-common";
 import { useAPI } from "../../providers/ApiProvider";
+import {
+  DEFAULT_TEMPLATE_GROUPS,
+  PROJECT_TYPE_FILTERS,
+  filterSidebarTemplateGroups,
+  resolveProjectDataTypeKey,
+} from "./projectTaxonomy";
 
-const TYPE_FILTERS = [
-  { key: "all", labelKey: "All types" },
-  { key: "image", labelKey: "Image" },
-  { key: "video", labelKey: "Video" },
-  { key: "text", labelKey: "Text" },
-  { key: "audio", labelKey: "Audio" },
-  { key: "general", labelKey: "General" },
-];
+const TYPE_FILTERS = [{ key: "all", labelKey: "All types" }, ...PROJECT_TYPE_FILTERS];
 
 /** 超过 6 个项目时即使当前只有一页也显示底栏，方便把每页从 30 改为 6 */
 const PROJECTS_PAGINATION_FORCE_MIN = 7;
 
-/** 与 annotation_templates/groups.txt 一致；侧栏不展示「社区贡献」 */
-const DEFAULT_TEMPLATE_GROUPS = [
-  "Computer Vision",
-  "Natural Language Processing",
-  "Audio/Speech Processing",
-  "Conversational AI",
-  "Chat",
-  "Ranking & Scoring",
-  "Structured Data Parsing",
-  "Time Series Analysis",
-  "Videos",
-  "Generative AI",
-];
-
-/** 标注项目标签侧栏排除的分组（与 groups.txt 中 Community Contributions 对应） */
-function filterSidebarTemplateGroups(groups) {
-  return groups.filter(
-    (g) => String(g).trim().toLowerCase() !== "community contributions",
-  );
-}
-
-function pseudoTypeKey(project) {
-  const keys = ["image", "video", "text", "audio", "general"];
-  return keys[Math.abs(Number(project.id)) % keys.length];
-}
-
 function typeLabelForProject(t, project) {
-  const key = pseudoTypeKey(project);
-  const f = TYPE_FILTERS.find((x) => x.key === key);
+  const key = resolveProjectDataTypeKey(project);
+  const f = PROJECT_TYPE_FILTERS.find((x) => x.key === key);
   return f ? t(f.labelKey) : t("General");
 }
 
@@ -133,7 +106,7 @@ export const ProjectsList = ({
       ) {
         return false;
       }
-      if (typeKey !== "all" && pseudoTypeKey(project) !== typeKey) return false;
+      if (typeKey !== "all" && resolveProjectDataTypeKey(project) !== typeKey) return false;
       if (
         tagKey !== "all" &&
         String(project.template_group ?? "").trim() !== tagKey

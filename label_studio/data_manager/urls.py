@@ -13,6 +13,7 @@ urlpatterns = [
     path('api/dm/columns/', api.ProjectColumnsAPI.as_view(), name='dm-columns'),
     path('api/dm/project/', api.ProjectStateAPI.as_view(), name='dm-project'),
     path('api/dm/actions/', api.ProjectActionsAPI.as_view(), name='dm-actions'),
+    path('api/dm/prediction-retrieval/', api.PredictionRetrievalJobAPI.as_view(), name='dm-prediction-retrieval'),
     path('api/dm/actions/<str:action_id>/form/', api.ProjectActionsFormAPI.as_view(), name='dm-actions-form'),
     # path("api/dm/tasks/", api.TaskListAPI.as_view()),
     # path("api/dm/tasks/<int:pk>", api.TaskAPI.as_view()),

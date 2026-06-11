@@ -160,6 +160,8 @@ export const ImportPage = ({
   const [error, setError] = useState();
   const [parentSyncing, setParentSyncing] = useState(false);
   const [parentSyncMsg, setParentSyncMsg] = useState(null);
+  const [parentSyncProgress, setParentSyncProgress] = useState(null);
+  const parentSyncPollRef = useRef(null);
   const [newlyUploadedFiles, setNewlyUploadedFiles] = useState(new Set());
   const prevUploadedRef = useRef(new Set());
   const api = useAPI();
@@ -210,19 +212,70 @@ export const ImportPage = ({
   const visibleRowCount =
     (showParentRow ? 1 : 0) + (showSampleRow ? 1 : 0) + files.uploaded.length + files.uploading.length;
 
+  useEffect(() => {
+    return () => {
+      if (parentSyncPollRef.current) {
+        clearTimeout(parentSyncPollRef.current);
+        parentSyncPollRef.current = null;
+      }
+    };
+  }, []);
+
   const handleParentDatasetSync = useCallback(async () => {
     if (!project?.id) return;
     setParentSyncing(true);
     setParentSyncMsg(null);
+    setParentSyncProgress({ percent: 0, phase: "preparing", message: t("import.parentDataset.syncStarting") });
     setError(undefined);
+
+    const pollJob = (jobId) =>
+      new Promise((resolve, reject) => {
+        const tick = async () => {
+          try {
+            const statusRes = await api.callApi("syncParentDatasetStatus", {
+              params: { pk: project.id, job_id: jobId },
+              errorFilter: () => true,
+            });
+            const status = statusRes?.response ?? statusRes;
+            setParentSyncProgress(status);
+
+            if (status?.status === "done") {
+              resolve(status);
+              return;
+            }
+            if (status?.status === "failed") {
+              reject(new Error(status.error || status.message || "sync failed"));
+              return;
+            }
+            parentSyncPollRef.current = setTimeout(tick, 600);
+          } catch (e) {
+            reject(e);
+          }
+        };
+        tick();
+      });
+
     try {
-      const res = await api.callApi("syncParentDataset", { params: { pk: project.id }, body: {} });
-      const raw = res?.response ?? res;
-      const created = raw?.created ?? res?.created ?? 0;
+      const startRes = await api.callApi("syncParentDataset", { params: { pk: project.id }, body: {} });
+      const jobId = startRes?.job_id ?? startRes?.response?.job_id;
+      if (!jobId) {
+        throw new Error("missing job_id");
+      }
+      const finalStatus = await pollJob(jobId);
+      const created = finalStatus?.result?.created ?? finalStatus?.created ?? 0;
+      setParentSyncProgress((prev) =>
+        prev ? { ...prev, percent: 100, status: "done", message: t("import.parentDataset.syncDone", { count: created }) } : prev,
+      );
       setParentSyncMsg(t("import.parentDataset.syncDone", { count: created }));
+      setTimeout(() => setParentSyncProgress(null), 1200);
     } catch (e) {
       setError(e);
+      setParentSyncProgress(null);
     } finally {
+      if (parentSyncPollRef.current) {
+        clearTimeout(parentSyncPollRef.current);
+        parentSyncPollRef.current = null;
+      }
       setParentSyncing(false);
     }
   }, [api, project?.id, t]);
@@ -582,51 +635,89 @@ export const ImportPage = ({
                           </tr>
                         )}
                         {showParentRow && parentDatasetSelection && (
-                          <tr key={`parent-ds-${parentDatasetSelection.datasetId}`}>
-                            <td className="align-middle">
-                              <Badge variant="info" className="h-5 text-xs rounded-sm whitespace-nowrap">
-                                {t("import.parentDataset.badge")}
-                              </Badge>
-                            </td>
-                            <td className="align-middle max-w-[200px]">
-                              <Typography variant="body" size="small" className="truncate">
-                                {parentDatasetSelection.datasetName}
-                              </Typography>
-                            </td>
-                            <td className="align-middle max-w-[280px] break-all text-body-small text-neutral-content-subtle">
-                              {parentDatasetSelection.path}
-                            </td>
-                            <td className="align-middle text-neutral-content-subtler text-body-small">
-                              {parentDatasetSelection.dataSetTypeLabel ?? parentDatasetSelection.dataSetType ?? "—"}
-                            </td>
-                            <td className="align-middle text-right">
-                              <div className={importClass.elem("parent-row-actions").toClassName()}>
-                                <Button
-                                  size="small"
-                                  look="primary"
-                                  className={scn(
-                                    importClass.elem("action-primary").toClassName(),
-                                    importClass.elem("parent-sync-btn").toClassName(),
-                                  )}
-                                  waiting={parentSyncing}
-                                  disabled={parentSyncing || !project?.id}
-                                  onClick={() => void handleParentDatasetSync()}
-                                >
-                                  {t("import.parentDataset.sync")}
-                                </Button>
-                                <Button
-                                  size="small"
-                                  variant="negative"
-                                  look="outlined"
-                                  className={importClass.elem("parent-delete-btn").toClassName()}
-                                  onClick={() => onParentDatasetClear?.()}
-                                  aria-label={t("import.clearParentSelection")}
-                                >
-                                  <IconTrash className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            </td>
-                          </tr>
+                          <>
+                            <tr key={`parent-ds-${parentDatasetSelection.datasetId}`}>
+                              <td className="align-middle">
+                                <Badge variant="info" className="h-5 text-xs rounded-sm whitespace-nowrap">
+                                  {t("import.parentDataset.badge")}
+                                </Badge>
+                              </td>
+                              <td className="align-middle max-w-[200px]">
+                                <Typography variant="body" size="small" className="truncate">
+                                  {parentDatasetSelection.datasetName}
+                                </Typography>
+                              </td>
+                              <td className="align-middle max-w-[280px] break-all text-body-small text-neutral-content-subtle">
+                                {parentDatasetSelection.path}
+                              </td>
+                              <td className="align-middle text-neutral-content-subtler text-body-small">
+                                {parentDatasetSelection.dataSetTypeLabel ?? parentDatasetSelection.dataSetType ?? "—"}
+                              </td>
+                              <td className="align-middle text-right">
+                                <div className={importClass.elem("parent-row-actions").toClassName()}>
+                                  <Button
+                                    size="small"
+                                    look="primary"
+                                    className={scn(
+                                      importClass.elem("action-primary").toClassName(),
+                                      importClass.elem("parent-sync-btn").toClassName(),
+                                    )}
+                                    waiting={parentSyncing}
+                                    disabled={parentSyncing || !project?.id}
+                                    onClick={() => void handleParentDatasetSync()}
+                                  >
+                                    {t("import.parentDataset.sync")}
+                                  </Button>
+                                  <Button
+                                    size="small"
+                                    variant="negative"
+                                    look="outlined"
+                                    className={importClass.elem("parent-delete-btn").toClassName()}
+                                    disabled={parentSyncing}
+                                    onClick={() => onParentDatasetClear?.()}
+                                    aria-label={t("import.clearParentSelection")}
+                                  >
+                                    <IconTrash className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                            {parentSyncing && parentSyncProgress && (
+                              <tr key={`parent-ds-progress-${parentDatasetSelection.datasetId}`}>
+                                <td colSpan={5} className="pt-0 pb-3">
+                                  <div className={importClass.elem("parent-sync-progress").toClassName()}>
+                                    <div className={importClass.elem("parent-sync-progress").elem("track").toClassName()}>
+                                      <div
+                                        className={scn(
+                                          importClass.elem("parent-sync-progress").elem("fill").toClassName(),
+                                          (parentSyncProgress?.phase === "listing" || parentSyncProgress?.percent < 5) &&
+                                            importClass
+                                              .elem("parent-sync-progress")
+                                              .elem("fill")
+                                              .mod({ indeterminate: true })
+                                              .toClassName(),
+                                        )}
+                                        style={
+                                          parentSyncProgress?.phase === "listing" ||
+                                          (parentSyncProgress?.percent ?? 0) < 5
+                                            ? undefined
+                                            : {
+                                                width: `${Math.min(100, Math.max(0, parentSyncProgress?.percent ?? 0))}%`,
+                                              }
+                                        }
+                                      />
+                                    </div>
+                                    <Typography size="small" className={importClass.elem("parent-sync-progress").elem("text").toClassName()}>
+                                      {t("import.parentDataset.syncProgress", {
+                                        percent: Math.round(parentSyncProgress?.percent ?? 0),
+                                        message: parentSyncProgress?.message ?? t("import.parentDataset.syncStarting"),
+                                      })}
+                                    </Typography>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </>
                         )}
                         {showSampleRow && sample && (
                           <tr key={sample.url}>

@@ -291,6 +291,24 @@ PUB_DIRECTORY_SYNC_ENABLED = get_bool_env('PUB_DIRECTORY_SYNC_ENABLED', True)
 PUB_DIRECTORY_SYNC_INTERVAL_SECONDS = max(10, int(get_env('PUB_DIRECTORY_SYNC_INTERVAL_SECONDS', '60')))
 PUB_DIRECTORY_SYNC_PRUNE_MEMBERSHIPS = get_bool_env('PUB_DIRECTORY_SYNC_PRUNE_MEMBERSHIPS', False)
 
+# data_database / md_data_set：同步后从本库读取；源库默认与 PUB_DIRECTORY_MYSQL 相同（pub_directory 别名）
+def _resolve_parent_dataset_source_db() -> str:
+    explicit = get_env('PARENT_DATASET_SOURCE_DB', '').strip()
+    if explicit:
+        return explicit
+    if get_env('PUB_DIRECTORY_MYSQL_NAME', '').strip():
+        return 'pub_directory'
+    if get_env('PARENT_PLATFORM_MYSQL_NAME', '').strip():
+        return 'parent_platform'
+    return 'default'
+
+
+PARENT_DATASET_DB = (get_env('PARENT_DATASET_DB', 'default') or 'default').strip()
+PARENT_DATASET_SOURCE_DB = _resolve_parent_dataset_source_db()
+PARENT_DATASET_SYNC_ENABLED = get_bool_env('PARENT_DATASET_SYNC_ENABLED', True)
+PARENT_DATASET_SYNC_INTERVAL_SECONDS = max(10, int(get_env('PARENT_DATASET_SYNC_INTERVAL_SECONDS', '60')))
+PARENT_DATASET_SYNC_PRUNE = get_bool_env('PARENT_DATASET_SYNC_PRUNE', False)
+
 DATABASE_ROUTERS = ['parent_integration.db_router.ParentPlatformRouter']
 
 DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
@@ -433,6 +451,12 @@ CORS_ALLOW_METHODS = [
     'PATCH',
     'POST',
     'PUT',
+]
+
+# Export downloads use custom `filename` and Content-Disposition headers.
+CORS_EXPOSE_HEADERS = [
+    'Content-Disposition',
+    'filename',
 ]
 ALLOWED_HOSTS = get_env_list('ALLOWED_HOSTS', default=['*'])
 

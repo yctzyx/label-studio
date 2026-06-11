@@ -313,6 +313,7 @@ class ProjectSerializer(FlexFieldsModelSerializer):
             'control_weights',
             'parent_platform_dataset',
             'template_group',
+            'data_type_category',
             'parsed_label_config',
             'evaluate_predictions_automatically',
             'config_has_control_tags',

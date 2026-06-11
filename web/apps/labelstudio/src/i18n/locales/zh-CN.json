@@ -291,6 +291,8 @@
   "import.parentDataset.discardPending": "取消选择",
   "import.parentDataset.applySelection": "应用为项目数据",
   "import.parentDataset.sync": "同步",
+  "import.parentDataset.syncStarting": "正在启动同步…",
+  "import.parentDataset.syncProgress": "{{percent}}% · {{message}}",
   "import.parentDataset.syncDone": "同步完成，已新增 {{count}} 条标注任务。",
   "import.parentDataset.baseMissing": "未配置父平台 API 根路径。可在 window.APP_SETTINGS.parentPlatformApiBase 中设置，或与 Label Studio 网关同源的 /api 路径。",
   "import.parentDataset.sourceFilter": "数据源",

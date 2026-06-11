@@ -23,6 +23,10 @@ services:
       - "${LLM_BACKEND_PORT:-9090}:9090"
     volumes:
       - "./data/server:/data"
+      # 开发时挂载业务代码：改 model.py 后只需 `docker compose restart`，无需 --build 重装依赖
+      - "./model.py:/app/model.py:ro"
+      - "./_wsgi.py:/app/_wsgi.py:ro"
+      - "./default_prompt.txt:/app/default_prompt.txt:ro"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9090/health')"]
       interval: 15s

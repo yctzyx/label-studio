@@ -1,7 +1,8 @@
-"""REST API：从父平台库读取 `data_database` / `md_data_set`（替代跨域 HTTP）。"""
+"""REST API：读取本库镜像表 `data_database` / `md_data_set`（由定时同步从父平台库写入）。"""
 
 import logging
 
+from django.conf import settings
 from django.db import OperationalError, ProgrammingError
 from django.db.models import Q
 from drf_spectacular.utils import extend_schema
@@ -178,6 +179,36 @@ class PubDirectorySyncAPI(APIView):
             logger.exception('sync_pub_directory failed')
             return Response(
                 {'detail': str(e), 'code': 'SYNC_PUB_DIRECTORY_FAILED'},
+                status=500,
+            )
+        return Response({'ok': True, **stats})
+
+
+class ParentDatasetSyncAPI(APIView):
+    """
+    触发 `sync_parent_dataset_tables`：将 data_database / md_data_set 从父平台库同步到本库。
+    仅 Django staff / superuser 可调用。
+    """
+
+    permission_classes = (IsAuthenticated,)
+
+    @extend_schema(
+        summary='Sync data_database/md_data_set from parent platform DB to local mirror',
+        tags=['Parent integration'],
+    )
+    def post(self, request):
+        user = request.user
+        if not (getattr(user, 'is_staff', False) or getattr(user, 'is_superuser', False)):
+            raise PermissionDenied('仅管理员可执行数据集元数据同步')
+        from parent_integration.parent_dataset_sync import sync_parent_dataset_tables
+
+        prune = bool(getattr(settings, 'PARENT_DATASET_SYNC_PRUNE', False))
+        try:
+            stats = sync_parent_dataset_tables(dry_run=False, prune=prune)
+        except Exception as e:
+            logger.exception('sync_parent_dataset_tables failed')
+            return Response(
+                {'detail': str(e), 'code': 'SYNC_PARENT_DATASET_FAILED'},
                 status=500,
             )
         return Response({'ok': True, **stats})

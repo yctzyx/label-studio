@@ -311,6 +311,28 @@ class Project(ProjectMixin, FsmHistoryStateModel):
         help_text='标注模板库分组名称（与 annotation_templates/groups.txt 及选中模板的 group 一致）',
     )
 
+    DATA_TYPE_IMAGE = 'image'
+    DATA_TYPE_VIDEO = 'video'
+    DATA_TYPE_TEXT = 'text'
+    DATA_TYPE_AUDIO = 'audio'
+    DATA_TYPE_GENERAL = 'general'
+    DATA_TYPE_CATEGORY_CHOICES = (
+        (DATA_TYPE_IMAGE, _('Image')),
+        (DATA_TYPE_VIDEO, _('Video')),
+        (DATA_TYPE_TEXT, _('Text')),
+        (DATA_TYPE_AUDIO, _('Audio')),
+        (DATA_TYPE_GENERAL, _('General')),
+    )
+
+    data_type_category = models.CharField(
+        _('data type category'),
+        max_length=32,
+        choices=DATA_TYPE_CATEGORY_CHOICES,
+        blank=True,
+        default=DATA_TYPE_GENERAL,
+        help_text='标注项目数据类型（图片/视频/文本/音频/通用），用于列表筛选与展示',
+    )
+
     is_draft = models.BooleanField(
         _('is draft'), default=False, help_text='Whether or not the project is in the middle of being created'
     )

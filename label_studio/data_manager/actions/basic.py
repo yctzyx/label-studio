@@ -12,6 +12,8 @@ from data_manager.functions import evaluate_predictions
 from django.conf import settings
 from projects.models import Project
 from tasks.functions import update_tasks_counters
+from django.db.models import Count
+
 from tasks.models import Annotation, AnnotationDraft, Prediction, Task
 from users.models import User
 from webhooks.models import WebhookAction
@@ -27,8 +29,89 @@ def retrieve_tasks_predictions(project, queryset, **kwargs):
     :param project: project instance
     :param queryset: filtered tasks db queryset
     """
-    evaluate_predictions(queryset)
-    return {'processed_items': queryset.count(), 'detail': 'Retrieved ' + str(queryset.count()) + ' predictions'}
+    task_count = queryset.count()
+    if task_count == 0:
+        return {
+            'response_code': 400,
+            'processed_items': 0,
+            'predictions_created': 0,
+            'detail': '未选中任何任务。',
+        }
+
+    if not project.ml_backends.exists():
+        return {
+            'response_code': 400,
+            'processed_items': 0,
+            'predictions_created': 0,
+            'detail': (
+                '当前项目未配置大模型或机器学习服务。'
+                '请前往「设置 → 大模型预标注」或「设置 → 模型」连接服务后重试。'
+            ),
+        }
+
+    backend = project.ml_backend
+    if backend is None:
+        return {
+            'response_code': 400,
+            'processed_items': 0,
+            'predictions_created': 0,
+            'detail': (
+                '当前项目未配置可用的大模型或机器学习服务。'
+                '请前往「设置 → 大模型预标注」或「设置 → 模型」连接服务后重试。'
+            ),
+        }
+
+    task_ids = list(queryset.values_list('id', flat=True))
+    eligible_qs = queryset.annotate(predictions_count=Count('predictions')).filter(predictions_count=0)
+    eligible_ids = list(eligible_qs.values_list('id', flat=True))
+    eligible_count = len(eligible_ids)
+    if eligible_count == 0:
+        return {
+            'response_code': 400,
+            'processed_items': task_count,
+            'predictions_created': 0,
+            'detail': '所选任务均已存在预测结果。如需重新获取，请先删除原有预测。',
+        }
+
+    if eligible_count > 1:
+        from ml.prediction_retrieval_runner import start_prediction_retrieval_job
+
+        job_id = start_prediction_retrieval_job(project, eligible_ids)
+        return {
+            'async': True,
+            'job_id': job_id,
+            'processed_items': eligible_count,
+            'predictions_created': 0,
+            'detail': f'已提交 {eligible_count} 条任务，正在后台获取预测结果…',
+        }
+
+    predictions_before = Prediction.objects.filter(task_id__in=task_ids).count()
+    evaluate_predictions(eligible_qs)
+    predictions_after = Prediction.objects.filter(task_id__in=task_ids).count()
+    created = predictions_after - predictions_before
+
+    if created == 0:
+        backend_label = backend.title or '模型服务'
+        backend_url = backend.url or ''
+        url_hint = f'（{backend_url}）' if backend_url else ''
+        detail = (
+            f'未能从「{backend_label}」获取到预测结果{url_hint}。'
+            '请确认大模型/ML 服务已启动、网络可达，且项目标注配置与模型输出格式一致。'
+        )
+        if backend.not_ready and getattr(backend, 'error_message', None):
+            detail = f'模型服务不可用：{backend.error_message}'
+        return {
+            'response_code': 400,
+            'processed_items': task_count,
+            'predictions_created': 0,
+            'detail': detail,
+        }
+
+    return {
+        'processed_items': task_count,
+        'predictions_created': created,
+        'detail': f'已成功为 {created} 条任务获取预测结果。',
+    }
 
 
 def delete_tasks(project, queryset, **kwargs):

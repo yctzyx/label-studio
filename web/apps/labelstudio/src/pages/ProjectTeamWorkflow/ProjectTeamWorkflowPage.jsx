@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { IconChevronLeft } from "@humansignal/icons";
 import { Button, ToastType, useToast } from "@humansignal/ui";
+import { useHistory } from "react-router";
 import { useUpdatePageTitle } from "@humansignal/core";
 import { useAPI } from "../../providers/ApiProvider";
 import { useParams } from "../../providers/RoutesProvider";
@@ -211,6 +213,7 @@ function OrgTreeUserList({
 
 export const ProjectTeamWorkflowPage = () => {
   const { id: projectId } = useParams();
+  const history = useHistory();
   const toast = useToast();
   const { callApi } = useAPI();
 
@@ -596,7 +599,19 @@ export const ProjectTeamWorkflowPage = () => {
   return (
     <div className={root.toClassName()}>
       <header className={root.elem("header").toClassName()}>
-        <h1 className={root.elem("title").toClassName()}>项目人员与分配</h1>
+        <div className={root.elem("header-start").toClassName()}>
+          <Button
+            size="small"
+            look="outlined"
+            variant="neutral"
+            leading={<IconChevronLeft />}
+            className={root.elem("back-btn").toClassName()}
+            onClick={() => history.push("/projects")}
+          >
+            返回
+          </Button>
+          <h1 className={root.elem("title").toClassName()}>项目人员与分配</h1>
+        </div>
         <div className={root.elem("steps").toClassName()}>
           <span>人员管理</span>
           <span style={{ opacity: 0.5, margin: "0 6px" }}>·</span>

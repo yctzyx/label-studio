@@ -1,4 +1,7 @@
+import { IconChevronLeft } from "@humansignal/icons";
+import { Button } from "@humansignal/ui";
 import { useTranslation } from "react-i18next";
+import { useHistory } from "react-router";
 import { SidebarMenu } from "../../components/SidebarMenu/SidebarMenu";
 import { WebhookPage } from "../WebhookPage/WebhookPage";
 import { DangerZone } from "./DangerZone";
@@ -23,6 +26,7 @@ const SETTINGS_MENU_ITEMS = [
 
 export const MenuLayout = ({ children, ...routeProps }) => {
   const { t } = useTranslation();
+  const history = useHistory();
   const menuItems = SETTINGS_MENU_ITEMS.map((item) => {
     const label = item.title ?? item.menuItem;
     if (!label) return item;
@@ -38,6 +42,19 @@ export const MenuLayout = ({ children, ...routeProps }) => {
     <SidebarMenu
       menuItems={menuItems}
       path={routeProps.match.url}
+      navigationPrefix={
+        <Button
+          size="small"
+          look="outlined"
+          variant="neutral"
+          leading={<IconChevronLeft />}
+          className="sidebar-menu__back"
+          aria-label={t("Back")}
+          onClick={() => history.push("/projects")}
+        >
+          {t("Back")}
+        </Button>
+      }
       children={children}
     />
   );

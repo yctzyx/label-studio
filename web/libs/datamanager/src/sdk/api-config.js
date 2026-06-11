@@ -178,6 +178,9 @@ export const APIConfig = {
       method: "post",
     },
 
+    /** Poll async batch prediction retrieval job */
+    predictionRetrievalStatus: "/prediction-retrieval",
+
     /** List comments ?annotation=<annotation_id> **/
     listComments: "/../comments",
 
