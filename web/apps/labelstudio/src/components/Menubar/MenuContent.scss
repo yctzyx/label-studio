@@ -1,8 +1,12 @@
 .content-wrapper {
   display: flex;
-  min-height: 100vh;
+  // min-height: 100%;
+  height: calc(100vh - 149px);
   flex-direction: column;
-  background-color: var(--color-neutral-background);
+  background: url('../../assets/images/bg.png');
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
 
   &__body {
     flex: 1;
@@ -19,6 +23,7 @@
     flex-direction: column;
     margin-left: 0;
     height: 100%;
+    padding: 16px;
     /* 单层子节点（.route-outlet）时填满中间区，才能把 %/flex 高度传到 /data */
     &:has(> :only-child) > :only-child {
       flex: 1 1 0%;

@@ -3,3 +3,7 @@
 {% load static %}
 
 {% block app_settings_hostname %}{{ embed_gateway_hostname }}{% endblock %}
+
+{% block bottomjs %}
+{# embed/wujie: skip jQuery & CSRF — API auth uses platform token via wujie props #}
+{% endblock %}

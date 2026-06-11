@@ -1,4 +1,11 @@
 // Align with CreateProject / 父平台工作台（参见 CreateProject.scss）
+// Element Plus table-like tokens (el-table): https://element-plus.org/en-US/component/table.html
+$el-table-border: #ebeef5;
+$el-table-header-bg: #f5f7fa;
+$el-table-header-text: #909399;
+$el-table-text: #606266;
+$el-table-row-hover: #f5f7fa;
+
 $pidata-page-bg: #f5f7fb;
 $pidata-card-bg: #fff;
 $pidata-border: #e8edf5;
@@ -6,11 +13,10 @@ $pidata-border-strong: #dbe5f4;
 $pidata-muted: #667085;
 $pidata-heading: #1f2937;
 $pidata-heading-soft: #344054;
-$pidata-primary: #2f6bff;
-$pidata-primary-active: #1d4ed8;
+$pidata-primary: #409eff;
+$pidata-primary-active: #337ecc;
 $pidata-track-bg: #f3f6fb;
-$pidata-row-hover: #f9fafb;
-$pidata-table-head: #fafbfd;
+$pidata-row-hover: $el-table-row-hover;
 
 // Custom scrollbar styling mixin
 @mixin custom-scrollbar {
@@ -117,7 +123,6 @@ $pidata-table-head: #fafbfd;
 
     flex: 1;
     min-height: 0;
-    overflow-y: auto;
     background-color: $pidata-page-bg;
   }
 
@@ -127,10 +132,11 @@ $pidata-table-head: #fafbfd;
     display: flex;
     flex-direction: column;
     gap: 20px;
-    padding: 24px 20px 28px;
-    max-width: 1080px;
+    padding: 24px 20px 0;
+    // max-width: 1080px;
     margin: 0 auto;
     width: 100%;
+    overflow-y: auto;
     box-sizing: border-box;
   }
 
@@ -250,6 +256,7 @@ $pidata-table-head: #fafbfd;
 
   &__summary-section {
     margin-top: var(--spacing-tight);
+    margin-bottom: 20px;
   }
 
   &__list-card-body {
@@ -257,20 +264,29 @@ $pidata-table-head: #fafbfd;
     padding-bottom: 18px !important;
   }
 
+  /* 数据清单滚动区：DOM 上同时挂 __table-scroll 与 __list-card-body */
+  &__table-scroll#{&}__list-card-body {
+    max-height: min(52vh, 480px);
+    overflow-y: auto;
+    @include custom-scrollbar;
+    background: $pidata-card-bg;
+    box-sizing: border-box;
+  }
+
   /* 与创建工作台卡片一致（参见 CreateProject form.project-name） */
   &__panel-card {
-    border-radius: 12px !important;
-    border-color: $pidata-border !important;
+    border-radius: 4px !important;
+    border-color: $el-table-border !important;
     background: $pidata-card-bg !important;
-    box-shadow: 0 8px 24px rgb(20 40 90 / 6%) !important;
+    box-shadow: none !important;
     overflow: hidden;
   }
 
   &__panel-card-heading {
-    padding: 14px 16px 11px !important;
+    padding: 12px 16px !important;
     margin: 0 !important;
-    border-bottom: 1px solid $pidata-border !important;
-    background: $pidata-table-head !important;
+    border-bottom: 1px solid $el-table-border !important;
+    background: $el-table-header-bg !important;
     gap: 2px !important;
 
     /* SimpleCard CardTitle defaults to text-2xl — tighten for list headers */
@@ -279,7 +295,7 @@ $pidata-table-head: #fafbfd;
       font-weight: 600 !important;
       line-height: 1.35 !important;
       letter-spacing: 0 !important;
-      color: $pidata-heading-soft !important;
+      color: #303133 !important;
     }
   }
 
@@ -288,14 +304,14 @@ $pidata-table-head: #fafbfd;
     --background-color: #{$pidata-primary};
     --border-color: #{$pidata-primary};
     --text-color: #fff;
-    --background-color-hover: #2566f5;
+    --background-color-hover: #66b1ff;
     --background-color-active: #{$pidata-primary-active};
-    border-radius: 8px !important;
+    border-radius: 4px !important;
     min-height: 34px;
     padding-left: 16px !important;
     padding-right: 16px !important;
     font-weight: 500 !important;
-    box-shadow: 0 4px 12px rgb(47 107 255 / 28%);
+    box-shadow: 0 2px 8px rgb(64 158 255 / 35%);
   }
 
   /* 数据清单：父平台数据集行 — 同步 / 删除 同高、间距加大 */
@@ -340,12 +356,6 @@ $pidata-table-head: #fafbfd;
     overflow: hidden;
   }
 
-  &__table-scroll {
-    max-height: min(52vh, 480px);
-    overflow-y: auto;
-    @include custom-scrollbar;
-  }
-
   &__drop-surface {
     flex: 1;
     min-height: 0;
@@ -360,7 +370,7 @@ $pidata-table-head: #fafbfd;
     }
   }
 
-  table:not(.upload_page__data-table) {
+  table:not(.upload_page__data-table):not(.parent-ds-picker__table) {
     table-layout: fixed;
     
     tr {
@@ -383,43 +393,56 @@ $pidata-table-head: #fafbfd;
 
   table.upload_page__data-table {
     table-layout: auto;
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 14px;
+    line-height: 1.5;
+    background: $pidata-card-bg;
 
     thead {
-      background: $pidata-table-head;
+      background: $el-table-header-bg !important;
 
       th {
-        color: $pidata-heading-soft;
-        font-weight: 600;
-        font-size: 12px;
-        padding-top: 10px;
-        padding-bottom: 10px;
+        color: $el-table-header-text !important;
+        font-weight: 600 !important;
+        font-size: 14px;
+        padding: 12px 12px !important;
+        border-bottom: 1px solid $el-table-border !important;
+        border-top: none !important;
+        border-left: none !important;
+        border-right: none !important;
+        vertical-align: middle;
+        background: $el-table-header-bg !important;
       }
 
       tr {
-        border-bottom: 1px solid $pidata-border;
-      }
-    }
-
-    tbody tr {
-      border-bottom: 1px solid $pidata-border;
-      background: $pidata-card-bg;
-      transition: background 0.12s ease;
-
-      &:hover {
-        background: $pidata-row-hover;
-      }
-
-      &:last-child {
         border-bottom: none;
       }
     }
 
-    tbody td {
-      color: #475467;
+    tbody tr {
+      border-bottom: none;
+      background: $pidata-card-bg;
+      transition: background-color 0.2s ease;
+
+      &:hover {
+        background: $el-table-row-hover;
+      }
     }
 
-    tr:nth-child(odd) {
-      background: transparent;
+    tbody td {
+      color: $el-table-text !important;
+      padding: 12px 12px !important;
+      border-bottom: 1px solid $el-table-border !important;
+      border-top: none !important;
+      border-left: none !important;
+      border-right: none !important;
+      vertical-align: middle;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: none !important;
     }
 
     td:nth-child(2),

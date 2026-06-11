@@ -1,15 +1,18 @@
-/* 冷色工作台表格：与白底卡片、Import 步骤一致（避免 neutral-surface-subtle 偏暖米色） */
+/* Element Plus el-table 风格：边框 / 表头 / 行 hover（与 Import 数据清单一致） */
 
 .parent-ds-picker {
-  $border: #e8edf5;
-  $row-divider: #f0f2f8;
-  $head-bg: #f8fafc;
-  $text: #344054;
-  $text-soft: #64748b;
+  $border: #ebeef5;
+  $row-divider: #ebeef5;
+  $head-bg: #f5f7fa;
+  $head-text: #909399;
+  $text: #606266;
+  $text-strong: #303133;
+  $text-soft: #909399;
   $surface: #fff;
-  $hover: #f1f5f9;
-  $selected: #eef4ff;
-  $selected-hover: #e3ecfc;
+  $hover: #f5f7fa;
+  $selected: #ecf5ff;
+  $selected-hover: #d9ecff;
+  $primary: #409eff;
 
   &__committed {
     border: 1px solid $border !important;
@@ -19,7 +22,7 @@
   }
 
   &__intro-title {
-    color: #1f2937 !important;
+    color: $text-strong !important;
     font-weight: 600 !important;
   }
 
@@ -43,8 +46,8 @@
       box-shadow 0.15s ease;
 
     &:focus-visible {
-      border-color: #2f6bff !important;
-      box-shadow: 0 0 0 3px rgb(47 107 255 / 16%);
+      border-color: $primary !important;
+      box-shadow: 0 0 0 3px rgb(64 158 255 / 22%);
     }
 
     &:disabled {
@@ -55,8 +58,8 @@
   }
 
   &__table-wrap {
-    border: 1px solid $border;
-    border-radius: 10px;
+    border: 1px solid $border !important;
+    border-radius: 4px;
     background: $surface;
     overflow: auto;
     max-height: min(360px, 50vh);
@@ -86,8 +89,8 @@
   &__table {
     width: 100%;
     text-align: left;
-    font-size: 13px;
-    line-height: 1.45;
+    font-size: 14px;
+    line-height: 1.5;
     border-collapse: separate;
     border-spacing: 0;
     color: $text;
@@ -96,45 +99,55 @@
       position: sticky;
       top: 0;
       z-index: 2;
-      padding: 10px 10px;
-      font-weight: 600;
-      color: #1f2937;
+      padding: 12px 12px !important;
+      font-weight: 600 !important;
+      color: $head-text !important;
       white-space: nowrap;
       background: $head-bg !important;
-      border-bottom: 1px solid $border;
+      border-bottom: 1px solid $border !important;
+      border-top: none !important;
+      border-left: none !important;
+      border-right: none !important;
     }
 
     tbody td {
-      padding: 10px;
-      vertical-align: top;
-      border-bottom: 1px solid $row-divider;
+      padding: 12px !important;
+      vertical-align: middle;
+      border-bottom: 1px solid $row-divider !important;
+      border-top: none !important;
+      border-left: none !important;
+      border-right: none !important;
       background: $surface !important;
-      color: $text-soft;
+      color: $text !important;
       font-weight: 400;
 
       &:first-child {
-        color: $text;
+        color: $text-strong !important;
         font-weight: 500;
       }
     }
 
     tbody tr:last-child td {
-      border-bottom: none;
+      border-bottom: none !important;
     }
   }
 
   /* tr 上使用 __row（及可选 __row_selected），提高选择器权重以压过 tbody td 默认底色 */
+  &__table tbody &__row > td {
+    background: $surface !important;
+  }
+
   &__table tbody &__row:hover > td {
     background: $hover !important;
   }
 
   &__table tbody &__row_selected > td {
     background: $selected !important;
-    box-shadow: inset 3px 0 0 #2f6bff;
+    box-shadow: inset 3px 0 0 $primary;
     color: $text;
 
     &:first-child {
-      color: #1d4ed8;
+      color: #337ecc;
       font-weight: 600;
     }
   }
@@ -184,15 +197,15 @@
   }
 
   &__pick-outline:not(:disabled) {
-    --border-outline: #93c5fd !important;
-    --text-outline: #1d4ed8 !important;
-    --border-color: #93c5fd !important;
-    --text-color: #1d4ed8 !important;
-    --background-color-hover-outline: #eff6ff !important;
+    --border-outline: rgb(64 158 255 / 55%) !important;
+    --text-outline: #{$primary} !important;
+    --border-color: rgb(64 158 255 / 55%) !important;
+    --text-color: #{$primary} !important;
+    --background-color-hover-outline: #ecf5ff !important;
 
     &:hover:not(.waiting) {
-      --border-outline: #2f6bff !important;
-      --border-color: #2f6bff !important;
+      --border-outline: #{$primary} !important;
+      --border-color: #{$primary} !important;
     }
   }
 
@@ -202,28 +215,29 @@
   }
 
   &__btn-primary-solid {
-    --background-color: #2f6bff !important;
-    --border-color: #2f6bff !important;
+    --background-color: #{$primary} !important;
+    --border-color: #{$primary} !important;
     --text-color: #fff !important;
-    --background-color-hover: #2566f5 !important;
-    --background-color-active: #1d4ed8 !important;
+    --background-color-hover: #66b1ff !important;
+    --background-color-active: #337ecc !important;
+    border-radius: 4px !important;
 
     &:disabled {
       --background-color: #e8ecf4 !important;
       --border-color: #dfe4ee !important;
-      --text-color: #64748b !important;
+      --text-color: #909399 !important;
       box-shadow: none !important;
     }
 
     &:not(:disabled) {
-      box-shadow: 0 2px 10px rgb(47 107 255 / 22%);
+      box-shadow: 0 2px 8px rgb(64 158 255 / 35%);
     }
   }
 
   &__btn-outline-soft {
-    --border-color: #d0d5dd !important;
-    --text-outline: #344054 !important;
-    border-radius: 8px !important;
+    --border-color: #dcdfe6 !important;
+    --text-outline: #606266 !important;
+    border-radius: 4px !important;
 
     &:disabled {
       opacity: 0.5;
@@ -236,14 +250,14 @@
   }
 
   &__page-btn {
-    --border-color: #d0d5dd !important;
-    border-radius: 8px !important;
+    --border-color: #dcdfe6 !important;
+    border-radius: 4px !important;
     font-weight: 500 !important;
-    color: #475467 !important;
+    color: #606266 !important;
 
     &:not(:disabled):hover {
-      border-color: #98a2b3 !important;
-      color: #1f2937 !important;
+      border-color: #409eff !important;
+      color: #409eff !important;
     }
   }
 }
