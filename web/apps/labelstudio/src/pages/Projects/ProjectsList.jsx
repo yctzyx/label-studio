@@ -8,7 +8,7 @@ import {
   IconMinus,
   IconSparks,
 } from "@humansignal/icons";
-import { Button, Tooltip, buttonVariant } from "@humansignal/ui";
+import { Button, buttonVariant } from "@humansignal/ui";
 import { PidataStylePagination, EmptyData } from "../../components";
 import { cn } from "../../utils/bem";
 import { ProjectStateChip } from "@humansignal/app-common";
@@ -410,16 +410,15 @@ const ProjectCard = ({ project, typeLabel }) => {
           <div className={cn("project-card").elem("title-row").toClassName()}>
             <div
               className={cn("project-card").elem("title-wrap").toClassName()}
+              data-tooltip={project.title ?? t("New project")}
             >
-              <Tooltip title={project.title ?? t("New project")}>
-                <h3
-                  className={cn("project-card")
-                    .elem("studio-title")
-                    .toClassName()}
-                >
-                  {project.title ?? t("New project")}
-                </h3>
-              </Tooltip>
+              <h3
+                className={cn("project-card")
+                  .elem("studio-title")
+                  .toClassName()}
+              >
+                {project.title ?? t("New project")}
+              </h3>
             </div>
             <div className={cn("project-card").elem("actions").toClassName()}>
               {isManager && (

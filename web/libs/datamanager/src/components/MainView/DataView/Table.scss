@@ -5,6 +5,56 @@
   flex-direction: column;
   background: var(--color-neutral-background);
   margin-bottom: 2.5rem;
+
+  &__header-icon-tooltip {
+    position: relative;
+    z-index: 2;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    &::after {
+      position: absolute;
+      z-index: 1000;
+      left: calc(100% + 10px);
+      top: calc(100% + 8px);
+      padding: 5px 8px;
+      color: #fff;
+      background: rgb(0 0 0 / 88%);
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 400;
+      line-height: 18px;
+      white-space: nowrap;
+      content: attr(data-tooltip);
+      opacity: 0;
+      pointer-events: none;
+      transform: none;
+      transition: opacity 0.12s ease;
+    }
+
+    &::before {
+      position: absolute;
+      z-index: 1001;
+      left: calc(100% + 14px);
+      top: calc(100% + 3px);
+      width: 0;
+      height: 0;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-bottom: 5px solid rgb(0 0 0 / 88%);
+      content: "";
+      opacity: 0;
+      pointer-events: none;
+      transform: none;
+      transition: opacity 0.12s ease;
+    }
+
+    &:hover::before,
+    &:hover::after {
+      opacity: 1;
+    }
+  }
 }
 
 .no-results {

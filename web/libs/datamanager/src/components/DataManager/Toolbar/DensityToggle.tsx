@@ -42,6 +42,19 @@ export const DensityToggle = densityInjector(
       window.dispatchEvent(new CustomEvent("dm:density:changed", { detail: density }));
     }, [density, onChange, key]);
 
+    useEffect(() => {
+      const handleDensityChange = (event: Event) => {
+        const nextDensity = (event as CustomEvent<Density>).detail;
+
+        if (nextDensity === DENSITY_COMFORTABLE || nextDensity === DENSITY_COMPACT) {
+          setDensity(nextDensity);
+        }
+      };
+
+      window.addEventListener("dm:density:changed", handleDensityChange);
+      return () => window.removeEventListener("dm:density:changed", handleDensityChange);
+    }, []);
+
     // Hide density toggle when in grid view
     if (view?.type === "grid") {
       return null;

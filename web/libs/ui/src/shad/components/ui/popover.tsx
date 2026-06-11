@@ -2,6 +2,7 @@ import type * as React from "react";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 
 import { cn } from "@humansignal/shad/utils";
+import { getPortalContainer } from "../../../utils/portal";
 
 function Popover({ ...props }: React.ComponentProps<typeof PopoverPrimitive.Root>) {
   return <PopoverPrimitive.Root data-slot="popover" {...props} />;
@@ -18,7 +19,7 @@ function PopoverContent({
   ...props
 }: React.ComponentProps<typeof PopoverPrimitive.Content>) {
   return (
-    <PopoverPrimitive.Portal>
+    <PopoverPrimitive.Portal container={getPortalContainer()}>
       <PopoverPrimitive.Content
         data-slot="popover-content"
         align={align}

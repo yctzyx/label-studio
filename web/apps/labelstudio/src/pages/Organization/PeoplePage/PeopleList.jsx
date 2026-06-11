@@ -1,7 +1,7 @@
 import { formatDistance } from "date-fns";
 import { zhCN } from "date-fns/locale";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Select, Userpic } from "@humansignal/ui";
+import { Userpic } from "@humansignal/ui";
 import { useAuth } from "@humansignal/core/providers/AuthProvider";
 import { Pagination, Spinner } from "../../../components";
 import { usePage, usePageSize } from "../../../components/Pagination/Pagination";
@@ -9,7 +9,6 @@ import { useAPI } from "../../../providers/ApiProvider";
 import { cn } from "../../../utils/bem";
 import { isDefined } from "../../../utils/helpers";
 import "./PeopleList.scss";
-import { CopyableTooltip } from "../../../components/CopyableTooltip/CopyableTooltip";
 
 function normalizeOrganizationListResponse(res) {
   if (!res) return [];
@@ -28,7 +27,9 @@ export const PeopleList = ({ onSelect, selectedUser, defaultSelected, reloadToke
   const [currentPage, setPage] = usePage("page", 1);
   const [currentPageSize] = usePageSize("page_size", 30);
   const [totalItems, setTotalItems] = useState(0);
+  const [orgDropdownOpen, setOrgDropdownOpen] = useState(false);
   const previousOrgIdRef = useRef(null);
+  const orgSelectRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -86,6 +87,7 @@ export const PeopleList = ({ onSelect, selectedUser, defaultSelected, reloadToke
       const id = typeof orgId === "string" ? Number.parseInt(orgId, 10) : orgId;
       if (Number.isNaN(id)) return;
       setSelectedOrgId(id);
+      setOrgDropdownOpen(false);
       setPage(1);
       onSelect?.(null);
     },
@@ -100,6 +102,23 @@ export const PeopleList = ({ onSelect, selectedUser, defaultSelected, reloadToke
       })),
     [organizations],
   );
+
+  const selectedOrgLabel = useMemo(() => {
+    return orgSelectOptions.find((option) => option.value === selectedOrgId)?.label;
+  }, [orgSelectOptions, selectedOrgId]);
+
+  useEffect(() => {
+    if (!orgDropdownOpen) return;
+
+    const handlePointerDown = (event) => {
+      if (!orgSelectRef.current?.contains(event.target)) {
+        setOrgDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [orgDropdownOpen]);
 
   useEffect(() => {
     if (selectedOrgId == null) {
@@ -174,9 +193,9 @@ export const PeopleList = ({ onSelect, selectedUser, defaultSelected, reloadToke
                 onClick={() => selectUser(user)}
               >
                 <div className={cn("people-list").elem("field").mix("avatar").toClassName()}>
-                  <CopyableTooltip title={`用户 ID：${user.id}`} textForCopy={user.id}>
+                  <span className={cn("people-list").elem("avatar-tooltip").toClassName()} data-tooltip={`用户 ID：${user.id}`}>
                     <Userpic user={user} style={{ width: 28, height: 28 }} />
-                  </CopyableTooltip>
+                  </span>
                 </div>
                 <div
                   className={cn("people-list").elem("field").mix("email").toClassName()}
@@ -203,16 +222,36 @@ export const PeopleList = ({ onSelect, selectedUser, defaultSelected, reloadToke
       <div className={cn("people-list").elem("panel").toClassName()}>
         <div className={cn("people-list").elem("org-toolbar").toClassName()}>
           <span className={cn("people-list").elem("org-label").toClassName()}>组织</span>
-          <div className={cn("people-list").elem("org-select").toClassName()}>
-            <Select
-              placeholder={orgsLoading ? "加载中…" : "请选择组织"}
-              options={orgSelectOptions}
-              value={selectedOrgId ?? null}
-              onChange={onOrganizationChange}
+          <div ref={orgSelectRef} className={cn("people-list").elem("org-select").toClassName()}>
+            <button
+              type="button"
+              className={cn("people-list")
+                .elem("org-select-trigger")
+                .mod({ open: orgDropdownOpen, disabled: orgsLoading || !organizations.length })
+                .toClassName()}
               disabled={orgsLoading || !organizations.length}
-              width="100%"
-              triggerClassName={cn("people-list").elem("org-select-trigger").toClassName()}
-            />
+              onClick={() => setOrgDropdownOpen((open) => !open)}
+            >
+              <span>{orgsLoading ? "加载中…" : selectedOrgLabel || "请选择组织"}</span>
+              <span className={cn("people-list").elem("org-select-arrow").toClassName()} />
+            </button>
+            {orgDropdownOpen ? (
+              <div className={cn("people-list").elem("org-select-menu").toClassName()}>
+                {orgSelectOptions.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={cn("people-list")
+                      .elem("org-select-option")
+                      .mod({ selected: option.value === selectedOrgId })
+                      .toClassName()}
+                    onClick={() => onOrganizationChange(option.value)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </div>
         </div>
         <div className={cn("people-list").elem("wrapper").toClassName()}>{listBody()}</div>

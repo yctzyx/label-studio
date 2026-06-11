@@ -152,7 +152,11 @@ const DropdownComponent = forwardRef<DropdownRef, DropdownProps>(
         props.openUpwardForShortViewport ?? true,
       );
 
-      setOffset({ left: result.left, top: result.top });
+      setOffset({
+        left: result.left - window.scrollX,
+        top: result.top - window.scrollY,
+        position: "fixed",
+      });
 
       // Store maxHeight from alignElements for fallback positioning
       if (props.constrainHeight && result.maxHeight) {
@@ -203,7 +207,6 @@ const DropdownComponent = forwardRef<DropdownRef, DropdownProps>(
 
         if (currentVisible !== newState) {
           props.onToggle?.(newState);
-          const animStart = performance.now();
           await performAnimation(newState, disableAnimation);
           setVisible(newState);
           props.onVisibilityChanged?.(newState);

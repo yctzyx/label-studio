@@ -12,7 +12,7 @@ export const Spinner = ({ className, style, size = 32, stopped = false }) => {
       role="status"
       aria-label="加载中"
     >
-      <div className={rootClass.elem("ring").mod({ stopped })} />
+      {/* <div className={rootClass.elem("ring").mod({ stopped })} /> */}
     </div>
   );
 };

@@ -134,7 +134,7 @@ export const ProjectsPage = () => {
     <div className={cn("projects-page").toClassName()}>
       <Oneof value={networkState}>
         <div className={cn("projects-page").elem("loading").toClassName()} case="loading">
-          <Spinner size={64} />
+          <Spinner size={32} />
         </div>
         <div className={cn("projects-page").elem("content").toClassName()} case="loaded">
           {projectsList.length ? (

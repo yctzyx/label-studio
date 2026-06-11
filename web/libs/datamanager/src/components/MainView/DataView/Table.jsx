@@ -8,7 +8,6 @@ import { cn } from "../../../utils/bem";
 import { FF_DEV_2536, isFF } from "../../../utils/feature-flags";
 import * as CellViews from "../../CellViews";
 import { Icon } from "../../Common/Icon/Icon";
-import { Spinner } from "../../Common/Spinner";
 import { Table } from "../../Common/Table/Table";
 import { Tag } from "../../Common/Tag/Tag";
 import { GridView } from "../GridView/GridView";
@@ -42,7 +41,6 @@ const injector = inject(({ store }) => {
     isLabeling: store.isLabeling ?? false,
     data: dataStore?.list ?? [],
     total: dataStore?.total ?? 0,
-    isLoading: dataStore?.loading ?? true,
     isLocked: currentView?.locked ?? false,
     hasData: (store.project?.task_count ?? store.project?.task_number ?? dataStore?.total ?? 0) > 0,
     focusedItem: dataStore?.selected ?? dataStore?.highlighted,
@@ -66,7 +64,6 @@ export const DataView = injector(
     dataStore,
     viewType,
     total,
-    isLoading,
     isLabeling,
     hiddenColumns = [],
     hasData = false,
@@ -189,13 +186,6 @@ export const DataView = injector(
 
     const renderContent = useCallback(
       (content) => {
-        if (isLoading && total === 0 && !isLabeling) {
-          return (
-            <div className={cn("fill-container").toClassName()}>
-              <Spinner size="large" />
-            </div>
-          );
-        }
         if (store.SDK.type === "DE" && ["canceled", "failed"].includes(datasetStatusID)) {
           return (
             <div className={cn("syncInProgress").toClassName()}>
@@ -289,14 +279,18 @@ export const DataView = injector(
 
         return content;
       },
-      [hasData, isLabeling, isLoading, total, datasetStatusID, role, project, hasFilters, canLabel],
+      [hasData, isLabeling, total, datasetStatusID, role, project, hasFilters, canLabel],
     );
 
     const decorationContent = (col) => {
       const column = col.original;
 
       if (column.icon) {
-        return <Tooltip title={column.help ?? col.title}>{column.icon}</Tooltip>;
+        return (
+          <span className={cn("data-view-dm").elem("header-icon-tooltip").toClassName()} data-tooltip={column.help ?? col.title}>
+            {column.icon}
+          </span>
+        );
       }
 
       return column.title;

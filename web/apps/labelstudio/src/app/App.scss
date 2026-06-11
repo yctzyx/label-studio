@@ -118,6 +118,17 @@ html.ls-embed .app-wrapper {
   overscroll-behavior: none;
 }
 
+html.ls-embed #ls-iframe-portal-root {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  pointer-events: none;
+}
+
+html.ls-embed #ls-iframe-portal-root > * {
+  pointer-events: auto;
+}
+
 .route-outlet {
   display: flex;
   flex-direction: column;

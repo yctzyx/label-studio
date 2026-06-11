@@ -46,7 +46,7 @@ const initializeDataManager = async (root, props, params, runtimeUser) => {
     interfaces: {
       import: true,
       export: true,
-      backButton: false,
+      backButton: true,
       labelingHeader: false,
       instruction: true,
       autoAnnotation: params.autoAnnotation,
@@ -177,6 +177,17 @@ export const DataManagerPage = ({ ...props }) => {
       else history.push("/projects");
     });
 
+    dataManager.on("backClicked", () => {
+      history.push("/projects");
+    });
+
+    dataManager.on("labelingBackClicked", () => {
+      const projectId = params?.id ?? project?.id;
+
+      history.push(buildLink("/data", { id: projectId }));
+      dataManager.store?.closeLabeling({ pushState: false });
+    });
+
     if (interactiveBacked) {
       dataManager.on("lsf:regionFinishedDrawing", (reg, group) => {
         const { lsf, task, currentAnnotation: annotation } = dataManager.lsf;
@@ -247,7 +258,7 @@ export const DataManagerPage = ({ ...props }) => {
     <div className={cn("datamanager-layout").toClassName()}>
       {loading && (
         <div className="flex-1 absolute inset-0 flex items-center justify-center">
-          <Spinner size={64} />
+          <Spinner size={32} />
         </div>
       )}
       {/* Allow this to exist before the DataManager is initialized as the async app.fetchData call eventually calls startLabeling, and that requires the root element to exist */}

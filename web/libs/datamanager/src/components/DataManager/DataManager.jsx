@@ -54,11 +54,11 @@ const ProjectSummary = summaryInjector((props) => {
       <span style={{ display: "flex", alignItems: "center", fontSize: 12 }}>
         <Space size="compact">
           <span>
-            Tasks: <span title="Filtered tasks">{props.totalFoundTasks}</span> /{" "}
-            <span title="Total tasks in the project">{props.totalTasks}</span>
+            任务: <span title="筛选后的任务数">{props.totalFoundTasks}</span> /{" "}
+            <span title="项目任务总数">{props.totalTasks}</span>
           </span>
-          <span>Submitted annotations: {props.totalAnnotations}</span>
-          <span>Predictions: {props.totalPredictions}</span>
+          <span>已提交标注: {props.totalAnnotations}</span>
+          <span>预测: {props.totalPredictions}</span>
         </Space>
       </span>
     </Space>

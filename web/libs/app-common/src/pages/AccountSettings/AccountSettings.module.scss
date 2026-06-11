@@ -4,6 +4,7 @@
   flex-direction: column;
   min-height: 0;
   min-width: 0;
+  height: 100%;
   width: 100%;
 
   &__content {
@@ -12,6 +13,7 @@
     flex: 1;
     gap: var(--spacing-wide);
     width: 100%;
+    height: 100%;
     max-width: none;
     min-width: 0;
     min-height: 0;
@@ -26,6 +28,7 @@
 /* 覆盖 Card 默认 660px 宽度，与右侧主区同宽；视觉与项目页白卡片一致 */
 .accountSettingsCard {
   width: 100% !important;
+  height: 100%;
   max-width: 100%;
   box-sizing: border-box;
   border-radius: 12px !important;

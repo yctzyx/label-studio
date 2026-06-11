@@ -6,6 +6,7 @@ import { IconClose } from "@humansignal/icons";
 
 import { cn } from "@humansignal/shad/utils";
 import { Button } from "../../../lib/button/button";
+import { getPortalContainer } from "../../../utils/portal";
 
 const Sheet = DialogPrimitive.Root;
 
@@ -13,7 +14,9 @@ const SheetTrigger = DialogPrimitive.Trigger;
 
 const SheetClose = DialogPrimitive.Close;
 
-const SheetPortal = DialogPrimitive.Portal;
+const SheetPortal = ({ ...props }: React.ComponentProps<typeof DialogPrimitive.Portal>) => (
+  <DialogPrimitive.Portal container={getPortalContainer()} {...props} />
+);
 
 const SheetOverlay = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Overlay>,

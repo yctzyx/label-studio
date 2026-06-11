@@ -67,7 +67,11 @@ const TooltipInner = forwardRef(
       if (isDefined(parent) && isDefined(target)) {
         const { left, top, align: resultAlign } = alignElements(parent, target, align, 10);
 
-        setOffset({ left, top });
+        setOffset({
+          left: left - window.scrollX,
+          top: top - window.scrollY,
+          position: "fixed",
+        });
         setAlign(resultAlign);
       }
     }, [triggerElement.current, tooltipElement.current]);

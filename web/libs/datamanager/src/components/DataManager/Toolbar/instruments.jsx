@@ -9,6 +9,7 @@ import { Interface } from "../../Common/Interface";
 import { ExportButton, ImportButton } from "../../Common/SDKButtons";
 import { Tooltip } from "@humansignal/ui";
 import { ActionsButton, PredictionProgressButton } from "./ActionsButton";
+import { BackButton } from "./BackButton";
 import { DensityToggle } from "./DensityToggle";
 import { GridWidthButton } from "./GridWidthButton";
 import { LabelButton } from "./LabelButton";
@@ -111,6 +112,9 @@ export const instruments = {
   },
   "prediction-progress": ({ size }) => {
     return <PredictionProgressButton size={size} />;
+  },
+  "back-button": ({ size }) => {
+    return <BackButton size={size} style={style} />;
   },
   actions: ({ size }) => {
     return <ActionsButton size={size} style={style} />;

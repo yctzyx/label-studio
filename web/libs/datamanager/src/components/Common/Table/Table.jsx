@@ -4,7 +4,7 @@ import { useSDK } from "../../../providers/SDKProvider";
 import { isDefined } from "../../../utils/utils";
 import { Icon } from "../Icon/Icon";
 import { modal } from "../Modal/Modal";
-import { IconCode, IconChevronDown } from "@humansignal/icons";
+import { IconChevronDown, IconChevronLeft, IconCode } from "@humansignal/icons";
 import { AutoSizerTable, Button } from "@humansignal/ui";
 import "./Table.scss";
 import { TableCheckboxCell } from "./TableCheckbox";
@@ -57,18 +57,18 @@ export const Table = observer(
     const [colOrder, setColOrder] = useState(JSON.parse(localStorage.getItem(colOrderKey)) ?? {});
     const listRef = useRef();
     const Decoration = useMemo(() => Decorator(decoration), [decoration]);
-    const { api, type } = useSDK();
+    const sdk = useSDK();
+    const { api, type } = sdk;
     const toolbarHeight = 41;
     const isQuickView = view.root.isLabeling;
-    const [toolbarVisible, setToolbarVisible] = useState(true);
+    const toolbarVisible = true;
     // Track last clicked row ID for shift-click range selection
     const lastClickedId = useRef(null);
 
     // Reset virtualizer cache when rowHeight changes
     useEffect(() => {
-      if (listRef.current?._listRef) {
-        listRef.current._listRef.resetAfterIndex(0);
-      }
+      listRef.current?._listRef?.resetAfterIndex?.(0);
+      listRef.current?.resetAfterIndex?.(0);
     }, [props.rowHeight]);
 
     const headerCheckboxCell = useCallback(() => {
@@ -135,70 +135,72 @@ export const Table = observer(
       Cell: rowCheckBoxCell,
     });
 
-    columns.push({
-      id: "show-source",
-      cellClassName: "show-source",
-      headerClassName: "show-source",
-      style: {
-        width: 44,
-        maxWidth: 44,
-        justifyContent: "center",
-      },
-      onClick: (e) => e.stopPropagation(),
-      Header() {
-        return <div style={{ width: 44 }} />;
-      },
-      Cell({ data }) {
-        let out = JSON.parse(data.source ?? "{}");
+    if (!isQuickView) {
+      columns.push({
+        id: "show-source",
+        cellClassName: "show-source",
+        headerClassName: "show-source",
+        style: {
+          width: 44,
+          maxWidth: 44,
+          justifyContent: "center",
+        },
+        onClick: (e) => e.stopPropagation(),
+        Header() {
+          return <div style={{ width: 44 }} />;
+        },
+        Cell({ data }) {
+          let out = JSON.parse(data.source ?? "{}");
 
-        out = {
-          id: out?.id,
-          data: out?.data,
-          annotations: out?.annotations,
-          predictions: out?.predictions,
-        };
+          out = {
+            id: out?.id,
+            data: out?.data,
+            annotations: out?.annotations,
+            predictions: out?.predictions,
+          };
 
-        const onTaskLoad = async (options = {}) => {
-          if (isFF(FF_LOPS_E_3) && type === "DE") {
-            return new Promise((resolve) => resolve(out));
-          }
-          const response = await api.task({
-            taskID: out.id,
-            resolve_uri: options.resolveUri ?? false,
-          });
+          const onTaskLoad = async (options = {}) => {
+            if (isFF(FF_LOPS_E_3) && type === "DE") {
+              return new Promise((resolve) => resolve(out));
+            }
+            const response = await api.task({
+              taskID: out.id,
+              resolve_uri: options.resolveUri ?? false,
+            });
 
-          return response ?? {};
-        };
+            return response ?? {};
+          };
 
-        return (
-          <Button
-            look="string"
-            className="w-6 h-6 p-0 text-primary-content hover:text-primary-content-hover"
-            onClick={() => {
-              const modalInstance = modal({
-                title: `Source for task ${out?.id}`,
-                style: { width: 900 },
-                header: null, // Will be set by renderToggle
-                body: (
-                  <TaskSourceViewer
-                    content={out}
-                    onTaskLoad={onTaskLoad}
-                    sdkType={type}
-                    storageKey="dm:tasksource"
-                    renderToggle={(toggle) => {
-                      // Update modal header with toggle
-                      modalInstance?.update({ header: toggle });
-                    }}
-                  />
-                ),
-              });
-            }}
-            leading={<Icon icon={IconCode} />}
-            tooltip="Show task source"
-          />
-        );
-      },
-    });
+          return (
+            <Button
+              look="string"
+              className="w-6 h-6 p-0 text-primary-content hover:text-primary-content-hover"
+              onClick={() => {
+                const modalInstance = modal({
+                  title: `Source for task ${out?.id}`,
+                  style: { width: 900 },
+                  header: null, // Will be set by renderToggle
+                  body: (
+                    <TaskSourceViewer
+                      content={out}
+                      onTaskLoad={onTaskLoad}
+                      sdkType={type}
+                      storageKey="dm:tasksource"
+                      renderToggle={(toggle) => {
+                        // Update modal header with toggle
+                        modalInstance?.update({ header: toggle });
+                      }}
+                    />
+                  ),
+                });
+              }}
+              leading={<Icon icon={IconCode} />}
+              tooltip="Show task source"
+            />
+          );
+        },
+      });
+    }
 
     if (Object.keys(colOrder).length > 0) {
       columns.sort((a, b) => {
@@ -220,19 +222,34 @@ export const Table = observer(
     const renderTableToolbar = useCallback(() => {
       return (
         <div className={cn("table-toolbar").mod({ visible: toolbarVisible }).toString()}>
-          <FieldsButton
-            className={cn("table-toolbar").elem("customize-button").toString()}
-            wrapper={FieldsButton.Checkbox}
-            title={"Columns"}
-            size="small"
-            trailingIcon={<Icon icon={IconChevronDown} />}
-            tooltip={"Customize Columns"}
-            data-testid="columns-picker-quickview"
-          />
+          <div className={cn("table-toolbar").elem("start").toString()}>
+            {sdk.interfaceEnabled("backButton") && (
+              <Button
+                size="small"
+                look="outlined"
+                variant="neutral"
+                leading={<IconChevronLeft />}
+                aria-label="返回"
+                onClick={() => sdk.invoke("labelingBackClicked")}
+                data-testid="back-button-quickview"
+              >
+                返回
+              </Button>
+            )}
+            <FieldsButton
+              className={cn("table-toolbar").elem("customize-button").toString()}
+              wrapper={FieldsButton.Checkbox}
+              title={"Columns"}
+              size="small"
+              trailingIcon={<Icon icon={IconChevronDown} />}
+              tooltip={"Customize Columns"}
+              data-testid="columns-picker-quickview"
+            />
+          </div>
           <DensityToggle size="small" onChange={onDensityChange} data-testid="density-toggle-quickview" />
         </div>
       );
-    }, [toolbarVisible, onDensityChange]);
+    }, [toolbarVisible, onDensityChange, sdk, view]);
 
     const renderTableHeader = useCallback(
       ({ style }) => (
@@ -381,15 +398,6 @@ export const Table = observer(
     }, [data, focusedItem]);
     const tableWrapper = useRef();
 
-    const handleScroll = useCallback(
-      ({ scrollOffset }) => {
-        if (isQuickView && scrollOffset >= 0) {
-          setToolbarVisible(scrollOffset === 0);
-        }
-      },
-      [isQuickView, toolbarHeight],
-    );
-
     return (
       <div ref={tableWrapper} className={tableCN.mod({ fit: props.fitToContent }).toString()}>
         {isQuickView && renderTableToolbar()}
@@ -411,7 +419,6 @@ export const Table = observer(
             toolbarHeight={toolbarHeight}
             headerHeight={headerHeight}
             isQuickView={isQuickView}
-            onScroll={handleScroll}
             toolbarVisible={toolbarVisible}
           >
             {renderRow}
@@ -507,6 +514,7 @@ const StickyList = observer(
           isItemLoaded={isItemLoaded}
           itemData={itemData}
           itemSize={itemSize}
+          itemSizeKey={rest.itemHeight}
           initialScrollOffset={initialScrollOffset}
           className={tableCN.elem("auto-size").mod({ "quick-view": isQuickView }).toString()}
           onScroll={onScroll}

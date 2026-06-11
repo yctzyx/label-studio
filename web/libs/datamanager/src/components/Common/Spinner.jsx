@@ -12,13 +12,13 @@ export const Spinner = injector(({ SDK, visible = true, size: sizeKey, className
   const size = React.useMemo(() => {
     switch (sizeKey) {
       case "large":
-        return SDK?.spinnerSize?.large ?? 128;
+        return SDK?.spinnerSize?.large ?? 32;
       case "middle":
-        return SDK?.spinnerSize?.middle ?? 48;
+        return SDK?.spinnerSize?.middle ?? 32;
       case "small":
-        return SDK?.spinnerSize?.small ?? 24;
+        return SDK?.spinnerSize?.small ?? 32;
       default:
-        return SDK?.spinnerSize?.middle ?? 48;
+        return SDK?.spinnerSize?.middle ?? 32;
     }
   }, [SDK?.spinnerSize?.large, SDK?.spinnerSize?.middle, SDK?.spinnerSize?.small, sizeKey]);
 

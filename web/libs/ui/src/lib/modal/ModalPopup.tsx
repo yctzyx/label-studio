@@ -10,10 +10,14 @@ import { ModalCloseButton } from "./ModalCloseButton";
 import { ModalFooter } from "./ModalFooter";
 import { ModalHeader } from "./ModalHeader";
 import { ModalTitle } from "./ModalTitle";
+import { getPortalContainer } from "../../utils/portal";
 
 import "./Modal.scss";
 
 const ModalContext = createContext<Modal | null>(null);
+
+let modalOverflowLockCount = 0;
+let previousBodyOverflow = "";
 
 export type ModalProps<BP = unknown> = {
   children?: React.ReactNode;
@@ -71,6 +75,8 @@ export class Modal<BP = unknown> extends Component<ModalProps<BP>, ModalState> {
   componentDidMount() {
     if (this.props.animateAppearance) {
       setTimeout(() => this.show(), 30);
+    } else if (this.state.visible) {
+      this.lockBodyScroll();
     }
 
     // with `allowToInterceptEscape` we can prevent closing modal on escape
@@ -84,11 +90,14 @@ export class Modal<BP = unknown> extends Component<ModalProps<BP>, ModalState> {
     document.removeEventListener("keydown", this.closeOnEscape, {
       capture: !this.props.allowToInterceptEscape,
     });
+    if (this.state.visible) {
+      this.unlockBodyScroll();
+    }
   }
 
   componentDidUpdate(prevProps: ModalProps<BP>, prevState: ModalState) {
     if (prevState.visible !== this.state.visible) {
-      document.body.style.overflow = this.state.visible ? "hidden" : "";
+      this.state.visible ? this.lockBodyScroll() : this.unlockBodyScroll();
     }
     if (isDefined(this.props.visible) && prevProps.visible !== this.props.visible) {
       this.props.visible ? this.show() : this.hide();
@@ -179,7 +188,23 @@ export class Modal<BP = unknown> extends Component<ModalProps<BP>, ModalState> {
       </ModalContext.Provider>
     );
 
-    return createPortal(modalContent, document.body);
+    return createPortal(modalContent, getPortalContainer() ?? document.body);
+  }
+
+  lockBodyScroll() {
+    if (modalOverflowLockCount === 0) {
+      previousBodyOverflow = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+    }
+    modalOverflowLockCount += 1;
+  }
+
+  unlockBodyScroll() {
+    modalOverflowLockCount = Math.max(0, modalOverflowLockCount - 1);
+    if (modalOverflowLockCount === 0) {
+      document.body.style.overflow = previousBodyOverflow;
+      previousBodyOverflow = "";
+    }
   }
 
   onMouseDown = (e: React.MouseEvent) => {

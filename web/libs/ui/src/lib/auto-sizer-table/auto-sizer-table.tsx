@@ -1,4 +1,4 @@
-import { type FC, forwardRef, type ForwardedRef } from "react";
+import { type FC, forwardRef, type ForwardedRef, useImperativeHandle, useRef } from "react";
 import AutoSizer from "react-virtualized-auto-sizer";
 import InfiniteLoader from "react-window-infinite-loader";
 import { VariableSizeList } from "react-window";
@@ -10,6 +10,7 @@ export interface AutoSizerTableProps {
   isItemLoaded: (index: number) => boolean;
   itemData: any;
   itemSize: (index: number) => number;
+  itemSizeKey?: string | number;
   initialScrollOffset?: (height: number) => number;
   className?: string;
   children: FC<any>;
@@ -24,6 +25,7 @@ export const AutoSizerTable = forwardRef<VariableSizeList, AutoSizerTableProps>(
       isItemLoaded,
       itemData,
       itemSize,
+      itemSizeKey,
       initialScrollOffset,
       className,
       children: ItemWrapper,
@@ -32,6 +34,7 @@ export const AutoSizerTable = forwardRef<VariableSizeList, AutoSizerTableProps>(
     },
     ref: ForwardedRef<VariableSizeList>,
   ) => {
+    const listRef = useRef<VariableSizeList | null>(null);
     const {
       itemCount: explicitItemCount,
       ...variableSizeListRest
@@ -39,6 +42,8 @@ export const AutoSizerTable = forwardRef<VariableSizeList, AutoSizerTableProps>(
 
     /** Must match VariableSizeList.itemCount (e.g. tasks + sticky header row). */
     const virtualRowCount = explicitItemCount ?? totalCount;
+
+    useImperativeHandle(ref, () => listRef.current as VariableSizeList);
 
     return (
       <AutoSizer className={clsx(className)} style={{ width: "100%", height: "100%", minHeight: 0 }}>
@@ -52,15 +57,25 @@ export const AutoSizerTable = forwardRef<VariableSizeList, AutoSizerTableProps>(
               isItemLoaded={isItemLoaded}
               threshold={5}
               minimumBatchSize={30}
-              ref={ref}
             >
               {({
                 onItemsRendered,
                 ref: infiniteLoaderRef,
               }: { onItemsRendered: (params: { startIndex: number; stopIndex: number }) => void; ref: any }) => {
+                const setListRef = (instance: VariableSizeList | null) => {
+                  listRef.current = instance;
+
+                  if (typeof infiniteLoaderRef === "function") {
+                    infiniteLoaderRef(instance);
+                  } else if (infiniteLoaderRef) {
+                    infiniteLoaderRef.current = instance;
+                  }
+                };
+
                 return (
                   <VariableSizeList
-                    ref={infiniteLoaderRef}
+                    key={itemSizeKey}
+                    ref={setListRef}
                     width={width}
                     height={adjustedHeight}
                     itemCount={virtualRowCount}
