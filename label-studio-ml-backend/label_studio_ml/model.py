@@ -133,6 +133,10 @@ class LabelStudioMLBase(ABC):
             extra_params: Extra parameters to set.
 
         """
+        if extra_params is None:
+            return
+        if not isinstance(extra_params, str):
+            extra_params = json.dumps(extra_params)
         self.set('extra_params', extra_params)
 
     @property

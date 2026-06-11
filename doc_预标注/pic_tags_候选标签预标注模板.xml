@@ -1,0 +1,106 @@
+<!--
+  pic_tags_ 候选标签图片预标注模板
+
+  适用场景：
+  - 图片多标签识别：模型只判断图片中是否出现候选标签。
+  - 候选标签由 <Choices name="pic_tags"> 下的 <Choice> 自动抽取。
+  - 大模型预标注后端必须返回 Label Studio Prediction result，写入 pic_tags 控件。
+
+  任务数据字段：
+  {
+    "image": "https://example.com/a.jpg"
+  }
+
+  模板约束：
+  1. 必须存在一个 <Image name="image" value="$image"/>
+  2. 必须存在一个主输出控件 <Choices name="pic_tags" toName="image" choice="multiple">
+  3. 可选存在 <TextArea name="pic_tags_prompt" toName="image">，用于交互式改写 Prompt
+  4. 可选存在 <TextArea name="pic_tags_note" toName="image">，仅供人工备注，不由模型写入
+  5. Choice value 是最终入库标签名，不要把判定说明写入 value
+  6. 判定说明通过 hint / description / 项目预标配置维护，避免模型返回长标签导致无法匹配
+-->
+<View>
+  <Style>
+    .pic-tags-layout {
+      display: grid;
+      grid-template-columns: minmax(360px, 1fr) minmax(360px, 0.9fr);
+      gap: 20px;
+      align-items: start;
+    }
+    .pic-tags-panel {
+      border: 1px solid #e6e6e6;
+      border-radius: 6px;
+      padding: 16px;
+      background: #fff;
+    }
+    .pic-tags-hint {
+      color: #666;
+      font-size: 12px;
+      line-height: 1.5;
+      margin: 4px 0 12px;
+    }
+    .lsf-main-content.lsf-requesting .pic-tags-prompt::before {
+      content: ' 大模型预标注生成中...';
+      color: #777;
+      font-size: 13px;
+    }
+    @media (max-width: 900px) {
+      .pic-tags-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+  </Style>
+
+  <Header value="图片候选标签预标注" size="4"/>
+
+  <View className="pic-tags-layout">
+    <View className="pic-tags-panel">
+      <Header value="图片" size="5"/>
+      <Image name="image"
+             value="$image"
+             zoom="true"
+             zoomControl="true"
+             rotateControl="true"/>
+    </View>
+
+    <View className="pic-tags-panel">
+      <Header value="候选标签" size="5"/>
+      <View className="pic-tags-hint">
+        大模型只允许从下方候选标签中选择；没有清晰证据时不勾选。模型预标结果会自动填充到本控件，人工可修正。
+      </View>
+
+      <Choices name="pic_tags"
+               toName="image"
+               choice="multiple"
+               showInline="false"
+               required="false">
+        <Choice value="烟雾" hint="可见烟气、烟尘或烟雾，呈飘散、升腾或团状；一般云雾、水雾排除"/>
+        <Choice value="火焰" hint="可见明火、跳火或明显橙红燃烧光亮；一般路灯、车灯、灯牌、点状反光排除"/>
+        <Choice value="吸烟行为" hint="可见人员吸烟、持烟或烟头，属于违规用火或火种隐患"/>
+        <Choice value="箱子" hint="可见箱体、包装箱或货物方盒堆放，可能与可燃物堆积或占用空间有关"/>
+        <Choice value="电焊" hint="可见电焊、气割等动火作业，有弧光、火花或焊枪作业，属于明火类施工"/>
+      </Choices>
+
+      <View className="pic-tags-prompt">
+        <Header value="交互式 Prompt（可选）" size="5"/>
+        <TextArea name="pic_tags_prompt"
+                  toName="image"
+                  rows="4"
+                  editable="true"
+                  maxSubmissions="1"
+                  showSubmitButton="false"
+                  placeholder="可临时补充判定规则后按 Shift+Enter 重新生成。为空时使用项目预标配置中的默认规则。"/>
+      </View>
+
+      <Header value="人工备注" size="5"/>
+      <TextArea name="pic_tags_note"
+                toName="image"
+                rows="3"
+                editable="true"
+                smart="false"
+                maxSubmissions="1"
+                showSubmitButton="false"
+                placeholder="记录模型误判、遮挡、低清晰度、需复核等说明。"/>
+    </View>
+  </View>
+</View>

@@ -1,0 +1,32 @@
+services:
+  label-studio-llm-backend:
+    container_name: label-studio-llm-backend
+    image: label-studio-llm-backend:local
+    init: true
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      - MODEL_DIR=/data/models
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - PROMPT_PREFIX=${PROMPT_PREFIX:-prompt}
+      - USE_INTERNAL_PROMPT_TEMPLATE=${USE_INTERNAL_PROMPT_TEMPLATE:-0}
+      - NUM_RESPONSES=${NUM_RESPONSES:-1}
+      - TEMPERATURE=${TEMPERATURE:-0.7}
+      - LABEL_STUDIO_URL=${LABEL_STUDIO_URL:-}
+      - LABEL_STUDIO_API_KEY=${LABEL_STUDIO_API_KEY:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${LLM_BACKEND_PORT:-9090}:9090"
+    volumes:
+      - "./data/server:/data"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9090/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped

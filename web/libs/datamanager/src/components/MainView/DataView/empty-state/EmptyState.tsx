@@ -1,18 +1,11 @@
 import React, { type FC, type ReactNode } from "react";
 import {
-  IconUpload,
   IconLsLabeling,
   IconCheck,
   IconSearch,
   IconInbox,
-  IconCloudProviderS3,
-  IconCloudProviderGCS,
-  IconCloudProviderAzure,
-  IconCloudProviderRedis,
 } from "@humansignal/icons";
-import { Button, IconExternal, Typography, Tooltip } from "@humansignal/ui";
-import { getDocsUrl } from "../../../../../../editor/src/utils/docs";
-import { ABILITY, useAuth } from "@humansignal/core/providers/AuthProvider";
+import { Button, Typography } from "@humansignal/ui";
 
 declare global {
   interface Window {
@@ -134,55 +127,6 @@ const renderEmptyStateLayout = ({
   return content;
 };
 
-// Storage provider icons component
-const StorageProviderIcons = () => (
-  <div className="flex items-center justify-center gap-base mb-wide" data-testid="dm-storage-provider-icons">
-    <Tooltip title="Amazon S3">
-      <div className="flex items-center justify-center p-2" aria-label="Amazon S3">
-        <IconCloudProviderS3 width={32} height={32} className="text-neutral-content-subtler" />
-      </div>
-    </Tooltip>
-    <Tooltip title="Google Cloud Storage">
-      <div className="flex items-center justify-center p-2" aria-label="Google Cloud Storage">
-        <IconCloudProviderGCS width={32} height={32} className="text-neutral-content-subtler" />
-      </div>
-    </Tooltip>
-    <Tooltip title="Azure Blob Storage">
-      <div className="flex items-center justify-center p-2" aria-label="Azure Blob Storage">
-        <IconCloudProviderAzure width={32} height={32} className="text-neutral-content-subtler" />
-      </div>
-    </Tooltip>
-    <Tooltip title="Redis Storage">
-      <div className="flex items-center justify-center p-2" aria-label="Redis Storage">
-        <IconCloudProviderRedis width={32} height={32} className="text-neutral-content-subtler" />
-      </div>
-    </Tooltip>
-  </div>
-);
-
-// Documentation link component
-const DocumentationLink = () => {
-  if (window.APP_SETTINGS?.whitelabel_is_active) {
-    return null;
-  }
-
-  return (
-    <Typography variant="label" size="small" className="text-primary-link hover:underline">
-      <a
-        href={getDocsUrl("guide/tasks")}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-center gap-1"
-        data-testid="dm-docs-data-import-link"
-      >
-        查看导入数据帮助文档
-        <span className="sr-only">（在新标签页打开）</span>
-        <IconExternal width={20} height={20} />
-      </a>
-    </Typography>
-  );
-};
-
 /**
  * Unified empty state for Data Manager
  * Handles different empty states based on user role and context
@@ -201,9 +145,9 @@ const DocumentationLink = () => {
  */
 
 export const EmptyState: FC<EmptyStateProps> = ({
-  canImport,
-  onOpenSourceStorageModal,
-  onOpenImportModal,
+  canImport: _canImport,
+  onOpenSourceStorageModal: _onOpenSourceStorageModal,
+  onOpenImportModal: _onOpenImportModal,
   // Role-based props (optional)
   userRole,
   project,
@@ -213,9 +157,6 @@ export const EmptyState: FC<EmptyStateProps> = ({
   onLabelAllTasks,
   onClearFilters,
 }) => {
-  const isImportEnabled = Boolean(canImport);
-  const { permissions } = useAuth();
-
   // If filters are applied, show the filter-specific empty state (regardless of user role)
   if (hasFilters) {
     return renderEmptyStateLayout({
@@ -285,41 +226,15 @@ export const EmptyState: FC<EmptyStateProps> = ({
     }
   }
 
-  return renderEmptyStateLayout({
-    icon: <IconUpload />,
-    title: "导入数据以启动项目",
-    description: "连接云存储或从本机上传文件",
-    testId: "empty-state-label",
-    ariaLabelledBy: "dm-empty-title",
-    ariaDescribedBy: "dm-empty-desc",
-    additionalContent: <StorageProviderIcons />,
-    actions: (
-      <>
-        {permissions.can(ABILITY.can_manage_storage) && (
-          <Button
-            variant="primary"
-            look="filled"
-            className="flex-1"
-            onClick={onOpenSourceStorageModal}
-            data-testid="dm-connect-source-storage-button"
-          >
-            连接云存储
-          </Button>
-        )}
-
-        {isImportEnabled && (
-          <Button
-            variant="primary"
-            look="outlined"
-            className="flex-1"
-            onClick={onOpenImportModal}
-            data-testid="dm-import-button"
-          >
-            导入
-          </Button>
-        )}
-      </>
-    ),
-    footer: <DocumentationLink />,
-  });
+  return (
+    <div
+      data-testid="empty-state-label"
+      aria-labelledby="dm-empty-title"
+      className="w-full h-full flex items-center justify-center text-center p-wide"
+    >
+      <Typography variant="headline" size="medium" id="dm-empty-title">
+        导入数据以启动项目
+      </Typography>
+    </div>
+  );
 };

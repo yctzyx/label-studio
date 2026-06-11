@@ -350,12 +350,11 @@ class MLBackend(models.Model):
 
             tasks = Task.objects.filter(id__in=[task.id for task in tasks])
 
-        # Filter tasks that already contain the current model version in predictions
-        tasks = tasks.annotate(predictions_count=Count('predictions')).exclude(
-            Q(predictions_count__gt=0) & Q(predictions__model_version=model_version)
-        )
+        # Preannotation is idempotent for product workflows: once a task has any prediction,
+        # do not call the ML backend again unless the existing prediction is deleted first.
+        tasks = tasks.annotate(predictions_count=Count('predictions')).filter(predictions_count=0)
         if not tasks.exists():
-            logger.debug(f'All tasks already have prediction from model version={self.model_version}')
+            logger.debug(f'All tasks already have predictions, skip ML backend {self}')
             return model_version
         tasks_ser = TaskSimpleSerializer(tasks, many=True).data
         predictions = self._get_predictions_from_ml_backend(tasks_ser)
@@ -372,6 +371,10 @@ class MLBackend(models.Model):
             options = {'user': user}
         if not self.is_interactive:
             result['errors'] = ['Model is not set to be used for interactive preannotations']
+            return result
+        if task.predictions.exists():
+            logger.debug(f'Task {task.id} already has predictions, skip interactive ML backend {self}')
+            result['data'] = {'result': []}
             return result
 
         tasks_ser = InteractiveAnnotatingDataSerializer(

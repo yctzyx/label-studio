@@ -1,0 +1,5 @@
+gunicorn==23.0.0
+label-studio-ml @ git+https://github.com/HumanSignal/label-studio-ml-backend.git
+pytesseract==0.3.10
+openai==1.58.1
+tenacity==8.2.2

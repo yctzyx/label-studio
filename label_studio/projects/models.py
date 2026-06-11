@@ -415,7 +415,21 @@ class Project(ProjectMixin, FsmHistoryStateModel):
 
     @property
     def ml_backend(self):
-        return fast_first(self.ml_backends.all())
+        backends = list(self.ml_backends.all())
+        if not backends:
+            return None
+
+        if self.model_version:
+            for backend in backends:
+                if backend.title == self.model_version:
+                    return backend
+
+        for backend in backends:
+            extra_params = backend.extra_params or {}
+            if isinstance(extra_params, dict) and extra_params.get('_llm_preannotation'):
+                return backend
+
+        return backends[0]
 
     @property
     def should_retrieve_predictions(self):

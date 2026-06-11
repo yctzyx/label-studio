@@ -6,6 +6,7 @@ import { GeneralSettings } from "./GeneralSettings";
 import { AnnotationSettings } from "./AnnotationSettings";
 import { LabelingSettings } from "./LabelingSettings";
 import { MachineLearningSettings } from "./MachineLearningSettings/MachineLearningSettings";
+import { LLMPreannotationSettings } from "./LLMPreannotationSettings/LLMPreannotationSettings";
 import { PredictionsSettings } from "./PredictionsSettings/PredictionsSettings";
 import "./settings.scss";
 
@@ -14,6 +15,7 @@ const SETTINGS_MENU_ITEMS = [
   LabelingSettings,
   AnnotationSettings,
   MachineLearningSettings,
+  LLMPreannotationSettings,
   PredictionsSettings,
   WebhookPage,
   DangerZone,
@@ -45,6 +47,7 @@ const pages = {
   AnnotationSettings,
   LabelingSettings,
   MachineLearningSettings,
+  LLMPreannotationSettings,
   PredictionsSettings,
   WebhookPage,
   DangerZone,

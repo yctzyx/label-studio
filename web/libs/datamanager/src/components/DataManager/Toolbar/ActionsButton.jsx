@@ -57,6 +57,172 @@ const DialogContent = ({ text, form, formRef, store, action }) => {
   );
 };
 
+const predictionProgressListeners = new Set();
+let predictionProgressState = {
+  status: "idle",
+  selectedCount: 0,
+  detail: "",
+  error: "",
+};
+let predictionProgressModal = null;
+
+const setPredictionProgressState = (patch) => {
+  predictionProgressState = { ...predictionProgressState, ...patch };
+  predictionProgressListeners.forEach((listener) => listener(predictionProgressState));
+};
+
+const subscribePredictionProgress = (listener) => {
+  predictionProgressListeners.add(listener);
+  listener(predictionProgressState);
+  return () => predictionProgressListeners.delete(listener);
+};
+
+const PredictionProgressBody = ({ status = "running", selectedCount, detail, error }) => {
+  const isRunning = status === "running";
+  const isFailed = status === "failed";
+  const isIdle = status === "idle";
+
+  return (
+    <div className={cn("prediction-progress").toClassName()}>
+      <div className={cn("prediction-progress").elem("status").toClassName()}>
+        {isRunning && <Spinner />}
+        <div>
+          <div className={cn("prediction-progress").elem("title").toClassName()}>
+            {isIdle
+              ? "暂无预标注任务"
+              : isRunning
+                ? "正在获取预测结果"
+                : isFailed
+                  ? "获取预测结果失败"
+                  : "获取预测结果完成"}
+          </div>
+          <div className={cn("prediction-progress").elem("description").toClassName()}>
+            {isIdle
+              ? "当前没有正在运行或最近完成的预标注任务。"
+              : isRunning
+                ? `已提交 ${selectedCount || 0} 条任务到 ML 后端，请等待模型返回。`
+                : isFailed
+                  ? error || "请求失败，请查看后端日志。"
+                  : detail || "预测结果已写入所选任务。"}
+          </div>
+        </div>
+      </div>
+      {isRunning && <div className={cn("prediction-progress").elem("bar").toClassName()} />}
+    </div>
+  );
+};
+
+const getPredictionProgressFooter = (status) => {
+  if (status === "running") {
+    return (
+      <div className="flex justify-end">
+        <Button
+          variant="neutral"
+          look="outlined"
+          onClick={() => predictionProgressModal?.close()}
+          aria-label="后台运行预标注任务"
+          data-testid="prediction-progress-background"
+        >
+          后台运行
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex justify-end">
+      <Button
+        variant="primary"
+        onClick={() => predictionProgressModal?.close()}
+        aria-label="关闭预标注进度弹窗"
+        data-testid="prediction-progress-close"
+      >
+        {status === "failed" ? "关闭" : "完成"}
+      </Button>
+    </div>
+  );
+};
+
+const openPredictionProgressModal = () => {
+  const state = predictionProgressState;
+  predictionProgressModal = Modal.modal({
+    unique: "retrieve-tasks-predictions-progress",
+    title: "预标注进度",
+    body: <PredictionProgressBody {...state} />,
+    allowClose: true,
+    closeOnClickOutside: false,
+    footer: getPredictionProgressFooter(state.status),
+    onHidden: () => {
+      predictionProgressModal = null;
+    },
+  });
+  return predictionProgressModal;
+};
+
+const updatePredictionProgressModal = () => {
+  if (!predictionProgressModal?.visible) return;
+  const state = predictionProgressState;
+  predictionProgressModal.update({
+    title: "预标注进度",
+    body: <PredictionProgressBody {...state} />,
+    allowClose: true,
+    closeOnClickOutside: false,
+    footer: getPredictionProgressFooter(state.status),
+  });
+};
+
+const showPredictionProgress = ({ action, store, body }) => {
+  const selectedCount = store.currentView?.selectedCount ?? 0;
+
+  setPredictionProgressState({
+    status: "running",
+    selectedCount,
+    detail: "",
+    error: "",
+  });
+  openPredictionProgressModal();
+
+  Promise.resolve(store.invokeAction(action.id, { body }))
+    .then((result) => {
+      setPredictionProgressState({
+        status: "done",
+        selectedCount,
+        detail: result?.detail || `已处理 ${result?.processed_items ?? selectedCount} 条任务。`,
+        error: "",
+      });
+      updatePredictionProgressModal();
+    })
+    .catch((error) => {
+      setPredictionProgressState({
+        status: "failed",
+        selectedCount,
+        detail: "",
+        error: error?.message || "请求失败，请查看后端日志。",
+      });
+      updatePredictionProgressModal();
+    });
+};
+
+export const PredictionProgressButton = ({ size }) => {
+  const [progress, setProgress] = useState(predictionProgressState);
+  const isRunning = progress.status === "running";
+
+  useEffect(() => subscribePredictionProgress(setProgress), []);
+
+  return (
+    <Button
+      size={size}
+      variant={isRunning ? "primary" : "neutral"}
+      look={isRunning ? undefined : "outlined"}
+      onClick={openPredictionProgressModal}
+      aria-label="查看预标注进度"
+      data-testid="prediction-progress-button"
+    >
+      {isRunning ? `预标注中 ${progress.selectedCount || 0}` : "预标注进度"}
+    </Button>
+  );
+};
+
 const ActionButton = ({ action, parentRef, store, formRef }) => {
   const isDeleteAction = action.id.includes("delete");
   const hasChildren = !!action.children?.length;
@@ -155,6 +321,8 @@ const ActionButton = ({ action, parentRef, store, formRef }) => {
 };
 
 const invokeAction = (action, destructive, store, formRef) => {
+  const isPredictionRetrieval = action.id === "retrieve_tasks_predictions";
+
   if (action.dialog) {
     const { type: dialogType, text, form, title } = action.dialog;
     const dialog = Modal[dialogType] ?? Modal.confirm;
@@ -193,12 +361,20 @@ const invokeAction = (action, destructive, store, formRef) => {
         const body = formRef.current?.assembleFormData({ asJSON: true });
 
         store.SDK.invoke("actionDialogOk", action.id, { body });
-        store.invokeAction(action.id, { body });
+        if (isPredictionRetrieval) {
+          showPredictionProgress({ action, store, body });
+        } else {
+          store.invokeAction(action.id, { body });
+        }
       },
       closeOnClickOutside: false,
     });
   } else {
-    store.invokeAction(action.id);
+    if (isPredictionRetrieval) {
+      showPredictionProgress({ action, store });
+    } else {
+      store.invokeAction(action.id);
+    }
   }
 };
 

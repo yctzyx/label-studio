@@ -380,12 +380,13 @@ export const AppStore = types
     confirmLabelingConfigured() {
       if (!self.labelingIsConfigured) {
         Modal.confirm({
-          title: "You're almost there!",
-          body: "Before you can annotate the data, set up labeling configuration",
+          title: "还差一步！",
+          body: "开始标注前，请先完成标注配置。",
           onOk() {
             self.SDK.invoke("settingsClicked");
           },
-          okText: "Go to setup",
+          okText: "前往设置",
+          cancelText: "取消",
         });
         return false;
       }

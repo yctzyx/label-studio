@@ -21,6 +21,14 @@ from label_studio_sdk.label_interface.control_tags import ControlTag, ObjectTag
 logger = logging.getLogger(__name__)
 
 
+class _SafeDict(dict):
+    """dict that leaves unknown {placeholders} untouched during str.format_map,
+    so a user prompt referencing a missing task field won't raise KeyError."""
+
+    def __missing__(self, key):
+        return '{' + key + '}'
+
+
 @retry(wait=wait_random(min=5, max=10), stop=stop_after_attempt(6))
 def chat_completion_call(messages, params, *args, **kwargs):
     """
@@ -41,29 +49,37 @@ def chat_completion_call(messages, params, *args, **kwargs):
     """
     provider = params.get("provider", OpenAIInteractive.OPENAI_PROVIDER)
     model = params.get("model", OpenAIInteractive.OPENAI_MODEL)
-    if provider == "openai":
-        client = OpenAI(
-            api_key=params.get("api_key", OpenAIInteractive.OPENAI_KEY),
-        )
-        if not model:
-            model = 'gpt-3.5-turbo'
-    elif provider == "azure":
+    base_url = params.get("base_url") or None
+    api_key = params.get("api_key", OpenAIInteractive.OPENAI_KEY)
+
+    if provider == "azure":
         client = AzureOpenAI(
-            api_key=params.get("api_key", OpenAIInteractive.OPENAI_KEY),
+            api_key=api_key,
             api_version=params.get("api_version", OpenAIInteractive.AZURE_API_VERSION),
             azure_endpoint=params.get('resource_endpoint', OpenAIInteractive.AZURE_RESOURCE_ENDPOINT).rstrip('/'),
             azure_deployment=params.get('deployment_name', OpenAIInteractive.AZURE_DEPLOYMENT_NAME)
         )
         if not model:
             model = 'gpt-35-turbo'
-    elif provider == "ollama":
-        client = OpenAI(
-            base_url=params.get('base_url', OpenAIInteractive.OLLAMA_ENDPOINT),
-            # required but ignored
-            api_key='ollama',
-        )
+    elif provider == "openai" and not base_url:
+        client = OpenAI(api_key=api_key)
+        if not model:
+            model = 'gpt-3.5-turbo'
     else:
-        raise
+        # Generic OpenAI-compatible providers: ollama / dashscope (Qwen) / deepseek / zhipu / custom,
+        # or OpenAI behind a custom gateway. They all share the OpenAI Chat Completions protocol.
+        if not base_url and provider == "ollama":
+            base_url = OpenAIInteractive.OLLAMA_ENDPOINT
+        client = OpenAI(
+            base_url=base_url,
+            # some local/self-hosted gateways ignore the key but the SDK requires a non-empty value
+            api_key=api_key or 'EMPTY',
+        )
+
+    # Optional global system prompt shared across the session
+    system_prompt = params.get("system_prompt")
+    if system_prompt:
+        messages = [{"role": "system", "content": system_prompt}] + list(messages)
 
     request_params = {
         "messages": messages,
@@ -154,6 +170,9 @@ class OpenAIInteractive(LabelStudioMLBase):
         # Initializing - get existing prompt from storage
         elif prompt := self.get(prompt_tag.name):
             return [prompt]
+        # Prompt configured through the Label Studio UI (extra_params.prompt)
+        elif self.extra_params.get('prompt'):
+            return [self.extra_params.get('prompt')]
         # Default prompt
         elif self.DEFAULT_PROMPT:
             if self.USE_INTERNAL_PROMPT_TEMPLATE:
@@ -231,10 +250,18 @@ class OpenAIInteractive(LabelStudioMLBase):
     def _generate_normalized_prompt(self, text: str, prompt: str, task_data: Dict, labels: Optional[List[str]]) -> str:
         """
         """
-        if self.USE_INTERNAL_PROMPT_TEMPLATE:
-            norm_prompt = self.PROMPT_TEMPLATE.format(text=text, prompt=prompt, labels=labels)
+        # UI-configured options (extra_params) take precedence over env defaults
+        use_internal_template = self.extra_params.get(
+            'use_internal_prompt_template', self.USE_INTERNAL_PROMPT_TEMPLATE
+        )
+        prompt_template = self.extra_params.get('prompt_template', self.PROMPT_TEMPLATE)
+
+        if use_internal_template:
+            norm_prompt = prompt_template.format(text=text, prompt=prompt, labels=labels)
         else:
-            norm_prompt = prompt.format(labels=labels, **task_data)
+            # tolerate prompts that reference task fields which may be missing
+            format_kwargs = _SafeDict({**task_data, 'labels': labels, 'text': text})
+            norm_prompt = prompt.format_map(format_kwargs)
 
         return norm_prompt
 
@@ -260,14 +287,30 @@ class OpenAIInteractive(LabelStudioMLBase):
                              choices_tag: ControlTag, textarea_tag: ControlTag, prompts: List[str]) -> Dict:
         """
         """
-        text = self._get_text(task_data, object_tag)
         # Add {labels} to the prompt if choices tag is present
         labels = choices_tag.labels if choices_tag else None
-        norm_prompt = self._generate_normalized_prompt(text, prompt, task_data, labels=labels)
 
-        # run inference
-        # this are params provided through the web interface
-        response = gpt(norm_prompt, self.extra_params)
+        model_type = self.extra_params.get('model_type', 'text')
+        is_vision = model_type == 'vision' and isinstance(object_tag, ImageTag)
+
+        if is_vision:
+            # Multimodal: send the image directly to a vision model instead of OCR
+            image_url = task_data.get(object_tag.value_name)
+            norm_prompt = self._generate_normalized_prompt('', prompt, task_data, labels=labels)
+            messages = [{
+                'role': 'user',
+                'content': [
+                    {'type': 'text', 'text': norm_prompt},
+                    {'type': 'image_url', 'image_url': {'url': image_url}},
+                ],
+            }]
+            response = gpt(messages, self.extra_params)
+        else:
+            text = self._get_text(task_data, object_tag)
+            norm_prompt = self._generate_normalized_prompt(text, prompt, task_data, labels=labels)
+            # run inference; params are provided through the web interface (extra_params)
+            response = gpt(norm_prompt, self.extra_params)
+
         regions = self._generate_response_regions(response, prompt_tag, choices_tag, textarea_tag, prompts)
 
         return PredictionValue(result=regions, score=0.1, model_version=str(self.model_version))

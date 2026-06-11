@@ -1,0 +1,34 @@
+INFO:     Started server process [2996670]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:6661 (Press CTRL+C to quit)
+============================================================
+🚀 反诈图片打标 API v1.0.0
+============================================================
+📡 服务地址: http://0.0.0.0:6661
+📚 API 文档: http://0.0.0.0:6661/docs
+============================================================
+INFO:     134.96.224.105:47706 - "POST /api/v1/tag HTTP/1.1" 422 Unprocessable Entity
+WARNING:  Invalid HTTP request received.
+INFO:     134.96.224.104:29832 - "GET / HTTP/1.1" 200 OK
+INFO:     134.96.226.211:45668 - "GET / HTTP/1.1" 200 OK
+WARNING:  Invalid HTTP request received.
+WARNING:  Invalid HTTP request received.
+INFO:     134.96.224.104:56341 - "GET /api/v1/tag HTTP/1.1" 405 Method Not Allowed
+INFO:     134.96.224.104:19160 - "POST /api/v1/tag HTTP/1.1" 422 Unprocessable Entity
+INFO:     134.96.224.105:25882 - "POST /api/v1/tag HTTP/1.1" 422 Unprocessable Entity
+INFO:     134.96.224.105:20605 - "POST /api/v1/tag HTTP/1.1" 422 Unprocessable Entity
+INFO:     134.96.224.104:1233 - "GET /api/v1/tag HTTP/1.1" 405 Method Not Allowed
+INFO:     134.96.224.104:45365 - "GET /api/v1/tag HTTP/1.1" 405 Method Not Allowed
+INFO:     134.96.224.104:7090 - "POST /api/v1/tag HTTP/1.1" 422 Unprocessable Entity
+INFO:     134.96.224.104:56800 - "POST /api/v1/tag HTTP/1.1" 422 Unprocessable Entity
+INFO:     134.96.226.212:59295 - "POST /api/v1/tag HTTP/1.1" 422 Unprocessable Entity
+INFO:     134.96.226.211:38482 - "GET /api/v1/tag HTTP/1.1" 405 Method Not Allowed
+INFO:     134.96.226.211:38574 - "GET /api/v1/tag HTTP/1.1" 405 Method Not Allowed
+INFO:     134.96.226.211:38612 - "GET /api/v1/tag HTTP/1.1" 405 Method Not Allowed
+INFO:     134.96.226.211:38902 - "POST /api/v1/tag HTTP/1.1" 422 Unprocessable Entity
+INFO:     134.96.226.212:56723 - "POST /api/v1/tag HTTP/1.1" 422 Unprocessable Entity
+INFO:     134.96.226.211:40452 - "POST /api/v1/tag HTTP/1.1" 422 Unprocessable Entity
+INFO:     134.96.226.211:41010 - "POST /api/v1/tag HTTP/1.1" 422 Unprocessable Entity
+INFO:     134.96.226.211:41960 - "POST /api/v1/tag HTTP/1.1" 422 Unprocessable Entity
+INFO:     134.96.226.211:42226 - "POST /api/v1/tag HTTP/1.1" 422 Unprocessable Entity

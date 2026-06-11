@@ -1,0 +1,135 @@
+<!--
+  图片语义理解标注模板（适配 label-studio-llm-backend）
+
+  使用前提（项目设置 → 大模型预标注）：
+  1. 模型类型选择「多模态（图文）」
+  2. 模型选用视觉模型，如 qwen-vl-max / MiniMax-M3 / glm-4v / gpt-4o
+  3. Prompt 模板示例见 doc 内说明；use_internal_prompt_template = false（UI 默认已是）
+  4. 开启「交互式预标注」后，在 Prompt 框修改指令并按 Shift+Enter 重新生成
+
+  任务数据字段：image（图片 URL 或 /data/upload/... 路径）
+
+  示例任务 JSON：
+  {
+    "image": "https://example.com/sample.jpg"
+  }
+-->
+<View>
+  <Style>
+    .lsf-main-content.lsf-requesting .prompt::before {
+      content: ' 大模型生成中...';
+      color: #808080;
+      font-size: 13px;
+    }
+    .layout {
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+    }
+    .image-panel {
+      flex: 0 0 48%;
+      max-width: 48%;
+    }
+    .form-panel {
+      flex: 1;
+      min-width: 0;
+    }
+    .block {
+      background: #fafafa;
+      border: 1px solid #e8e8e8;
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+    .hint {
+      color: #888;
+      font-size: 12px;
+      margin-top: 4px;
+    }
+  </Style>
+
+  <Header value="图片语义理解标注" size="4"/>
+
+  <View className="layout">
+    <!-- 左侧：待理解图片 -->
+    <View className="image-panel">
+      <Header value="待标注图片"/>
+      <Image name="image" value="$image" zoom="true" zoomControl="true" rotateControl="true"/>
+    </View>
+
+    <!-- 右侧：Prompt + 语义输出 + 人工校验 -->
+    <View className="form-panel">
+
+      <View className="block">
+        <Header value="任务指令（Prompt）"/>
+        <View className="prompt">
+          <!-- name 必须以 prompt 开头，供 ML 后端识别；Shift+Enter 触发交互式生成 -->
+          <TextArea name="prompt"
+                    toName="image"
+                    rows="4"
+                    editable="true"
+                    maxSubmissions="1"
+                    showSubmitButton="false"
+                    placeholder="可修改指令后按 Shift+Enter 重新调用大模型。留空则使用项目设置中的默认 Prompt。"/>
+        </View>
+        <Header value="批量预标使用项目配置 Prompt；交互模式下可在此修改指令并按 Shift+Enter 重新生成。" size="6"/>
+      </View>
+
+      <View className="block">
+        <Header value="场景类型（单选，可人工修正）"/>
+        <Choices name="scene_category" toName="image" choice="single" showInline="true">
+          <Choice value="人物活动"/>
+          <Choice value="自然景观"/>
+          <Choice value="城市街景"/>
+          <Choice value="室内场景"/>
+          <Choice value="商品物品"/>
+          <Choice value="文档票据"/>
+          <Choice value="图表界面"/>
+          <Choice value="其他"/>
+        </Choices>
+      </View>
+
+      <View className="block">
+        <Header value="语义描述（大模型预填，请核对并修改）"/>
+        <!-- 非 prompt 的 TextArea：ML 后端会将模型输出写入此处 -->
+        <TextArea name="semantic_description"
+                  toName="image"
+                  rows="8"
+                  editable="true"
+                  smart="false"
+                  maxSubmissions="1"
+                  showSubmitButton="false"
+                  placeholder="应包含：主体对象、关键动作/关系、场景环境、可见文字（如有）、整体语义摘要。"/>
+      </View>
+
+      <View className="block">
+        <Header value="关键语义标签（多选，可补充）"/>
+        <Choices name="semantic_tags" toName="image" choice="multiple" showInline="false">
+          <Choice value="含人物"/>
+          <Choice value="含文字"/>
+          <Choice value="含车辆"/>
+          <Choice value="含动物"/>
+          <Choice value="含食物"/>
+          <Choice value="室内"/>
+          <Choice value="室外"/>
+          <Choice value="白天"/>
+          <Choice value="夜晚"/>
+          <Choice value="需要 OCR"/>
+        </Choices>
+      </View>
+
+      <View className="block">
+        <Header value="标注员备注（可选）"/>
+        <TextArea name="annotator_note"
+                  toName="image"
+                  rows="2"
+                  editable="true"
+                  smart="false"
+                  maxSubmissions="1"
+                  showSubmitButton="false"
+                  placeholder="记录模型错误、歧义说明或质检意见。"/>
+      </View>
+
+    </View>
+  </View>
+</View>

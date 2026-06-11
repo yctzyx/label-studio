@@ -16,6 +16,7 @@ from requests.adapters import HTTPAdapter
 from requests.auth import HTTPBasicAuth
 
 from label_studio.core.utils.params import get_env
+from ml.media_inline import inline_task_media_as_base64
 
 version = get_git_version()
 logger = logging.getLogger(__name__)
@@ -207,13 +208,14 @@ class MLApi(BaseHTTPAPI):
 
     def _prep_prediction_req(self, tasks, project, context=None):
         request = {
-            'tasks': tasks,
+            'tasks': inline_task_media_as_base64(tasks, project),
             'project': self._create_project_uid(project),
             'label_config': project.label_config,
             'params': {
                 'login': project.task_data_login,
                 'password': project.task_data_password,
                 'context': context,
+                'inline_media_base64': True,
             },
         }
 

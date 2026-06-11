@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+data/server/*
+!data/server/.gitkeep
+__pycache__
+*.pyc
+.pytest_cache
+.git
+README.md

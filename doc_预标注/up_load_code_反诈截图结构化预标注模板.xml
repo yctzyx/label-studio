@@ -1,0 +1,130 @@
+<!--
+  up_load_code 反诈网页截图结构化预标注模板
+
+  适用场景：
+  - 输入：网页截图 / APP 页面截图 / 引流页面截图
+  - 输出：违法类型、诈骗类型、关键话术、收款账户、联系方式、APP 下载、域名、反侦查提示等
+  - 预标注后由人工复核、补充、修正
+
+  任务数据示例：
+  {
+    "image": "https://example.com/screenshot.png",
+    "source_image": "2026-06-03/images/a.png"
+  }
+
+  产品化约束：
+  1. Image name 建议固定为 image，value 可按数据字段调整。
+  2. Choices 控件用于标准分类字段，模型只能返回 Choice value 中的值。
+  3. TextArea 控件用于原文引用、账户、联系方式、域名等结构化文本。
+  4. raw_json 仅用于调试和追溯，人工标注时可折叠或隐藏。
+-->
+<View>
+  <Style>
+    .anti-fraud-layout {
+      display: grid;
+      grid-template-columns: minmax(360px, 1fr) minmax(420px, 1fr);
+      gap: 20px;
+      align-items: start;
+    }
+    .anti-fraud-panel {
+      border: 1px solid #e6e6e6;
+      border-radius: 6px;
+      padding: 14px;
+      background: #fff;
+    }
+    .anti-fraud-field {
+      margin-top: 12px;
+    }
+    .anti-fraud-help {
+      color: #666;
+      font-size: 13px;
+      line-height: 1.5;
+      margin: 4px 0 10px;
+    }
+    @media (max-width: 980px) {
+      .anti-fraud-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+  </Style>
+
+  <Header value="反诈网页截图结构化预标注" size="4"/>
+  <View>
+    大模型先判断截图是否涉诈/涉黄赌毒等风险；命中后抽取可用于处置的关键线索，人工可在此页复核修正。
+  </View>
+
+  <View className="anti-fraud-layout">
+    <View className="anti-fraud-panel">
+      <Header value="截图" size="5"/>
+      <Image name="image" value="$image" zoom="true" zoomControl="true" rotateControl="true"/>
+      <View className="anti-fraud-help">
+        如需追溯来源，可在任务数据中保留 source_image 字段。
+      </View>
+    </View>
+
+    <View className="anti-fraud-panel">
+      <Header value="风险定性" size="5"/>
+      <View className="anti-fraud-help">
+        只选择截图中有明确证据的类型；无法确认时不要勾选。
+      </View>
+
+      <Choices name="main_illegal_types" toName="image" choice="multiple" showInline="true">
+        <Choice value="赌博"/>
+        <Choice value="诈骗"/>
+        <Choice value="色情"/>
+        <Choice value="毒品"/>
+        <Choice value="网址分发"/>
+        <Choice value="其他违法"/>
+      </Choices>
+
+      <View className="anti-fraud-field">
+        <Header value="诈骗类型" size="5"/>
+        <Choices name="fraud_types" toName="image" choice="multiple" showInline="true">
+          <Choice value="刷单"/>
+          <Choice value="贷款"/>
+          <Choice value="杀猪盘"/>
+          <Choice value="投资"/>
+          <Choice value="冒充"/>
+          <Choice value="中奖"/>
+          <Choice value="虚假购物"/>
+          <Choice value="ETC"/>
+          <Choice value="其他"/>
+        </Choices>
+      </View>
+
+      <View className="anti-fraud-field">
+        <Header value="关键诈骗话术" size="5"/>
+        <TextArea name="key_fraud_phrases" toName="image" rows="4" placeholder="逐行填写截图中可见的诱导、欺诈、承诺类原文。"/>
+      </View>
+
+      <View className="anti-fraud-field">
+        <Header value="显著诱导承诺" size="5"/>
+        <TextArea name="enticement_phrases" toName="image" rows="3" placeholder="例如永久有效、稳赚不赔、100%防失联等原文。"/>
+      </View>
+
+      <View className="anti-fraud-field">
+        <Header value="资金与收款信息" size="5"/>
+        <TextArea name="payment_accounts" toName="image" rows="4" placeholder="逐行填写银行卡、微信、支付宝、虚拟货币地址等原文；无则填未提供。"/>
+        <TextArea name="recharge_buttons" toName="image" rows="2" placeholder="充值/支付按钮或入口描述。"/>
+      </View>
+
+      <View className="anti-fraud-field">
+        <Header value="联系方式与引流信息" size="5"/>
+        <TextArea name="customer_contacts" toName="image" rows="4" placeholder="逐行填写 QQ、微信、Telegram、邮箱、二维码等联系方式原文；无则填未提供。"/>
+        <TextArea name="app_download" toName="image" rows="3" placeholder="APP 名称、下载链接、二维码位置等。"/>
+        <TextArea name="website_domain" toName="image" rows="3" placeholder="可见 URL、核心域名、推广名称等。"/>
+      </View>
+
+      <View className="anti-fraud-field">
+        <Header value="反侦查与异常特征" size="5"/>
+        <TextArea name="anti_detection_hints" toName="image" rows="3" placeholder="地址更新、防失联、浏览器限制、备用网址等原文。"/>
+        <TextArea name="salient_anomalies" toName="image" rows="2" placeholder="其他显著异常特征。"/>
+      </View>
+
+      <View className="anti-fraud-field">
+        <Header value="模型原始 JSON（调试）" size="5"/>
+        <TextArea name="raw_json" toName="image" rows="6" placeholder="由预标注后端写入，用于排查解析问题。"/>
+      </View>
+    </View>
+  </View>
+</View>
