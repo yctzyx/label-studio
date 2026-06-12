@@ -125,6 +125,9 @@ FRONTEND_HOSTNAME = get_env('FRONTEND_HOSTNAME', 'http://localhost:8010' if FRON
 # When using /embed/ entry (e.g. 无界), API requests use this hostname so they go through gateway.
 # Set to your gateway URL (e.g. https://main-platform.com/label-studio). If empty, falls back to HOSTNAME.
 EMBED_GATEWAY_HOSTNAME = get_env('EMBED_GATEWAY_HOSTNAME', '')
+# Optional override for /static sample URLs. Default: empty → relative /static/… resolved via browser page origin
+# (parent platform nginx: location /static { proxy_pass LS; }).
+EMBED_STATIC_HOSTNAME = get_env('EMBED_STATIC_HOSTNAME', '')
 
 DOMAIN_FROM_REQUEST = get_bool_env('DOMAIN_FROM_REQUEST', False)
 

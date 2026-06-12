@@ -10,6 +10,8 @@ declare global {
     $wujie?: {
       props?: {
         getUser?: () => { token?: string; [key: string]: unknown };
+        /** Optional: platform origin for /static proxy (e.g. http://platform:5173). See getStaticOrigin in @humansignal/core. */
+        getStaticOrigin?: () => string | null | undefined;
       };
     };
   }
@@ -71,4 +73,30 @@ export function getMainPlatformAuthHeaders(getTokenFallback?: () => string | nul
   const token = getMainPlatformToken(getTokenFallback);
   if (!token) return {};
   return { Authorization: token };
+}
+
+const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Poll until wujie injects a platform token, or timeout.
+ * Avoids racing the parent shell on first embed mount (token arrives shortly after sub-app loads).
+ */
+export async function waitForMainPlatformToken(
+  options: { timeoutMs?: number; intervalMs?: number; getTokenFallback?: () => string | null } = {},
+): Promise<string | null> {
+  const { timeoutMs = 3000, intervalMs = 100, getTokenFallback } = options;
+
+  if (typeof window === "undefined" || !window.__POWERED_BY_WUJIE__) {
+    return getMainPlatformToken(getTokenFallback);
+  }
+
+  const deadline = Date.now() + timeoutMs;
+  let token = getMainPlatformToken(getTokenFallback);
+
+  while (!token && Date.now() < deadline) {
+    await delay(intervalMs);
+    token = getMainPlatformToken(getTokenFallback);
+  }
+
+  return token;
 }

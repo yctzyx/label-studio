@@ -95,7 +95,9 @@ export const DataManagerPage = ({ ...props }) => {
       params: { project: project.id },
     });
 
-    const interactiveBacked = (mlBackends ?? []).find(({ is_interactive }) => is_interactive);
+    const interactiveBacked = (mlBackends ?? []).find(
+      (backend) => backend.is_interactive && backend.title === project.model_version,
+    ) ?? (mlBackends ?? []).find(({ is_interactive }) => is_interactive);
     let runtimeUser = null;
 
     try {

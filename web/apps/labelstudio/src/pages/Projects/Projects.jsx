@@ -13,7 +13,10 @@ import { ProjectTeamWorkflowPage } from "../ProjectTeamWorkflow/ProjectTeamWorkf
 import { SettingsPage } from "../Settings";
 import { EmptyProjectsList, ProjectsList } from "./ProjectsList";
 import { useAbortController, useUpdatePageTitle } from "@humansignal/core";
+import { isWujieEmbed, waitForMainPlatformToken } from "../../utils/getMainPlatformToken";
 import "./Projects.scss";
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const getCurrentPage = () => {
   const pageNumberFromURL = new URLSearchParams(location.search).get("page");
@@ -51,6 +54,10 @@ export const ProjectsPage = () => {
     setNetworkState("loading");
     abortController.renew(); // Cancel any in flight requests
 
+    const signal = abortController.controller.current.signal;
+    const isAbortedError = (e) => e.error?.includes?.("aborted");
+    const embedMode = isWujieEmbed();
+
     const requestParams = { page, page_size: pageSize };
 
     requestParams.include = [
@@ -66,20 +73,49 @@ export const ProjectsPage = () => {
       "data_type_category",
     ].join(",");
 
-    const data = await api.callApi("projects", {
-      params: requestParams,
-      signal: abortController.controller.current.signal,
-      errorFilter: (e) => e.error.includes("aborted"),
-    });
+    const callProjects = (suppressError = false) =>
+      api.callApi("projects", {
+        params: requestParams,
+        signal,
+        suppressError,
+        errorFilter: isAbortedError,
+      });
 
-    setTotalItems(data?.count ?? 1);
+    if (embedMode && typeof window !== "undefined" && window.__POWERED_BY_WUJIE__) {
+      await waitForMainPlatformToken({ timeoutMs: 3000 });
+    }
+
+    // Embed: suppress error modal on first attempt(s) — token/gateway may not be ready yet.
+    let data = await callProjects(embedMode);
+
+    if ((!data || data.error) && embedMode && !signal.aborted) {
+      await sleep(400);
+      await waitForMainPlatformToken({ timeoutMs: 2000 });
+      const retryData = await callProjects(true);
+      if (retryData && !retryData.error) {
+        data = retryData;
+        api.resetError?.();
+      }
+    }
+
+    if (signal.aborted) return;
+
+    if (!data || data.error) {
+      if (embedMode) await callProjects(false);
+      setProjectsList([]);
+      setTotalItems(1);
+      setNetworkState("loaded");
+      return;
+    }
+
+    setTotalItems(data.count ?? 1);
     setProjectsList(data.results ?? []);
     setNetworkState("loaded");
 
-    if (data?.results?.length) {
+    if (data.results?.length) {
       const additionalData = await api.callApi("projects", {
         params: {
-          ids: data?.results?.map(({ id }) => id).join(","),
+          ids: data.results.map(({ id }) => id).join(","),
           include: [
             "id",
             "description",
@@ -98,8 +134,8 @@ export const ProjectsPage = () => {
           ].join(","),
           page_size: pageSize,
         },
-        signal: abortController.controller.current.signal,
-        errorFilter: (e) => e.error.includes("aborted"),
+        signal,
+        errorFilter: isAbortedError,
       });
 
       if (additionalData?.results?.length) {

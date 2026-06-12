@@ -448,6 +448,11 @@ class Project(ProjectMixin, FsmHistoryStateModel):
 
         for backend in backends:
             extra_params = backend.extra_params or {}
+            if isinstance(extra_params, dict) and extra_params.get('_vision_preannotation'):
+                return backend
+
+        for backend in backends:
+            extra_params = backend.extra_params or {}
             if isinstance(extra_params, dict) and extra_params.get('_llm_preannotation'):
                 return backend
 

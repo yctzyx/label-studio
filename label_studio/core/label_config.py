@@ -232,6 +232,13 @@ def get_task_from_labeling_config(config):
     return task_data, annotations, predictions
 
 
+def _hostname_for_sample_media_urls():
+    """Hostname prefix for bundled /static sample assets in generated preview tasks."""
+    from core.utils.embed_static_hostname import resolve_embed_static_hostname
+
+    return resolve_embed_static_hostname()
+
+
 def data_examples(mode):
     """Data examples for editor preview and task upload examples"""
     global _DATA_EXAMPLES
@@ -240,11 +247,12 @@ def data_examples(mode):
         with open(find_file('data_examples.json'), encoding='utf-8') as f:
             _DATA_EXAMPLES = json.load(f)
 
+        media_host = _hostname_for_sample_media_urls()
         roots = ['editor_preview', 'upload']
         for root in roots:
             for key, value in _DATA_EXAMPLES[root].items():
                 if isinstance(value, str):
-                    _DATA_EXAMPLES[root][key] = value.replace('<HOSTNAME>', settings.HOSTNAME)
+                    _DATA_EXAMPLES[root][key] = value.replace('<HOSTNAME>', media_host)
 
     return _DATA_EXAMPLES[mode]
 

@@ -238,13 +238,27 @@ def chat_completion_call(messages, params, *args, **kwargs):
     return completion
 
 
+def _safe_log_value(value, prefix_len=10):
+    if isinstance(value, str):
+        if value.startswith("data:") and ";base64," in value:
+            return f"{value[:prefix_len]}...<base64 len={len(value)}>"
+        if len(value) > 2000 and "base64" in value[:100].lower():
+            return f"{value[:prefix_len]}...<long string len={len(value)}>"
+        return value
+    if isinstance(value, list):
+        return [_safe_log_value(item, prefix_len=prefix_len) for item in value]
+    if isinstance(value, dict):
+        return {key: _safe_log_value(item, prefix_len=prefix_len) for key, item in value.items()}
+    return value
+
+
 def gpt(messages: Union[List[Dict], str], params, *args, **kwargs):
     """
     """
     if isinstance(messages, str):
         messages = [{"role": "user", "content": messages}]
 
-    logger.debug(f"OpenAI request: {messages}, params={params}")
+    logger.debug("OpenAI request: %s, params=%s", _safe_log_value(messages), _safe_log_value(params))
     completion = chat_completion_call(messages, params)
     logger.debug(f"OpenAI response: {completion}")
     response = [choice.message.content for choice in completion.choices]
@@ -870,7 +884,7 @@ class OpenAIInteractive(LabelStudioMLBase):
     def fit(self, event, data, **additional_params):
         """
         """
-        logger.debug(f'Data received: {data}')
+        logger.debug("Data received: %s", _safe_log_value(data))
         if event not in ('ANNOTATION_CREATED', 'ANNOTATION_UPDATED'):
             return
 

@@ -38,3 +38,4 @@ export { ff };
 
 // Image cache for shared use across editor and datamanager
 export { imageCache } from "./lib/utils/ImageCache";
+export { getStaticOrigin, resolvePublicStaticUrl, trimStaticOrigin } from "./lib/utils/resolveStaticOrigin";

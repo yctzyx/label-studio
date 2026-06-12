@@ -1,0 +1,9 @@
+# requirements revision 4
+gunicorn==23.0.0
+Flask>2.3
+colorama~=0.4
+requests~=2.31
+semver~=3.0.2
+olefile==0.47
+accelerate==1.6.0
+label-studio-sdk==1.0.8

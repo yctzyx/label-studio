@@ -1,0 +1,54 @@
+services:
+  label-studio-grounding-dino-backend:
+    container_name: label-studio-grounding-dino-backend
+    image: label-studio-grounding-dino-backend:local
+    init: true
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        TEST_ENV: ${TEST_ENV:-false}
+    env_file:
+      - .env
+    environment:
+      - MODEL_DIR=/data/models
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - WORKERS=${WORKERS:-1}
+      - THREADS=${THREADS:-4}
+      - LABEL_STUDIO_URL=${LABEL_STUDIO_URL:-}
+      - LABEL_STUDIO_API_KEY=${LABEL_STUDIO_API_KEY:-}
+      - LABEL_STUDIO_HOST=${LABEL_STUDIO_HOST:-}
+      - LABEL_STUDIO_ACCESS_TOKEN=${LABEL_STUDIO_ACCESS_TOKEN:-}
+      - GROUNDINGDINO_REPO_PATH=${GROUNDINGDINO_REPO_PATH:-/GroundingDINO}
+      - GROUNDING_DINO_CONFIG=${GROUNDING_DINO_CONFIG:-GroundingDINO_SwinT_OGC.py}
+      - GROUNDING_DINO_WEIGHTS=${GROUNDING_DINO_WEIGHTS:-groundingdino_swint_ogc.pth}
+      - DEFAULT_PROMPT=${DEFAULT_PROMPT:-}
+      - BOX_THRESHOLD=${BOX_THRESHOLD:-0.30}
+      - TEXT_THRESHOLD=${TEXT_THRESHOLD:-0.25}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${GROUNDING_DINO_BACKEND_PORT:-9092}:9090"
+    volumes:
+      - "./data/server:/data"
+      - "./dino.py:/app/dino.py:ro"
+      - "./_wsgi.py:/app/_wsgi.py:ro"
+      - "./log_utils.py:/app/log_utils.py:ro"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9090/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
+    restart: unless-stopped
+
+    # GPU deployment:
+    # environment:
+    #   - NVIDIA_VISIBLE_DEVICES=all
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]

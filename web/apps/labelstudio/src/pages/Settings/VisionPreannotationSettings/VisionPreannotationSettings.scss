@@ -1,0 +1,25 @@
+.vision-preannotation {
+  &__grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  &__labels {
+    display: grid;
+    gap: 8px;
+  }
+
+  &__label-row {
+    display: grid;
+    grid-template-columns: 120px 1fr 1fr 72px;
+    gap: 8px;
+    align-items: center;
+  }
+
+  &__label-head {
+    color: var(--color-neutral-content-subtler);
+    font-size: 12px;
+    font-weight: 600;
+  }
+}

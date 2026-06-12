@@ -52,13 +52,22 @@ def embed(request):
     embed_hostname = getattr(settings, 'EMBED_GATEWAY_HOSTNAME', None) or settings.HOSTNAME or ''
     if not embed_hostname and request:
         embed_hostname = request.build_absolute_uri('/').rstrip('/')
-    logger.info("[LS-embed] embed view render hostname=%s", embed_hostname)
+    from core.utils.embed_static_hostname import resolve_embed_static_hostname
+
+    # Static: empty → browser uses page origin + /static (platform nginx proxy); or EMBED_STATIC_HOSTNAME.
+    embed_static_hostname = resolve_embed_static_hostname(request)
+    logger.info(
+        "[LS-embed] embed view render api_hostname=%s static_hostname=%s (empty=use page origin)",
+        embed_hostname,
+        embed_static_hostname or "<page-origin>",
+    )
     return render(
         request,
         'embed/embed_shell.html',
         {
             'user': _EmbedMockUser(),
             'embed_gateway_hostname': embed_hostname,
+            'embed_static_hostname': embed_static_hostname,
         },
     )
 

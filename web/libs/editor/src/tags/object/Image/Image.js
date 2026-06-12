@@ -1,4 +1,4 @@
-import { ff } from "@humansignal/core";
+import { ff, resolvePublicStaticUrl } from "@humansignal/core";
 import { inject } from "mobx-react";
 import { destroy, getRoot, getType, types } from "mobx-state-tree";
 
@@ -38,20 +38,24 @@ const ZOOM_INTENSITY = 0.009;
 
 /**
  * Resolve relative task URLs (e.g. /data/upload/xxx, /static/xxx) to absolute when in embed mode.
- * When APP_SETTINGS.hostname is set (e.g. gateway URL), prepend it so requests go through gateway.
- * For full URLs (http/https) that point to static/data paths, rewrite to use gateway so auth headers work.
+ * - `/static/*` → same origin as the platform page (nginx proxies /static → LS)
+ * - `/data/upload/*` and other API-backed paths → APP_SETTINGS.hostname (gateway) for auth headers
  */
 function resolveTaskUrl(src) {
   if (!src || typeof src !== "string") return src;
+
+  const staticUrl = resolvePublicStaticUrl(src);
+  if (staticUrl) return staticUrl;
+
   const hostname = typeof window !== "undefined" && window.APP_SETTINGS?.hostname;
 
   if (hostname) {
-    // Relative path: prepend gateway
+    // Relative path (non-static): prepend gateway
     if (src.startsWith("/")) {
       return [hostname.replace(/([/]+)$/, ""), src.replace(/^\/+/, "")].join("/");
     }
-    // Full URL pointing to static/data: rewrite to gateway so requests include auth (e.g. 无界 embed)
-    if (src.match(/^https?:/) && (src.includes("/static/") || src.includes("/data/upload/"))) {
+    // Full URL pointing to data upload: rewrite to gateway so requests include auth (e.g. 无界 embed)
+    if (src.match(/^https?:/) && src.includes("/data/upload/")) {
       try {
         const u = new URL(src);
         const path = u.pathname + u.search;

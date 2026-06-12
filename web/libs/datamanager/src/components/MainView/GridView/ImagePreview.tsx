@@ -14,6 +14,25 @@ const needsAuth = (): boolean => {
   return headers && typeof headers === "object" && Object.keys(headers).length > 0;
 };
 
+const isEmbeddedMode = (): boolean => {
+  if (typeof window === "undefined") return false;
+  return Boolean((window as any).__POWERED_BY_WUJIE__ || window.location?.pathname?.includes("/embed"));
+};
+
+const wait = (timeout: number) => new Promise((resolve) => setTimeout(resolve, timeout));
+
+const waitForAuthHeaders = async (timeout = 3000, interval = 100): Promise<boolean> => {
+  if (needsAuth()) return true;
+
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    await wait(interval);
+    if (needsAuth()) return true;
+  }
+
+  return false;
+};
+
 type Task = {
   id: number;
   data: Record<string, string>;
@@ -53,19 +72,36 @@ const ImagePreview = observer(({ task, field }: ImagePreviewProps) => {
 
   // Fetch with auth when needed (embed mode)
   useEffect(() => {
+    let cancelled = false;
+
     setLoadError(false);
     if (!src) {
       setDisplaySrc("");
       return;
     }
-    if (!needsAuth()) {
+
+    if (!isEmbeddedMode() && !needsAuth()) {
       setDisplaySrc(src);
       return;
     }
-    imageCache
-      .load(src, "anonymous")
-      .then((cached) => setDisplaySrc(cached.blobUrl))
-      .catch(() => setLoadError(true));
+
+    const load = async () => {
+      await waitForAuthHeaders();
+      if (cancelled) return;
+
+      try {
+        const cached = await imageCache.load(src, "anonymous");
+        if (!cancelled) setDisplaySrc(cached.blobUrl);
+      } catch {
+        if (!cancelled) setLoadError(true);
+      }
+    };
+
+    load();
+
+    return () => {
+      cancelled = true;
+    };
   }, [src]);
 
   // Reset on task change
@@ -241,7 +277,7 @@ const ImagePreview = observer(({ task, field }: ImagePreviewProps) => {
       onWheel={handleWheel}
       onMouseDown={handleMouseDown}
     >
-      {src && !loadError && (displaySrc || !needsAuth()) && (
+      {src && !loadError && (displaySrc || (!isEmbeddedMode() && !needsAuth())) && (
         <img
           ref={imageRef}
           src={displaySrc || src}
