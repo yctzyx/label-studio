@@ -37,6 +37,44 @@ class MLBackendAuth(models.TextChoices):
     BASIC_AUTH = 'BASIC_AUTH', _('Basic Auth')
 
 
+class SystemModelServiceType(models.TextChoices):
+    VISION = 'vision', _('Vision')
+    LLM = 'llm', _('LLM')
+    CUSTOM = 'custom', _('Custom')
+
+
+class SystemModelService(models.Model):
+    """Platform-level, always-on model service exposed for projects to select.
+
+    Unlike MLBackend, this model is not bound to a project. It represents
+    services operated by the platform, such as the standalone LLM and
+    Grounding DINO preannotation backends.
+    """
+
+    key = models.SlugField(max_length=64, unique=True)
+    title = models.TextField()
+    url = models.TextField()
+    provider = models.CharField(max_length=64, blank=True, default='')
+    service_type = models.CharField(
+        max_length=32,
+        choices=SystemModelServiceType.choices,
+        default=SystemModelServiceType.CUSTOM,
+    )
+    description = models.TextField(blank=True, default='')
+    capabilities = JSONField(default=list, blank=True)
+    is_builtin = models.BooleanField(default=True)
+    enabled = models.BooleanField(default=True)
+    sort_order = models.IntegerField(default=100)
+    created_at = models.DateTimeField(_('created at'), auto_now_add=True)
+    updated_at = models.DateTimeField(_('updated at'), auto_now=True)
+
+    class Meta:
+        ordering = ['sort_order', 'id']
+
+    def __str__(self):
+        return self.title
+
+
 class MLBackend(models.Model):
     """ """
 
@@ -335,26 +373,43 @@ class MLBackend(models.Model):
                         'task': task['id'],
                         'result': r['result'],
                         'score': r.get('score'),
-                        'model_version': r.get('model_version', self.model_version),
+                        'model_version': self.get_prediction_model_version()
+                        or r.get('model_version', self.model_version),
                         'project': task['project'],
                     }
                 )
         return predictions
 
+    def get_prediction_model_version(self):
+        """Prediction.model_version must match project.model_version for DM/API visibility."""
+        return (self.project.model_version or self.title or self.model_version or '').strip()
+
+    def filter_tasks_without_predictions(self, tasks):
+        model_version = self.get_prediction_model_version()
+        if model_version:
+            return tasks.annotate(
+                _mv_predictions_count=Count(
+                    'predictions', filter=Q(predictions__model_version=model_version)
+                )
+            ).filter(_mv_predictions_count=0)
+        return tasks.annotate(predictions_count=Count('predictions')).filter(predictions_count=0)
+
     def predict_tasks(self, tasks):
         model_version = self.update_state()
         if self.not_ready:
-            logger.debug(f'ML backend {self} is not ready')
+            logger.info('ML backend %s is not ready, skip predict_tasks', self)
             return
 
         if isinstance(tasks, list):
             tasks = Task.objects.filter(id__in=[task.id for task in tasks])
 
-        # Preannotation is idempotent for product workflows: once a task has any prediction,
-        # do not call the ML backend again unless the existing prediction is deleted first.
-        tasks = tasks.annotate(predictions_count=Count('predictions')).filter(predictions_count=0)
+        tasks = self.filter_tasks_without_predictions(tasks)
         if not tasks.exists():
-            logger.debug(f'All tasks already have predictions, skip ML backend {self}')
+            logger.info(
+                'Skip ML backend %s: tasks already have predictions for model_version=%r',
+                self,
+                self.get_prediction_model_version(),
+            )
             return model_version
 
         task_ids = list(tasks.values_list('id', flat=True))
@@ -383,7 +438,8 @@ class MLBackend(models.Model):
         if not self.is_interactive:
             result['errors'] = ['Model is not set to be used for interactive preannotations']
             return result
-        if task.predictions.exists():
+        context_results = (context or {}).get('result') if isinstance(context, dict) else None
+        if task.predictions.exists() and not context_results:
             logger.debug(f'Task {task.id} already has predictions, skip interactive ML backend {self}')
             result['data'] = {'result': []}
             return result

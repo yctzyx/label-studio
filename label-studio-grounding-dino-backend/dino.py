@@ -1,6 +1,7 @@
 import base64
 import logging
 import os
+import time
 import pathlib
 import re
 import tempfile
@@ -311,6 +312,16 @@ class GroundingDINO(LabelStudioMLBase):
             logger.error("Error getting image path: %s", safe_log_value(exc))
             return ModelResponse(predictions=[])
 
+        task_id = task.get("id")
+        started_at = time.perf_counter()
+        logger.info(
+            "Inference started: task_id=%s device=%s prompt=%r image=%s",
+            task_id,
+            device,
+            prompt,
+            img_path,
+        )
+
         src, img = load_image(img_path)
         boxes, logits, phrases = predict(
             model=get_groundingdino_model(),
@@ -319,6 +330,13 @@ class GroundingDINO(LabelStudioMLBase):
             box_threshold=thresh_controls["box_threshold"],
             text_threshold=thresh_controls["text_threshold"],
             device=device,
+        )
+        infer_seconds = time.perf_counter() - started_at
+        logger.info(
+            "Inference finished: task_id=%s raw_detections=%d elapsed=%.2fs",
+            task_id,
+            len(phrases),
+            infer_seconds,
         )
 
         height, width, _ = src.shape
@@ -332,6 +350,16 @@ class GroundingDINO(LabelStudioMLBase):
             phrases,
             from_name_r,
             to_name_r,
+        )
+
+        box_count = sum(1 for item in predictions.get("result", []) if item.get("type") == "rectanglelabels")
+        total_seconds = time.perf_counter() - started_at
+        logger.info(
+            "Prediction succeeded: task_id=%s boxes=%d score=%.4f total_elapsed=%.2fs",
+            task_id,
+            box_count,
+            predictions.get("score", 0.0),
+            total_seconds,
         )
 
         if not context:

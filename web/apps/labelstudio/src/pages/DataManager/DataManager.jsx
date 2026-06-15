@@ -15,7 +15,6 @@ import { isDefined } from "../../utils/helpers";
 import { ImportModal } from "../CreateProject/Import/ImportModal";
 import { ExportPage } from "../ExportPage/ExportPage";
 import { APIConfig } from "./api-config";
-
 import "./DataManager.scss";
 
 const loadDependencies = () => [import("@humansignal/datamanager"), import("@humansignal/editor")];
@@ -91,13 +90,19 @@ export const DataManagerPage = ({ ...props }) => {
     if (!project?.id) return;
     if (dataManagerRef.current) return;
 
-    const mlBackends = await api.callApi("mlBackends", {
+    const mlBackendsRaw = await api.callApi("mlBackends", {
       params: { project: project.id },
     });
+    const mlBackends = Array.isArray(mlBackendsRaw)
+      ? mlBackendsRaw
+      : Array.isArray(mlBackendsRaw?.results)
+        ? mlBackendsRaw.results
+        : [];
 
-    const interactiveBacked = (mlBackends ?? []).find(
-      (backend) => backend.is_interactive && backend.title === project.model_version,
-    ) ?? (mlBackends ?? []).find(({ is_interactive }) => is_interactive);
+    const interactiveBacked =
+      mlBackends.find(
+        (backend) => backend.is_interactive && backend.title === project.model_version,
+      ) ?? mlBackends.find(({ is_interactive }) => is_interactive);
     let runtimeUser = null;
 
     try {
@@ -192,7 +197,14 @@ export const DataManagerPage = ({ ...props }) => {
 
     if (interactiveBacked) {
       dataManager.on("lsf:regionFinishedDrawing", (reg, group) => {
-        const { lsf, task, currentAnnotation: annotation } = dataManager.lsf;
+        const lsfWrapper = dataManager.lsf;
+        if (!lsfWrapper?.lsf || !lsfWrapper.task) return;
+        if (lsfWrapper.lsf.isLoading) return;
+        if (!group?.length) return;
+
+        const { lsf, task, currentAnnotation: annotation } = lsfWrapper;
+        if (!annotation || reg?.annotation !== annotation) return;
+
         const ids = group.map((r) => r.cleanId);
         const result = annotation.serializeAnnotation().filter((res) => ids.includes(res.id));
 
@@ -204,12 +216,9 @@ export const DataManagerPage = ({ ...props }) => {
           },
         });
 
-        // we'll check that we are processing the same task
         const wrappedRequest = new Promise(async (resolve, reject) => {
           const response = await suggestionsRequest;
 
-          // right now task might be an old task,
-          // so in order to get a current one we need to get it from lsf
           if (task.id === dataManager.lsf.task.id) {
             resolve(response);
           } else {

@@ -266,6 +266,10 @@ export class LSFWrapper {
       interfaces.push("auto-annotation");
     }
 
+    if (this.project.show_collab_predictions) {
+      interfaces.push("retrieve-predictions");
+    }
+
     if (isFF(FF_DEV_2887)) {
       interfaces.push("annotations:comments");
       interfaces.push("comments:resolve-any");
@@ -326,6 +330,7 @@ export class LSFWrapper {
       onSelectAnnotation: this.onSelectAnnotation,
       onNextTask: this.onNextTask,
       onPrevTask: this.onPrevTask,
+      onRetrieveTaskPredictions: this.onRetrieveTaskPredictions,
 
       ...restOptions,
     };
@@ -678,7 +683,7 @@ export class LSFWrapper {
       } else if (isReviewStream && this.annotations.length > 0) {
         // In review/accept stream, select the annotator's existing annotation for review
         annotation = first;
-      } else if (showPredictions && this.predictions.length > 0 && !this.isInteractivePreannotations) {
+      } else if (showPredictions && this.predictions.length > 0) {
         annotation = cs.addAnnotationFromPrediction(this.predictions[0]);
       } else {
         annotation = cs.createAnnotation();
@@ -687,7 +692,11 @@ export class LSFWrapper {
       if (selectPrediction) {
         annotation = this.predictions.find((p) => p.pk === id);
         annotation ??= first; // if prediction not found, select first annotation and resume existing behaviour
-      } else if (this.annotations.length === 0 && this.predictions.length > 0 && !this.isInteractivePreannotations) {
+      } else if (
+        showPredictions &&
+        this.predictions.length > 0 &&
+        (this.annotations.length === 0 || hasAutoAnnotations)
+      ) {
         const predictionByModelVersion = this.predictions.find((p) => p.createdBy === this.project.model_version);
         annotation = cs.addAnnotationFromPrediction(predictionByModelVersion ?? this.predictions[0]);
       } else if (this.annotations.length > 0 && id && id !== "auto") {
@@ -758,6 +767,43 @@ export class LSFWrapper {
 
     this.lsf.userLabels.init(controls);
   }
+
+  onRetrieveTaskPredictions = async () => {
+    if (!this.task?.id || !this.lsf) return;
+
+    this.lsf.setFlags({ mlPredicting: true });
+
+    try {
+      const taskData = await this.datamanager.apiCall("retrieveTaskPredictions", {
+        taskID: this.task.id,
+      });
+
+      const failed =
+        !taskData ||
+        taskData.error ||
+        (taskData.$meta?.status && taskData.$meta.status >= 400);
+
+      if (failed) {
+        const message =
+          taskData?.response?.detail ||
+          taskData?.detail ||
+          taskData?.error ||
+          "获取预标注失败，请稍后重试。";
+        this.datamanager.invoke("toast", { message: String(message), type: "error" });
+        return;
+      }
+
+      const task = this.datamanager.store.taskStore.applyTaskSnapshot(taskData, this.task.id);
+
+      if (task) {
+        this.selectTask(task, "auto", false);
+      }
+    } catch {
+      this.datamanager.invoke("toast", { message: "获取预标注失败，请稍后重试。", type: "error" });
+    } finally {
+      this.lsf.setFlags({ mlPredicting: false });
+    }
+  };
 
   onLabelStudioLoad = async (ls) => {
     this.datamanager.invoke("labelStudioLoad", ls);

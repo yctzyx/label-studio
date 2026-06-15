@@ -20,17 +20,22 @@ function mapParentSelectionToPayload(selection) {
 export const useImportPage = (project, sample) => {
   const [uploading, setUploadingStatus] = React.useState(false);
   const [fileIds, setFileIds] = React.useState([]);
+  const [pendingLocalFiles, setPendingLocalFiles] = React.useState([]);
   const [parentDatasetSelection, setParentDatasetSelection] = React.useState(null);
   const [_columns, _setColumns] = React.useState([]);
   const addColumns = (cols) => _setColumns((current) => unique(current.concat(cols)));
-  // undefined - no csv added, all good, keep moving
-  // choose - csv added, block modal until user chooses a way to hangle csv
-  // tasks | ts — choice made, all good, this cannot be undone
-  const [csvHandling, setCsvHandling] = React.useState(); // undefined | choose | tasks | ts
+  const [csvHandling, setCsvHandling] = React.useState();
   const uploadDisabled = csvHandling === "choose";
   const hasImportData =
-    (fileIds && fileIds.length > 0) || parentDatasetSelection != null || sample != null;
+    (fileIds && fileIds.length > 0) ||
+    pendingLocalFiles.length > 0 ||
+    parentDatasetSelection != null ||
+    sample != null;
   const api = useAPI();
+
+  const queueLocalFiles = React.useCallback((files) => {
+    setPendingLocalFiles((prev) => unique([...prev, ...files], (a, b) => a.name === b.name && a.size === b.size));
+  }, []);
 
   const onParentDatasetSelect = React.useCallback(
     async (selection) => {
@@ -53,38 +58,93 @@ export const useImportPage = (project, sample) => {
     });
   }, [api, project?.id]);
 
-  // don't use columns from csv if we'll not use it as csv
   const columns = ["choose", "ts"].includes(csvHandling) ? [DEFAULT_COLUMN] : _columns;
 
-  const finishUpload = async () => {
+  const uploadPendingLocalFiles = useCallback(
+    async (targetProject) => {
+      if (!pendingLocalFiles.length || !targetProject?.id) return fileIds;
+
+      return new Promise((resolve, reject) => {
+        const fd = new FormData();
+        for (const file of pendingLocalFiles) {
+          fd.append(file.name, file);
+        }
+
+        importFiles({
+          files: pendingLocalFiles,
+          body: fd,
+          project: targetProject,
+          dontCommitToProject: true,
+          onFinish: (res) => {
+            const ids = res?.file_upload_ids ?? [];
+            setFileIds(ids);
+            setPendingLocalFiles([]);
+            resolve(ids);
+          },
+          onError: (err) => reject(err),
+        });
+      });
+    },
+    [fileIds, pendingLocalFiles],
+  );
+
+  const finishUpload = async (targetProject = project) => {
+    if (!targetProject?.id) return false;
+
     setUploadingStatus(true);
     const onlyParentDataset =
       parentDatasetSelection &&
       (!fileIds || fileIds.length === 0) &&
+      pendingLocalFiles.length === 0 &&
       csvHandling !== "choose";
 
-    if (onlyParentDataset) {
-      // 后端绑定父平台数据集与 LS 任务源时再调用专用接口；此处仅完成创建项目流
+    try {
+      let uploadIds = fileIds;
+
+      if (pendingLocalFiles.length) {
+        uploadIds = await uploadPendingLocalFiles(targetProject);
+      }
+
+      if (onlyParentDataset) {
+        const startRes = await api.callApi("syncParentDataset", {
+          params: { pk: targetProject.id },
+          body: {},
+          errorFilter: () => true,
+        });
+        if (startRes?.error || startRes === null) {
+          setUploadingStatus(false);
+          return false;
+        }
+        setUploadingStatus(false);
+        return true;
+      }
+
+      if (!uploadIds?.length) {
+        setUploadingStatus(false);
+        return true;
+      }
+
+      const imported = await api.callApi("reimportFiles", {
+        params: {
+          pk: targetProject.id,
+        },
+        body: {
+          file_upload_ids: uploadIds,
+          files_as_tasks_list: csvHandling === "tasks",
+        },
+      });
+
       setUploadingStatus(false);
-      return true;
+      return imported;
+    } catch {
+      setUploadingStatus(false);
+      return false;
     }
-
-    const imported = await api.callApi("reimportFiles", {
-      params: {
-        pk: project.id,
-      },
-      body: {
-        file_upload_ids: fileIds,
-        files_as_tasks_list: csvHandling === "tasks",
-      },
-    });
-
-    setUploadingStatus(false);
-    return imported;
   };
 
   const uploadSample = useCallback(
     async (sample, onStart, onFinish) => {
+      if (!project?.id) return;
       onStart?.();
       const url = sample.url;
       const body = new URLSearchParams({ url });
@@ -100,7 +160,6 @@ export const useImportPage = (project, sample) => {
 
   const pageProps = {
     onWaiting: setUploadingStatus,
-    // onDisableSubmit: onDisableSubmit,
     highlightCsvHandling: uploadDisabled,
     addColumns,
     csvHandling,
@@ -110,6 +169,8 @@ export const useImportPage = (project, sample) => {
     parentDatasetSelection,
     onParentDatasetSelect,
     onParentDatasetClear,
+    pendingLocalFiles,
+    onQueueLocalFiles: queueLocalFiles,
   };
 
   return {
@@ -119,6 +180,7 @@ export const useImportPage = (project, sample) => {
     hasImportData,
     finishUpload,
     fileIds,
+    parentDatasetSelection,
     pageProps,
     uploadSample,
   };

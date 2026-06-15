@@ -8,6 +8,7 @@ import { FF_BULK_ANNOTATION, FF_DEV_3873, isFF } from "../../utils/feature-flags
 import { AnnotationsCarousel } from "../AnnotationsCarousel/AnnotationsCarousel";
 import { ViewAllToggle } from "../AnnotationsCarousel/ViewAllToggle";
 import { DynamicPreannotationsToggle } from "../AnnotationTab/DynamicPreannotationsToggle";
+import { ManualPreannotationButton } from "../AnnotationTab/ManualPreannotationButton";
 import { Actions } from "./Actions";
 import { Annotations } from "./Annotations";
 import { Controls } from "./Controls";
@@ -77,6 +78,7 @@ export const TopBar = observer(({ store }) => {
           <div className={cn("topbar").elem("group").toClassName()}>
             {!isViewAll && (
               <div className={cn("topbar").elem("section").toClassName()}>
+                <ManualPreannotationButton />
                 <DynamicPreannotationsToggle />
               </div>
             )}

@@ -5,6 +5,8 @@ import { modal } from "../../components/Modal/Modal";
 import { ConfigContext } from "../../providers/ConfigProvider";
 import { FF_UNSAVED_CHANGES, isFF } from "../../utils/feature-flags";
 import { absoluteURL, removePrefix } from "../../utils/helpers";
+import { isEmbeddedLayout } from "../../utils/getMainPlatformToken";
+import { notifyGlobalError } from "../../utils/globalErrorNotify";
 import { clearScriptsCache, isScriptValid, reInsertScripts, replaceScript } from "../../utils/scripts";
 import { UNBLOCK_HISTORY_MESSAGE } from "../App";
 
@@ -30,35 +32,46 @@ const loadAsyncPage = async (url) => {
     }
 
     if (!response.ok) {
-      modal({
-        body: () => (
-          <ErrorWrapper
-            title={`Error ${response.status}: ${response.statusText}`}
-            errorId={response.status}
-            stacktrace={`Cannot load url ${url}\n\n${html}`}
-          />
-        ),
-        allowClose: false,
-        style: { width: 680 },
-      });
+      const title = `Error ${response.status}: ${response.statusText}`;
+      if (
+        !notifyGlobalError(title, `Cannot load url ${url}`, { forceToast: isEmbeddedLayout() })
+      ) {
+        modal({
+          body: () => (
+            <ErrorWrapper
+              title={title}
+              errorId={response.status}
+              stacktrace={`Cannot load url ${url}\n\n${html}`}
+            />
+          ),
+          allowClose: false,
+          style: { width: 680 },
+        });
+      }
       return null;
     }
 
     pageCache.set(url, html);
     return html;
   } catch (err) {
-    modal({
-      body: () => (
-        <ErrorWrapper
-          possum={false}
-          title={"Connection refused"}
-          message={"Server not responding. Is it still running?"}
-        />
-      ),
-      simple: true,
-      allowClose: false,
-      style: { width: 680 },
-    });
+    if (
+      !notifyGlobalError("Connection refused", "Server not responding. Is it still running?", {
+        forceToast: isEmbeddedLayout(),
+      })
+    ) {
+      modal({
+        body: () => (
+          <ErrorWrapper
+            possum={false}
+            title={"Connection refused"}
+            message={"Server not responding. Is it still running?"}
+          />
+        ),
+        simple: true,
+        allowClose: false,
+        style: { width: 680 },
+      });
+    }
     return null;
   }
 };

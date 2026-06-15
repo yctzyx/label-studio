@@ -1,58 +1,78 @@
 import React, { Component } from "react";
+import { Button } from "@humansignal/ui";
 import { ErrorWrapper } from "../components/Error/Error";
 import { Modal } from "../components/Modal/ModalPopup";
 import { captureException } from "../config/Sentry";
 import { isFF } from "../utils/feature-flags";
 import { IMPROVE_GLOBAL_ERROR_MESSAGES } from "../providers/ApiProvider";
+import { isEmbeddedLayout } from "../utils/getMainPlatformToken";
+import { notifyGlobalError } from "../utils/globalErrorNotify";
+import { cn } from "../utils/bem";
+import "./ErrorBoundary.scss";
 
 export const ErrorContext = React.createContext();
 
 export default class ErrorBoundary extends Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, toastNotified: false };
   }
 
   static getDerivedStateFromError(error) {
-    // Update state so the next render will show the fallback UI.
     return { hasError: true, error };
   }
 
   componentDidCatch(error, { componentStack }) {
     console.error(error);
 
-    // Capture the error in Sentry, so we can fix it directly
-    // Don't make the users copy and paste the stacktrace, it's not actionable
-    // Check if error has sentry_skip property (e.g., from ConfigurationError)
     captureException(error, {
       extra: {
         component_stacktrace: componentStack,
         sentry_skip: error.sentry_skip || false,
       },
     });
+
+    const message = error?.message ? String(error.message) : String(error);
+    if (isEmbeddedLayout()) {
+      notifyGlobalError("Runtime error", message);
+    }
+
     this.setState({
       error,
       hasError: true,
       errorInfo: componentStack,
+      toastNotified: true,
     });
   }
 
   render() {
     if (this.state.hasError) {
       const { error, errorInfo } = this.state;
+      const message = error?.message ? String(error.message) : String(error);
 
       const goBack = () => {
-        // usually this will trigger React Router in the broken app, which is not helpful
         history.back();
-        // so we reload app totally on that previous page after some delay for Router's stuff
         setTimeout(() => location.reload(), 32);
       };
 
-      // We will capture the stacktrace in Sentry, so we don't need to show it in the modal
-      // It is not actionable to the user, let's not show it
       const stacktrace = isFF(IMPROVE_GLOBAL_ERROR_MESSAGES)
         ? undefined
         : `${errorInfo ? `Component Stack: ${errorInfo}` : ""}\n\n${this.state.error?.stack ?? ""}`;
+
+      // Embed: toast + compact inline banner — do not block parent platform with a modal.
+      if (isEmbeddedLayout()) {
+        return (
+          <div className={cn("embed-error-fallback").toClassName()}>
+            <p className={cn("embed-error-fallback").elem("title").toClassName()}>页面加载出错</p>
+            <p className={cn("embed-error-fallback").elem("message").toClassName()}>{message}</p>
+            <div className={cn("embed-error-fallback").elem("actions").toClassName()}>
+              <Button size="small" onClick={() => location.reload()}>
+                重新加载
+              </Button>
+            </div>
+          </div>
+        );
+      }
 
       return (
         <Modal onHide={() => location.reload()} style={{ width: "60vw" }} visible bare>

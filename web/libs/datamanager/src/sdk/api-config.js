@@ -61,6 +61,12 @@ export const APIConfig = {
     /** Single task (sample) */
     task: "/tasks/:taskID",
 
+    /** Run ML backend for current task (manual pre-annotation in labeling UI) */
+    retrieveTaskPredictions: {
+      path: "/../tasks/:taskID/retrieve-predictions/",
+      method: "post",
+    },
+
     /** Next task (labelstream, default sequential) */
     nextTask: "/tasks/next",
 

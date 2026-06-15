@@ -62,7 +62,10 @@ def retrieve_tasks_predictions(project, queryset, **kwargs):
         }
 
     task_ids = list(queryset.values_list('id', flat=True))
-    eligible_qs = queryset.annotate(predictions_count=Count('predictions')).filter(predictions_count=0)
+    if backend is not None:
+        eligible_qs = backend.filter_tasks_without_predictions(queryset)
+    else:
+        eligible_qs = queryset.annotate(predictions_count=Count('predictions')).filter(predictions_count=0)
     eligible_ids = list(eligible_qs.values_list('id', flat=True))
     eligible_count = len(eligible_ids)
     if eligible_count == 0:

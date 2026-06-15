@@ -19,7 +19,7 @@ from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiExample, OpenApiParameter, OpenApiResponse, extend_schema
 from projects.functions.stream_history import fill_history_annotation
 from projects.models import Project
-from rest_framework import generics, viewsets
+from rest_framework import generics, status, viewsets
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
@@ -323,15 +323,7 @@ class TaskAPI(generics.RetrieveUpdateDestroyAPIView):
 
     def get(self, request, pk):
         context = self.get_retrieve_serializer_context(request)
-        context['project'] = project = self.task.project
-
-        # get prediction
-        if (
-            project.evaluate_predictions_automatically or project.show_collab_predictions
-        ) and not self.task.predictions.exists():
-            evaluate_predictions([self.task])
-            # refresh task from db with prefetches
-            self.task = self.get_object()
+        context['project'] = self.task.project
 
         serializer = self.get_serializer_class()(
             self.task, many=False, context=context, expand=['annotations.completed_by']
@@ -382,6 +374,63 @@ class TaskAPI(generics.RetrieveUpdateDestroyAPIView):
     @extend_schema(exclude=True)
     def put(self, request, *args, **kwargs):
         return super(TaskAPI, self).put(request, *args, **kwargs)
+
+
+@method_decorator(
+    name='post',
+    decorator=extend_schema(
+        tags=['Tasks'],
+        summary='Retrieve ML predictions for a task',
+        description='Run the project ML backend for a single task and return updated task data with predictions.',
+    ),
+)
+class TaskRetrievePredictionsAPI(generics.GenericAPIView):
+    permission_required = ViewClassPermission(
+        POST=all_permissions.tasks_view,
+    )
+
+    def post(self, request, pk):
+        task = generics.get_object_or_404(Task, pk=pk)
+        self.check_object_permissions(request, task)
+        project = task.project
+
+        if not project.ml_backends.exists():
+            return Response(
+                {'detail': '当前项目未配置大模型或机器学习服务。'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if task.predictions.exists():
+            return Response(
+                {'detail': '当前任务已有预标注结果。'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        evaluate_predictions([task])
+
+        task = (
+            Task.objects.filter(pk=task.pk)
+            .prefetch_related(
+                'annotations',
+                'predictions',
+                'annotations__completed_by',
+                'project',
+                'project__ml_backends',
+            )
+            .first()
+        )
+
+        context = {
+            'resolve_uri': True,
+            'predictions': True,
+            'annotations': True,
+            'drafts': True,
+            'request': request,
+        }
+        serializer = DataManagerTaskSerializer(
+            task, many=False, context=context, expand=['annotations.completed_by']
+        )
+        return Response(serializer.data)
 
 
 @method_decorator(

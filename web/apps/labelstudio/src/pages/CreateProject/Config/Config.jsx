@@ -533,6 +533,14 @@ const Configurator = ({
     const validate = async () => {
       if (!configToCheck) return;
 
+      if (!project?.id) {
+        setError(null);
+        setLoading(false);
+        setConfigToDisplay(configToCheck);
+        lastValidatedConfig.current = configToCheck;
+        return;
+      }
+
       setLoading(true);
 
       const validation = await api.callApi("validateConfig", {

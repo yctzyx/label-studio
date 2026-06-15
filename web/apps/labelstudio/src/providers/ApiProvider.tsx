@@ -9,7 +9,7 @@ import type { ApiResponse } from "@humansignal/core/lib/api-proxy/types";
 import { ErrorWrapper } from "../components/Error/Error";
 import { modal } from "../components/Modal/Modal";
 import { API_CONFIG } from "../config/ApiConfig";
-import { getMainPlatformAuthHeaders, isWujieEmbed } from "../utils/getMainPlatformToken";
+import { getMainPlatformAuthHeaders, isEmbeddedLayout, isWujieEmbed } from "../utils/getMainPlatformToken";
 
 // Expose auth headers for image requests (ImageCache, FileLoader) when embedded - gateway requires token
 declare global {
@@ -21,10 +21,15 @@ import { absoluteURL, isDefined } from "../utils/helpers";
 import { FF_IMPROVE_GLOBAL_ERROR_MESSAGES, isFF } from "../utils/feature-flags";
 import { ToastType, useToast } from "@humansignal/ui";
 import { captureException } from "../config/Sentry";
+import {
+  API_ERROR_TOAST_DURATION,
+  formatGlobalErrorMessage,
+  notifyGlobalError,
+  registerGlobalErrorToast,
+} from "../utils/globalErrorNotify";
 
+export { API_ERROR_TOAST_DURATION };
 export const IMPROVE_GLOBAL_ERROR_MESSAGES = isFF(FF_IMPROVE_GLOBAL_ERROR_MESSAGES);
-// Duration for toast errors
-export const API_ERROR_TOAST_DURATION = 10000;
 
 // Initialize API instance with Label Studio configuration.
 // When embedded via 无界 (wujie), getCommonHeaders adds Authorization: <token> (no Bearer prefix).
@@ -107,15 +112,26 @@ export const ApiProvider = forwardRef<ApiContextType, PropsWithChildren<Record<s
         });
       }
 
-      // Show toast for 4xx without validation errors
+      const toastMessage = formatGlobalErrorMessage(errorDetails.title, errorDetails.message);
+
+      // Embed: always toast — avoid blocking modal over parent platform chrome.
+      if (isEmbeddedLayout()) {
+        toast?.show({
+          message: toastMessage,
+          type: ToastType.error,
+          duration: API_ERROR_TOAST_DURATION,
+        });
+        return;
+      }
+
+      // Standalone: toast for 4xx without validation errors; modal otherwise.
       if (IMPROVE_GLOBAL_ERROR_MESSAGES && is4xx && !containsValidationErrors) {
         toast?.show({
-          message: `${errorDetails.title}: ${errorDetails.message}`,
+          message: toastMessage,
           type: ToastType.error,
           duration: API_ERROR_TOAST_DURATION,
         });
       } else {
-        // Show modal for validation errors or non-4xx
         displayErrorModal(errorDetails);
       }
     },
@@ -166,10 +182,16 @@ export const ApiProvider = forwardRef<ApiContextType, PropsWithChildren<Record<s
     }
   }, [toast]);
 
-  // When embedded (无界), provide auth headers for image requests (ImageCache, FileLoader)
-  // so /data/upload/* and other media requests include Authorization for the gateway
+  // Register toast for imperative global errors (ErrorBoundary, AsyncPage, etc.)
   useEffect(() => {
-    if (isWujieEmbed()) {
+    registerGlobalErrorToast(toast?.show ?? null);
+    return () => registerGlobalErrorToast(null);
+  }, [toast]);
+
+  // When embedded (无界 / iframe), provide auth headers for image requests (ImageCache, FileLoader)
+  // so /data/upload/* and parent-dataset proxy requests include Authorization for the gateway
+  useEffect(() => {
+    if (isEmbeddedLayout()) {
       window.__LS_IMAGE_REQUEST_HEADERS__ = () => getMainPlatformAuthHeaders();
     }
     return () => {

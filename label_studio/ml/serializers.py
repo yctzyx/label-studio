@@ -3,7 +3,7 @@
 from core.utils.io import validate_upload_url
 from django.conf import settings
 from drf_spectacular.utils import extend_schema_field
-from ml.models import MLBackend, MLBackendAuth
+from ml.models import MLBackend, MLBackendAuth, SystemModelService
 from rest_framework import serializers
 
 
@@ -110,6 +110,48 @@ class MLBackendSerializer(serializers.ModelSerializer):
             'updated_at',
             'auto_update',
             'project',
+        ]
+
+
+class SystemModelServiceSerializer(serializers.ModelSerializer):
+    readable_service_type = serializers.SerializerMethodField()
+    connectivity_status = serializers.SerializerMethodField()
+    connectivity_label = serializers.SerializerMethodField()
+
+    def get_readable_service_type(self, obj):
+        return obj.get_service_type_display()
+
+    def _get_connectivity_status(self, obj):
+        if not hasattr(obj, '_system_service_connectivity_status'):
+            result = MLBackend.healthcheck_(url=obj.url)
+            obj._system_service_connectivity_status = 'error' if result.is_error else 'ok'
+        return obj._system_service_connectivity_status
+
+    def get_connectivity_status(self, obj):
+        return self._get_connectivity_status(obj)
+
+    def get_connectivity_label(self, obj):
+        return '异常' if self._get_connectivity_status(obj) == 'error' else '正常'
+
+    class Meta:
+        model = SystemModelService
+        fields = [
+            'id',
+            'key',
+            'title',
+            'url',
+            'provider',
+            'service_type',
+            'readable_service_type',
+            'description',
+            'capabilities',
+            'connectivity_status',
+            'connectivity_label',
+            'is_builtin',
+            'enabled',
+            'sort_order',
+            'created_at',
+            'updated_at',
         ]
 
 

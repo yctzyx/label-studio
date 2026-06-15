@@ -2,7 +2,7 @@ import { Spinner } from "@humansignal/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
-import { useUpdatePageTitle } from "@humansignal/core";
+import { getVisitedProjectIds, useUpdatePageTitle } from "@humansignal/core";
 import { useAPI } from "../../providers/ApiProvider";
 import { cn } from "../../utils/bem";
 import "./MyTasksPage.scss";
@@ -15,13 +15,67 @@ const STAGES = [
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100, 200];
 
+const MEDIA_PATH_RE = /^(https?:\/\/|\/\/|\/|s3:|gs:)/i;
+const MEDIA_HINT_RE = /\/data\/upload\/|\/storage-data\/|\.(jpe?g|png|gif|webp|bmp|svg|mp4|webm|wav|mp3|m4a|txt|pdf|json)(\?|$)/i;
+
+function isMediaLikeString(value) {
+  return MEDIA_PATH_RE.test(value) || MEDIA_HINT_RE.test(value);
+}
+
+/** 从上传路径/URL 提取可读文件名（解码中文、去掉 upload uuid 前缀） */
+function humanizeUploadFilename(value) {
+  if (!value || typeof value !== "string") return "";
+
+  let segment = value.trim();
+
+  try {
+    if (/^https?:\/\//i.test(segment)) {
+      segment = new URL(segment).pathname;
+    }
+    segment = segment.split("?")[0].split("#")[0];
+    const parts = segment.split("/").filter(Boolean);
+    segment = parts[parts.length - 1] ?? segment;
+    segment = decodeURIComponent(segment);
+  } catch {
+    // keep raw segment
+  }
+
+  segment = segment.replace(/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}-/i, "");
+  segment = segment.replace(/^[0-9a-f]{8}-/i, "");
+
+  return segment.trim();
+}
+
 function taskDisplayName(task) {
+  const metaDesc = task?.meta?.description?.trim();
+  if (metaDesc) return metaDesc.slice(0, 64);
+
   const data = task?.data;
   if (data && typeof data === "object") {
-    const first = Object.values(data).find((v) => typeof v === "string" && v.trim());
-    if (first) return first.slice(0, 64);
+    const fields = Object.values(data).filter((v) => typeof v === "string" && v.trim());
+
+    const plainText = fields.find((v) => !isMediaLikeString(v));
+    if (plainText) return plainText.trim().slice(0, 64);
+
+    for (const value of fields) {
+      const name = humanizeUploadFilename(value);
+      if (name) return name.slice(0, 64);
+    }
   }
-  return task?.id != null ? `Task #${task.id}` : "—";
+
+  return task?.id != null ? `任务 #${task.id}` : "—";
+}
+
+/** 悬停提示：保留原始数据摘要 */
+function taskDisplayTitle(task) {
+  const data = task?.data;
+  if (!data || typeof data !== "object") return undefined;
+
+  const parts = Object.entries(data)
+    .filter(([, v]) => v != null && String(v).trim())
+    .map(([k, v]) => `${k}: ${String(v)}`);
+
+  return parts.length ? parts.join("\n") : undefined;
 }
 
 function formatDate(iso) {
@@ -65,6 +119,25 @@ const STAGE_STATUS_OPTIONS = {
   accept: ["in_accept"],
 };
 
+function pickDefaultProjectId(projectList) {
+  if (!projectList?.length) return "";
+
+  const userId = typeof window !== "undefined" ? window.APP_SETTINGS?.user?.id : undefined;
+  const visited = getVisitedProjectIds(userId);
+
+  for (const id of visited) {
+    if (projectList.some((p) => p.id === id)) return String(id);
+  }
+
+  const sorted = [...projectList].sort((a, b) => {
+    const ta = a.created_at ? Date.parse(a.created_at) : 0;
+    const tb = b.created_at ? Date.parse(b.created_at) : 0;
+    return tb - ta;
+  });
+
+  return String(sorted[0]?.id ?? projectList[0].id);
+}
+
 export const MyTasksPage = () => {
   const { t } = useTranslation();
   const api = useAPI();
@@ -101,14 +174,16 @@ export const MyTasksPage = () => {
       const projRes = await api.callApi("projects", {
         params: {
           page_size: 200,
-          include: ["id", "title", "task_workflow_enabled", "color"].join(","),
+          include: ["id", "title", "task_workflow_enabled", "color", "created_at"].join(","),
         },
       });
       const list = projRes?.results ?? [];
       const wfProjects = list.filter(
         (p) => p.task_workflow_enabled === true || p.taskWorkflowEnabled === true,
       );
-      setProjects(wfProjects.length ? wfProjects : list);
+      const nextProjects = wfProjects.length ? wfProjects : list;
+      setProjects(nextProjects);
+      setSelectedProjectId((prev) => prev || pickDefaultProjectId(nextProjects));
     } catch (e) {
       setProjectsError(e?.message || String(e));
       setProjects([]);
@@ -455,6 +530,7 @@ export const MyTasksPage = () => {
                                 className={root.elem("link-action").toClassName()}
                                 to={dataHref(projectId, task.id, stage, wfStage)}
                                 data-external
+                                title={taskDisplayTitle(task)}
                               >
                                 {taskDisplayName(task)}
                               </Link>

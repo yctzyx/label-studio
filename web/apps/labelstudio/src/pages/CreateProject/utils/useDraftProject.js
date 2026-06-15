@@ -1,40 +1,19 @@
-import { projectAtom } from "apps/labelstudio/src/providers/ProjectProvider";
-import { useAtom } from "jotai";
-import React, { useEffect } from "react";
-import { useAPI } from "../../../providers/ApiProvider";
+import React from "react";
 
+const DEFAULT_LOCAL_PROJECT = {
+  label_config: "<View></View>",
+};
+
+/**
+ * Local-only project draft for the create wizard.
+ * No API call until the user clicks Save in CreateProject.
+ */
 export const useDraftProject = () => {
-  const api = useAPI();
-  const [project, setProject] = useAtom(projectAtom);
+  const [project, setProject] = React.useState(() => ({ ...DEFAULT_LOCAL_PROJECT }));
 
-  const fetchDraftProject = React.useCallback(async () => {
-    const response = await api.callApi("projects");
-
-    // always create the new one
-    const projects = response?.results ?? [];
-    const lastIndex = projects.length;
-    let projectNumber = lastIndex + 1;
-    let projectName = `New Project #${projectNumber}`;
-
-    // dirty hack to get proper non-duplicate name
-    while (projects.find(({ title }) => title === projectName)) {
-      projectNumber++;
-      projectName = `New Project #${projectNumber}`;
-    }
-
-    const draft = await api.callApi("createProject", {
-      body: {
-        title: projectName,
-        is_draft: true,
-      },
-    });
-
-    if (draft) setProject(draft);
+  const resetProject = React.useCallback(() => {
+    setProject({ ...DEFAULT_LOCAL_PROJECT });
   }, []);
 
-  useEffect(() => {
-    fetchDraftProject();
-  }, []);
-
-  return { project, setProject };
+  return { project, setProject, resetProject };
 };

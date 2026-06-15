@@ -195,6 +195,7 @@ export const VisionPreannotationSettings = () => {
       url: state.backendUrl,
       is_interactive: state.isInteractive,
       auto_update: false,
+      timeout: 120,
       extra_params: buildExtraParams(),
     };
     const action = backendId ? "updateMLBackend" : "addMLBackend";

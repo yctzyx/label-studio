@@ -1,10 +1,20 @@
 import { types, getParent, addDisposer, isAlive } from "mobx-state-tree";
 import { FileLoader } from "../../../utils/FileLoader";
-import { imageCache } from "@humansignal/core";
+import { imageCache, needsImageAuthHeaders } from "@humansignal/core";
 import { clamp } from "../../../utils/utilities";
 import { FF_IMAGE_MEMORY_USAGE, isFF } from "../../../utils/feature-flags";
 
 const fileLoader = new FileLoader();
+
+const resetStalePreloadState = (self) => {
+  self.releaseImage();
+  self.setCurrentSrc(undefined);
+  self.setDownloaded(false);
+  self.setImageLoaded(false);
+  self.setDownloading(false);
+  self.error = false;
+  self._retryAttempted = false;
+};
 
 export const ImageEntity = types
   .model("ImageEntity", {
@@ -129,6 +139,11 @@ export const ImageEntity = types
         })
         .catch(() => {
           if (!isAlive(self)) return;
+          // Gateway-protected images require auth headers; <img src> cannot attach them
+          if (needsImageAuthHeaders()) {
+            self.markAsFailed();
+            return;
+          }
           // Fallback to old behavior if global cache fails
           if (isFF(FF_IMAGE_MEMORY_USAGE)) {
             const img = new Image();
@@ -162,7 +177,18 @@ export const ImageEntity = types
         return true;
       }
 
-      if (isFF(FF_IMAGE_MEMORY_USAGE)) return self.currentSrc !== undefined;
+      if (isFF(FF_IMAGE_MEMORY_USAGE) && self.currentSrc !== undefined) {
+        const isStaleBlob =
+          self.currentSrc.startsWith("blob:") &&
+          (imageCache.isRevokedBlobUrl(self.currentSrc) || !imageCache.get(self.src));
+
+        if (isStaleBlob) {
+          resetStalePreloadState(self);
+          return false;
+        }
+
+        return true;
+      }
 
       if (fileLoader.isError(self.src)) {
         self.markAsFailed();
@@ -354,5 +380,36 @@ export const ImageEntity = types
       addDisposer(self, () => {
         self.releaseImage();
       });
+
+      if (typeof document !== "undefined") {
+        const reloadIfNeeded = () => {
+          if (!isAlive(self) || !self.src) return;
+          if (document.visibilityState === "hidden") return;
+
+          const staleBlob =
+            self.currentSrc?.startsWith("blob:") &&
+            (imageCache.isRevokedBlobUrl(self.currentSrc) || !imageCache.get(self.src));
+
+          const authLoadFailed = self.error && needsImageAuthHeaders();
+
+          if (!staleBlob && !authLoadFailed) return;
+
+          resetStalePreloadState(self);
+          self.preload();
+        };
+
+        const onVisible = () => {
+          if (document.visibilityState !== "visible") return;
+          imageCache.evictExpired();
+          reloadIfNeeded();
+        };
+
+        document.addEventListener("visibilitychange", onVisible);
+        window.addEventListener("focus", reloadIfNeeded);
+        addDisposer(self, () => {
+          document.removeEventListener("visibilitychange", onVisible);
+          window.removeEventListener("focus", reloadIfNeeded);
+        });
+      }
     },
   }));

@@ -156,6 +156,8 @@ export const ImportPage = ({
   parentDatasetSelection,
   onParentDatasetSelect,
   onParentDatasetClear,
+  pendingLocalFiles = [],
+  onQueueLocalFiles,
 }) => {
   const [error, setError] = useState();
   const [parentSyncing, setParentSyncing] = useState(false);
@@ -181,9 +183,10 @@ export const ImportPage = ({
       };
     }
     if (action.uploaded) {
+      const uploaded = Array.isArray(action.uploaded) ? action.uploaded : [action.uploaded].filter(Boolean);
       return {
         ...state,
-        uploaded: unique([...state.uploaded, ...action.uploaded], (a, b) => a.id === b.id),
+        uploaded: unique([...state.uploaded, ...uploaded], (a, b) => a.id === b.id),
       };
     }
     if (action.ids) {
@@ -210,7 +213,11 @@ export const ImportPage = ({
   const showSampleRow = Boolean(sample);
 
   const visibleRowCount =
-    (showParentRow ? 1 : 0) + (showSampleRow ? 1 : 0) + files.uploaded.length + files.uploading.length;
+    (showParentRow ? 1 : 0) +
+    (showSampleRow ? 1 : 0) +
+    files.uploaded.length +
+    files.uploading.length +
+    pendingLocalFiles.length;
 
   useEffect(() => {
     return () => {
@@ -370,6 +377,11 @@ export const ImportPage = ({
 
   const importFilesImmediately = useCallback(
     async (files, body) => {
+      if (!project?.id) {
+        onQueueLocalFiles?.(files);
+        onWaiting?.(false);
+        return;
+      }
       importFiles({
         files,
         body,
@@ -381,14 +393,14 @@ export const ImportPage = ({
         dontCommitToProject,
       });
     },
-    [project, onFinish, onError],
+    [project, onFinish, onError, onQueueLocalFiles, onWaiting, dontCommitToProject],
   );
 
   const sendFiles = useCallback(
     (files) => {
       setError(null);
       onWaiting?.(true);
-      files = [...files]; // they can be array-like object
+      files = [...files];
       const fd = new FormData();
 
       for (const f of files) {
@@ -398,9 +410,14 @@ export const ImportPage = ({
         }
         fd.append(f.name, f);
       }
+
+      if (!project?.id && files.some((f) => /\.[ct]sv$/i.test(f.name)) && !csvHandling) {
+        setCsvHandling("choose");
+      }
+
       return importFilesImmediately(files, fd);
     },
-    [importFilesImmediately, t, onError],
+    [importFilesImmediately, t, onError, project?.id, csvHandling],
   );
 
   const onUpload = useCallback(
@@ -421,16 +438,15 @@ export const ImportPage = ({
   );
 
   useEffect(() => {
-    if (project?.id !== undefined) {
-      loadFilesList().then((files) => {
-        if (csvHandling) return;
-        // empirical guess on start if we have some possible tasks list/structured data problem
-        if (Array.isArray(files) && files.some(({ file }) => /\.[ct]sv$/.test(file))) {
-          setCsvHandling("choose");
-        }
-      });
-    }
-  }, [project?.id, loadFilesList]);
+    if (!project?.id) return;
+    loadFilesList().then((files) => {
+      if (csvHandling) return;
+      // empirical guess on start if we have some possible tasks list/structured data problem
+      if (Array.isArray(files) && files.some(({ file }) => /\.[ct]sv$/.test(file))) {
+        setCsvHandling("choose");
+      }
+    });
+  }, [project?.id, loadFilesList, csvHandling]);
 
   useEffect(() => {
     if (dataSourceTab === "parent" && !isParentDatasetImportEnabled()) {
@@ -454,7 +470,6 @@ export const ImportPage = ({
     return tabs;
   }, [t]);
 
-  if (!project) return null;
   if (!show) return null;
 
   const csvProps = {
@@ -746,6 +761,37 @@ export const ImportPage = ({
                             </td>
                           </tr>
                         )}
+                        {pendingLocalFiles.map((file) => {
+                          const truncatedFilename = truncate(
+                            file.name,
+                            FILENAME_TRUNCATE_START,
+                            FILENAME_TRUNCATE_END,
+                            "...",
+                          );
+                          return (
+                            <tr key={`pending-${file.name}-${file.size}`}>
+                              <td className="align-middle">
+                                <span className="text-body-small text-neutral-content">{t("import.sourceLocal")}</span>
+                              </td>
+                              <td className={`${importClass.elem("file-name")} align-middle max-w-[240px]`}>
+                                <Tooltip title={file.name}>
+                                  <Typography variant="body" size="small" className="truncate">
+                                    {truncatedFilename}
+                                  </Typography>
+                                </Tooltip>
+                              </td>
+                              <td className="align-middle text-neutral-content-subtler text-body-small">—</td>
+                              <td className={`${importClass.elem("file-size")} align-middle`}>
+                                <Typography variant="body" size="smaller" className="text-nowrap text-neutral-content-subtle">
+                                  {file.size ? formatFileSize(file.size) : ""}
+                                </Typography>
+                              </td>
+                              <td className="align-middle text-right text-neutral-content-subtler text-body-small">
+                                {t("import.pendingUpload", { defaultValue: "Pending" })}
+                              </td>
+                            </tr>
+                          );
+                        })}
                         {files.uploaded.map((file) => {
                           const truncatedFilename = truncate(
                             file.file,

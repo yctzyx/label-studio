@@ -76,6 +76,8 @@ function onNextTask(nextTaskId) {}
 
 function onPrevTask(prevTaskId) {}
 
+function onRetrieveTaskPredictions() {}
+
 export default {
   onDeleteAnnotation,
   onEntityCreate,
@@ -94,4 +96,5 @@ export default {
   onStorageInitialized,
   onNextTask,
   onPrevTask,
+  onRetrieveTaskPredictions,
 };

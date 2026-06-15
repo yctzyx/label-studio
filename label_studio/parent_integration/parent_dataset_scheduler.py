@@ -8,19 +8,27 @@ import threading
 from typing import Optional
 
 from django.conf import settings
-from django.db import OperationalError, close_old_connections, connections
 
 from parent_integration.parent_dataset_sync import (
-    parent_dataset_source_db,
     parent_dataset_db,
+    parent_dataset_source_db,
     sync_parent_dataset_tables,
 )
+from parent_integration.scheduler_utils import run_sync_with_retries
 
 logger = logging.getLogger(__name__)
 
 _thread: Optional[threading.Thread] = None
 _thread_lock = threading.Lock()
 _stop_event = threading.Event()
+
+
+def _dataset_db_aliases() -> tuple[str, ...]:
+    source_db = parent_dataset_source_db()
+    target_db = parent_dataset_db()
+    if source_db == target_db:
+        return (source_db,)
+    return (source_db, target_db)
 
 
 def _scheduler_loop(interval_seconds: int, prune: bool) -> None:
@@ -33,30 +41,12 @@ def _scheduler_loop(interval_seconds: int, prune: bool) -> None:
     )
     _stop_event.wait(interval_seconds)
     while not _stop_event.is_set():
-        try:
-            close_old_connections()
-            stats = sync_parent_dataset_tables(dry_run=False, prune=prune)
-            logger.info('[ParentDatasetSync] synced: %s', stats)
-        except OperationalError as e:
-            if 'server has gone away' in str(e).lower():
-                for alias in (parent_dataset_source_db(), parent_dataset_db()):
-                    logger.warning('[ParentDatasetSync] stale DB connection on alias=%s, reconnecting', alias)
-                    try:
-                        connections[alias].close()
-                    except Exception:
-                        logger.debug('[ParentDatasetSync] close connection failed', exc_info=True)
-                try:
-                    close_old_connections()
-                    stats = sync_parent_dataset_tables(dry_run=False, prune=prune)
-                    logger.info('[ParentDatasetSync] synced after reconnect: %s', stats)
-                    _stop_event.wait(interval_seconds)
-                    continue
-                except Exception:
-                    logger.exception('[ParentDatasetSync] retry after reconnect failed')
-            else:
-                logger.exception('[ParentDatasetSync] scheduled sync failed')
-        except Exception:
-            logger.exception('[ParentDatasetSync] scheduled sync failed')
+        run_sync_with_retries(
+            'ParentDatasetSync',
+            lambda: sync_parent_dataset_tables(dry_run=False, prune=prune),
+            db_aliases=_dataset_db_aliases(),
+            stop_event=_stop_event,
+        )
         _stop_event.wait(interval_seconds)
 
 

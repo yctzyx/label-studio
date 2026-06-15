@@ -15,6 +15,11 @@ _api_urlpatterns = [
     # CRUD
     path('', api.TaskListAPI.as_view(), name='task-list'),
     path('<int:pk>/', api.TaskAPI.as_view(), name='task-detail'),
+    path(
+        '<int:pk>/retrieve-predictions/',
+        api.TaskRetrievePredictionsAPI.as_view(),
+        name='task-retrieve-predictions',
+    ),
     path('<int:pk>/workflow/', workflow_api.TaskWorkflowDetailAPI.as_view(), name='task-workflow-detail'),
     path(
         '<int:pk>/workflow/submit-annotation/',

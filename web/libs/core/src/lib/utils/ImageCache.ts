@@ -3,12 +3,7 @@
  * This prevents re-downloading the same images when switching between annotations on the same task
  */
 
-declare global {
-  interface Window {
-    /** When set (e.g. by 无界 embed), provides auth headers for image requests (XHR/fetch). */
-    __LS_IMAGE_REQUEST_HEADERS__?: () => Record<string, string>;
-  }
-}
+import { needsImageAuthHeaders, waitBeforeAuthRetry } from "./imageAuth";
 
 /**
  * Custom error class for image cache errors that should not be sent to Sentry
@@ -42,6 +37,8 @@ class ImageCacheManager {
 
   // Cache for 30 minutes by default
   private readonly maxAge = 30 * 60 * 1000;
+  // Auth-protected images: retry with backoff while parent platform refreshes token
+  private readonly maxAuthRetries = 4;
   // Maximum cache size (100 images)
   private readonly maxSize = 100;
   // Minimum blob size in bytes (reject empty blobs)
@@ -156,10 +153,32 @@ class ImageCacheManager {
     }
   }
 
+  /**
+   * Remove expired cache entries and revoke their blob URLs.
+   * Called when the tab becomes visible again after a long idle period.
+   */
+  evictExpired(): void {
+    const now = Date.now();
+    for (const [key, value] of this.cache) {
+      if (now - value.timestamp > this.maxAge || this.revokedUrls.has(value.blobUrl)) {
+        this.safeRevokeBlobUrl(value);
+        this.cache.delete(key);
+      }
+    }
+  }
+
+  /**
+   * True when the blob URL was revoked and is no longer safe to use in <img src>.
+   */
+  isRevokedBlobUrl(blobUrl: string | undefined): boolean {
+    return Boolean(blobUrl && this.revokedUrls.has(blobUrl));
+  }
+
   private async loadImage(
     url: string,
     crossOrigin?: string,
     onProgress?: (progress: number) => void,
+    attempt = 0,
   ): Promise<CachedImage> {
     return new Promise((resolve, reject) => {
       // Use fetch with XHR for progress tracking
@@ -169,6 +188,20 @@ class ImageCacheManager {
       xhr.addEventListener("load", async () => {
         if (xhr.readyState === 4 && xhr.status === 200) {
           const blob = xhr.response as Blob;
+
+          // Gateway may return HTML/JSON login page with 200 when session expired
+          if (
+            needsImageAuthHeaders() &&
+            blob?.type &&
+            !blob.type.startsWith("image/") &&
+            attempt < this.maxAuthRetries
+          ) {
+            await waitBeforeAuthRetry(attempt);
+            this.loadImage(url, crossOrigin, onProgress, attempt + 1)
+              .then(resolve)
+              .catch(reject);
+            return;
+          }
 
           // Validate blob size - reject empty or too small blobs
           if (!blob || blob.size < this.minBlobSize) {
@@ -222,6 +255,16 @@ class ImageCacheManager {
           };
 
           img.src = blobUrl;
+        } else if (
+          needsImageAuthHeaders() &&
+          (xhr.status === 401 || xhr.status === 403) &&
+          attempt < this.maxAuthRetries
+        ) {
+          // Auth token may have expired during a long idle session; retry with fresh headers
+          await waitBeforeAuthRetry(attempt);
+          this.loadImage(url, crossOrigin, onProgress, attempt + 1)
+            .then(resolve)
+            .catch(reject);
         } else {
           reject(new ImageCacheError(`Failed to download image: ${xhr.status}`));
         }
@@ -315,3 +358,11 @@ class ImageCacheManager {
 
 // Singleton instance - persists across annotation switches
 export const imageCache = new ImageCacheManager();
+
+if (typeof document !== "undefined") {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      imageCache.evictExpired();
+    }
+  });
+}

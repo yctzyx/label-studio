@@ -23,4 +23,5 @@ _api_urlpatterns = [
 
 urlpatterns = [
     path('api/ml/', include((_api_urlpatterns, app_name), namespace='api')),
+    path('api/system-model-services/', api.SystemModelServiceListAPI.as_view(), name='system-model-services'),
 ]

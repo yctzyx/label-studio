@@ -398,6 +398,10 @@ export const Table = observer(
     }, [data, focusedItem]);
     const tableWrapper = useRef();
 
+    // When more pages exist, virtual list must include unloaded rows so InfiniteLoader
+    // can detect the sentinel and call loadMore (header row is index 0).
+    const virtualItemCount = view.dataStore.hasNextPage ? props.total + 1 : data.length + 1;
+
     return (
       <div ref={tableWrapper} className={tableCN.mod({ fit: props.fitToContent }).toString()}>
         {isQuickView && renderTableToolbar()}
@@ -407,7 +411,7 @@ export const Table = observer(
             overscanCount={10}
             itemHeight={props.rowHeight}
             totalCount={props.total}
-            itemCount={data.length + 1}
+            itemCount={virtualItemCount}
             itemKey={itemKey}
             innerElementType={innerElementType}
             stickyItems={[0]}

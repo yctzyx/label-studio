@@ -119,6 +119,10 @@ export default types
      */
     isLoading: types.optional(types.boolean, false),
     /**
+     * ML pre-annotation in progress (labeling UI only, does not block the page)
+     */
+    mlPredicting: types.optional(types.boolean, false),
+    /**
      * Submitting task; used to prevent from duplicating requests
      */
     isSubmitting: false,
@@ -293,6 +297,7 @@ export default types
         "showingSettings",
         "showingDescription",
         "isLoading",
+        "mlPredicting",
         "isSubmitting",
         "noTask",
         "noAccess",

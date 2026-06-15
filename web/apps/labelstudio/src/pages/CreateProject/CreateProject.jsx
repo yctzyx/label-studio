@@ -18,6 +18,20 @@ import {
   PROJECT_TYPE_FILTERS,
   filterSidebarTemplateGroups,
 } from "../Projects/projectTaxonomy";
+import { importFiles } from "./Import/utils";
+
+function mapParentSelectionToPayload(selection) {
+  if (!selection) return null;
+  return {
+    dataset_id: selection.datasetId,
+    dataset_name: selection.datasetName,
+    source_id: selection.sourceId,
+    source_name: selection.sourceName,
+    path: selection.path,
+    data_set_type: selection.dataSetType,
+    data_set_type_label: selection.dataSetTypeLabel,
+  };
+}
 
 const taxonomyClass = cn("project-taxonomy");
 
@@ -118,7 +132,7 @@ export const CreateProject = ({ onClose }) => {
   const [step, _setStep] = React.useState("name"); // name | import | config
   const [waiting, setWaitingStatus] = React.useState(false);
 
-  const { project, setProject: updateProject } = useDraftProject();
+  const { project, setProject: updateProject, resetProject } = useDraftProject();
   const history = useHistory();
   const api = useAPI();
 
@@ -159,10 +173,8 @@ export const CreateProject = ({ onClose }) => {
     };
   }, [api]);
 
-  const { columns, uploading, uploadDisabled, hasImportData, finishUpload, pageProps, uploadSample } = useImportPage(
-    project,
-    sample,
-  );
+  const { columns, uploading, uploadDisabled, hasImportData, finishUpload, pageProps, parentDatasetSelection } =
+    useImportPage(project, sample);
 
   const rootClass = cn("create-project");
   const tabClass = rootClass.elem("tab");
@@ -178,7 +190,7 @@ export const CreateProject = ({ onClose }) => {
   const step1SyncedFromProject = React.useRef(false);
 
   React.useEffect(() => {
-    if (!project || step1SyncedFromProject.current) return;
+    if (!project?.id || step1SyncedFromProject.current) return;
     setName(project.title ?? "");
     setDataTypeCategory(project.data_type_category || "general");
     setTemplateGroup(String(project.template_group ?? "").trim());
@@ -186,21 +198,11 @@ export const CreateProject = ({ onClose }) => {
   }, [project]);
 
   const persistProjectMeta = React.useCallback(
-    async (patch) => {
-      if (!project) return false;
-
-      const res = await api.callApi("updateProject", {
-        params: { pk: project.id },
-        body: patch,
-        errorFilter: () => true,
-      });
-
-      if (res === null || res?.error) return false;
-
+    (patch) => {
       updateProject({ ...project, ...patch });
       return true;
     },
-    [api, project, updateProject],
+    [project, updateProject],
   );
 
   const projectBody = React.useMemo(
@@ -215,38 +217,83 @@ export const CreateProject = ({ onClose }) => {
   );
 
   const onCreate = React.useCallback(async () => {
+    const trimmedName = name.trim();
+
+    if (!trimmedName) {
+      setError(t("validators.field_required", { field: t("Project Name") }));
+      setStep("name");
+      return;
+    }
+
     if (!templateGroup.trim()) {
       setMetaError(t("validators.field_required", { field: t("Tags") }));
       setStep("name");
       return;
     }
 
-    const response = await api.callApi("updateProject", {
-      params: {
-        pk: project.id,
-      },
-      body: { ...projectBody, is_draft: false },
-    });
-
-    if (response === null) return;
-
-    const imported = await finishUpload();
-
-    if (!imported) return;
-
     setWaitingStatus(true);
 
-    if (sample) await uploadSample(sample);
+    const createBody = {
+      ...projectBody,
+      title: trimmedName,
+      is_draft: false,
+    };
+
+    const parentPayload = mapParentSelectionToPayload(parentDatasetSelection);
+    if (parentPayload) {
+      createBody.parent_platform_dataset = parentPayload;
+    }
+
+    const response = await api.callApi("createProject", {
+      body: createBody,
+    });
+
+    if (!response || response.error) {
+      setWaitingStatus(false);
+      return;
+    }
+
+    const imported = await finishUpload(response);
+
+    if (!imported) {
+      await api.callApi("deleteProject", {
+        params: { pk: response.id },
+        errorFilter: () => true,
+      });
+      setWaitingStatus(false);
+      return;
+    }
+
+    if (sample) {
+      const body = new URLSearchParams({ url: sample.url });
+      await importFiles({
+        files: [{ name: sample.url }],
+        body,
+        project: response,
+      });
+    }
 
     __lsa("create_project.create", { sample: sample?.url });
 
     setWaitingStatus(false);
-
+    resetProject();
     history.push(`/projects/${response.id}/data`);
-  }, [project, projectBody, finishUpload, templateGroup, t, setStep]);
+  }, [
+    name,
+    projectBody,
+    finishUpload,
+    templateGroup,
+    parentDatasetSelection,
+    sample,
+    t,
+    setStep,
+    api,
+    history,
+    resetProject,
+  ]);
 
-  const onSaveName = async () => {
-    if (error || !project) return;
+  const onSaveName = () => {
+    if (error) return;
 
     const trimmed = name.trim();
 
@@ -255,61 +302,33 @@ export const CreateProject = ({ onClose }) => {
       return;
     }
 
-    if (trimmed === project.title) return;
-
-    const res = await api.callApi("updateProjectRaw", {
-      params: {
-        pk: project.id,
-      },
-      body: {
-        title: trimmed,
-      },
-    });
-
-    if (res.ok) {
-      updateProject({ ...project, title: trimmed });
-      if (trimmed !== name) setName(trimmed);
-      return;
-    }
-
-    const err = await res.json();
-
-    setError(err.validation_errors?.title);
+    setError(null);
+    updateProject({ ...project, title: trimmed });
+    if (trimmed !== name) setName(trimmed);
   };
 
   const onDataTypeChange = React.useCallback(
-    async (key) => {
+    (key) => {
       setDataTypeCategory(key);
       setMetaError(null);
-      await persistProjectMeta({ data_type_category: key });
+      persistProjectMeta({ data_type_category: key });
     },
     [persistProjectMeta],
   );
 
   const onTemplateGroupChange = React.useCallback(
-    async (group) => {
+    (group) => {
       setTemplateGroup(group);
       setMetaError(null);
-      await persistProjectMeta({ template_group: group });
+      persistProjectMeta({ template_group: group });
     },
     [persistProjectMeta],
   );
 
   const onDelete = React.useCallback(() => {
-    const performClose = async () => {
-      setWaitingStatus(true);
-      if (project)
-        await api.callApi("deleteProject", {
-          params: {
-            pk: project.id,
-          },
-        });
-      setWaitingStatus(false);
-      updateProject(null);
-      onClose?.();
-    };
-    performClose();
-  }, [project]);
+    resetProject();
+    onClose?.();
+  }, [onClose, resetProject]);
 
   return (
     <Modal onHide={onDelete} closeOnClickOutside={false} allowToInterceptEscape fullscreen visible bare>
@@ -335,7 +354,9 @@ export const CreateProject = ({ onClose }) => {
               onClick={onCreate}
               waiting={waiting || uploading}
               waitingClickable={false}
-              disabled={!project || uploadDisabled || error || metaError || !hasImportData || !templateGroup.trim()}
+              disabled={
+                uploadDisabled || error || metaError || !hasImportData || !templateGroup.trim() || !name.trim()
+              }
             >
               {t("Save")}
             </Button>
@@ -371,15 +392,9 @@ export const CreateProject = ({ onClose }) => {
             updateProject({ ...project, label_config: config });
           }}
           onTemplateGroupChange={(group) => {
-            if (!project) return;
             const nextGroup = group ?? "";
             setTemplateGroup(nextGroup);
             updateProject({ ...project, template_group: nextGroup });
-            void api.callApi("updateProject", {
-              params: { pk: project.id },
-              body: { template_group: nextGroup },
-              errorFilter: () => true,
-            });
           }}
           show={step === "config"}
           columns={columns}

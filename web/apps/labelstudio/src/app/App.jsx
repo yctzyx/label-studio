@@ -16,7 +16,6 @@ import { RoutesProvider } from "../providers/RoutesProvider";
 import { DRAFT_GUARD_KEY, DraftGuard, draftGuardCallback } from "../components/DraftGuard/DraftGuard";
 import { AsyncPage } from "./AsyncPage/AsyncPage";
 import ErrorBoundary from "./ErrorBoundary";
-import { FF_UNSAVED_CHANGES, isFF } from "../utils/feature-flags";
 import { TourProvider } from "@humansignal/core";
 import { ToastProvider, ToastViewport } from "@humansignal/ui";
 import { JotaiProvider, JotaiStore } from "../utils/jotai-store";
@@ -24,6 +23,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@humansignal/core/lib/utils/query-client";
 import { RootPage } from "./RootPage";
 import { ff } from "@humansignal/core";
+import { FF_UNSAVED_CHANGES, isFF } from "../utils/feature-flags";
 import "@humansignal/ui/src/tailwind.css";
 import "./App.scss";
 import { AuthProvider } from "@humansignal/core/providers/AuthProvider";
@@ -76,30 +76,30 @@ const App = ({ content }) => {
   }, []);
 
   return (
-    <ErrorBoundary>
-      <Router history={browserHistory}>
-        <MultiProvider
-          providers={[
-            <QueryClientProvider client={queryClient} key="query" />,
-            <JotaiProvider key="jotai" store={JotaiStore} />,
-            <AuthProvider key="auth" />,
-            <AppStoreProvider key="app-store" />,
-            <ToastProvider key="toast" />,
-            <ApiProvider key="api" />,
-            <ConfigProvider key="config" />,
-            <RoutesProvider key="rotes" />,
-            <ProjectProvider key="project" />,
-            ff.isActive(ff.FF_PRODUCT_TOUR) && <TourProvider useAPI={useAPI} />,
-          ].filter(Boolean)}
-        >
+    <Router history={browserHistory}>
+      <MultiProvider
+        providers={[
+          <QueryClientProvider client={queryClient} key="query" />,
+          <JotaiProvider key="jotai" store={JotaiStore} />,
+          <AuthProvider key="auth" />,
+          <AppStoreProvider key="app-store" />,
+          <ToastProvider key="toast" />,
+          <ApiProvider key="api" />,
+          <ConfigProvider key="config" />,
+          <RoutesProvider key="rotes" />,
+          <ProjectProvider key="project" />,
+          ff.isActive(ff.FF_PRODUCT_TOUR) && <TourProvider useAPI={useAPI} />,
+        ].filter(Boolean)}
+      >
+        <ErrorBoundary>
           <AsyncPage>
             <DraftGuard />
             <RootPage content={content} />
             <ToastViewport />
           </AsyncPage>
-        </MultiProvider>
-      </Router>
-    </ErrorBoundary>
+        </ErrorBoundary>
+      </MultiProvider>
+    </Router>
   );
 };
 

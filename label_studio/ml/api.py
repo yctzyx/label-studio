@@ -9,8 +9,8 @@ from django.utils.decorators import method_decorator
 from django_filters.rest_framework import DjangoFilterBackend
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
-from ml.models import MLBackend
-from ml.serializers import MLBackendSerializer, MLInteractiveAnnotatingRequest
+from ml.models import MLBackend, SystemModelService
+from ml.serializers import MLBackendSerializer, MLInteractiveAnnotatingRequest, SystemModelServiceSerializer
 from projects.models import Project, Task
 from rest_framework import generics, status
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
@@ -147,6 +147,33 @@ class MLBackendListAPI(generics.ListCreateAPIView):
         if project.show_collab_predictions and not project.model_version:
             project.model_version = ml_backend.title
             project.save(update_fields=['model_version'])
+
+
+def ensure_builtin_system_model_services():
+    for item in getattr(settings, 'SYSTEM_MODEL_SERVICES', []):
+        SystemModelService.objects.update_or_create(
+            key=item['key'],
+            defaults={
+                'title': item['title'],
+                'url': item['url'],
+                'provider': item.get('provider', ''),
+                'service_type': item.get('service_type', 'custom'),
+                'description': item.get('description', ''),
+                'capabilities': item.get('capabilities', []),
+                'is_builtin': True,
+                'enabled': item.get('enabled', True),
+                'sort_order': item.get('sort_order', 100),
+            },
+        )
+
+
+class SystemModelServiceListAPI(generics.ListAPIView):
+    permission_required = ViewClassPermission(GET=all_permissions.projects_view)
+    serializer_class = SystemModelServiceSerializer
+
+    def get_queryset(self):
+        ensure_builtin_system_model_services()
+        return SystemModelService.objects.filter(enabled=True, is_builtin=True)
 
 
 @method_decorator(

@@ -272,9 +272,15 @@ def merge_parent_integration_databases(databases):
             get_env('PARENT_PLATFORM_MYSQL_HOST', get_env('MYSQL_HOST', 'localhost')),
         ),
         'PORT': int(get_env('PUB_DIRECTORY_MYSQL_PORT', get_env('PARENT_PLATFORM_MYSQL_PORT', get_env('MYSQL_PORT', '3306')))),
+        'CONN_MAX_AGE': int(get_env('PUB_DIRECTORY_MYSQL_CONN_MAX_AGE', get_env('MYSQL_CONN_MAX_AGE', '60'))),
+        'CONN_HEALTH_CHECKS': get_bool_env(
+            'PUB_DIRECTORY_MYSQL_CONN_HEALTH_CHECKS',
+            get_bool_env('MYSQL_CONN_HEALTH_CHECKS', True),
+        ),
         'OPTIONS': {
             'init_command': "SET sql_mode='STRICT_TRANS_TABLES', NAMES utf8mb4",
             'charset': 'utf8mb4',
+            'connect_timeout': int(get_env('PUB_DIRECTORY_MYSQL_CONNECT_TIMEOUT', '10')),
         },
     }
     return merged
@@ -311,6 +317,10 @@ PARENT_DATASET_SOURCE_DB = _resolve_parent_dataset_source_db()
 PARENT_DATASET_SYNC_ENABLED = get_bool_env('PARENT_DATASET_SYNC_ENABLED', True)
 PARENT_DATASET_SYNC_INTERVAL_SECONDS = max(10, int(get_env('PARENT_DATASET_SYNC_INTERVAL_SECONDS', '60')))
 PARENT_DATASET_SYNC_PRUNE = get_bool_env('PARENT_DATASET_SYNC_PRUNE', False)
+
+# 父平台后台同步：瞬时连库失败时的重试（指数退避，间隔 = base * 2^(attempt-1)）
+PARENT_INTEGRATION_SYNC_MAX_RETRIES = max(1, int(get_env('PARENT_INTEGRATION_SYNC_MAX_RETRIES', '3')))
+PARENT_INTEGRATION_SYNC_RETRY_BASE_SECONDS = max(0.5, float(get_env('PARENT_INTEGRATION_SYNC_RETRY_BASE_SECONDS', '2')))
 
 DATABASE_ROUTERS = ['parent_integration.db_router.ParentPlatformRouter']
 
@@ -1096,3 +1106,30 @@ FSM_INITIALIZATION_TRANSITION_NAME = 'fsm.utils._get_initialization_transition_n
 # Used for async migrations. In LSE this is set to a real queue name, including here so we
 # can use settings.SERVICE_QUEUE_NAME in async migrations in LSO
 SERVICE_QUEUE_NAME = get_env('SERVICE_QUEUE_NAME', 'default')
+
+# Platform-level resident model services. These are not project-created MLBackend
+# records; they are managed by the platform and selectable by projects.
+LLM_ML_BACKEND_URL = get_env('LLM_ML_BACKEND_URL', 'http://localhost:9090')
+GROUNDING_DINO_ML_BACKEND_URL = get_env('GROUNDING_DINO_ML_BACKEND_URL', 'http://localhost:9092')
+SYSTEM_MODEL_SERVICES = [
+    {
+        'key': 'llm-preannotation',
+        'title': 'LLM 大模型预标注服务',
+        'url': LLM_ML_BACKEND_URL,
+        'provider': 'llm',
+        'service_type': 'llm',
+        'description': '独立部署的大模型预标注后端，面向文本、分类、抽取和多模态预标注场景。',
+        'capabilities': ['文本分类预标注', '文本抽取预标注', '多模态预标注', '批量预测'],
+        'sort_order': 10,
+    },
+    {
+        'key': 'grounding-dino',
+        'title': 'Grounding DINO 视觉预标注服务',
+        'url': GROUNDING_DINO_ML_BACKEND_URL,
+        'provider': 'grounding_dino',
+        'service_type': 'vision',
+        'description': '独立部署的 Grounding DINO 开放词表目标检测后端，面向图片框选预标注。',
+        'capabilities': ['图片框选预标注', '开放词表检测', '交互式预标注', '批量预测'],
+        'sort_order': 20,
+    },
+]

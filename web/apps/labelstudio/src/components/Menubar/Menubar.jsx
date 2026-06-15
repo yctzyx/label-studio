@@ -7,6 +7,7 @@ import {
   IconFolder,
   IconHome,
   IconHotkeys,
+  IconModels,
   IconPeople,
   IconPersonInCircle,
   IconPin,
@@ -234,6 +235,7 @@ export const Menubar = ({ enabled, defaultOpened, defaultPinned, children, onSid
                 {isFF(FF_HOMEPAGE) && <Menu.Item label={t("Home")} to="/" icon={<IconHome />} data-external exact />}
                 <Menu.Item label={t("Projects")} to="/projects" icon={<IconFolder />} data-external exact />
                 <Menu.Item label={t("My tasks")} to="/my-tasks" icon={<IconSparks />} data-external exact />
+                <Menu.Item label="模型服务管理" to="/model-services" icon={<IconModels />} data-external exact />
                 <Menu.Item label={t("Organization")} to="/organization" icon={<IconPeople />} data-external exact />
                 <Menu.Item label={t("Settings")} to="/settings" icon={<IconPersonInCircle />} data-external exact />
 

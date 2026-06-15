@@ -73,6 +73,7 @@ export const API_CONFIG = {
     storageFiles: "POST:/storages/:target?/:type/files",
 
     // ML
+    systemModelServices: "GET:/system-model-services/",
     mlBackends: "GET:/ml",
     mlBackend: "GET:/ml/:pk",
     addMLBackend: "POST:/ml",
@@ -84,6 +85,7 @@ export const API_CONFIG = {
     deletePredictions: "DELETE:/projects/:pk/model-versions",
     modelVersions: "/ml/:pk/versions",
     mlInteractive: "POST:/ml/:pk/interactive-annotating",
+    predictionRetrievalStatus: "GET:/dm/prediction-retrieval",
 
     // Export
     export: "/projects/:pk/export",
