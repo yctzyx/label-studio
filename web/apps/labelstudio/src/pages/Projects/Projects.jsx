@@ -32,17 +32,42 @@ const getProjectsListPageSize = () => {
   return Number.isFinite(n) && n > 0 ? n : 6;
 };
 
+const ALL_FILTER = "all";
+
+const buildListFilters = ({ typeKey = ALL_FILTER, tagKey = ALL_FILTER, appliedQuery = "" } = {}) => ({
+  typeKey,
+  tagKey,
+  appliedQuery,
+});
+
+const hasActiveListFilters = ({ typeKey, tagKey, appliedQuery }) =>
+  typeKey !== ALL_FILTER || tagKey !== ALL_FILTER || Boolean(appliedQuery?.trim());
+
+const appendListFilterParams = (requestParams, filters) => {
+  const title = filters.appliedQuery?.trim();
+  if (title) requestParams.title = title;
+  if (filters.typeKey && filters.typeKey !== ALL_FILTER) {
+    requestParams.data_type_category = filters.typeKey;
+  }
+  if (filters.tagKey && filters.tagKey !== ALL_FILTER) {
+    requestParams.template_group = filters.tagKey;
+  }
+};
+
 export const ProjectsPage = () => {
   const api = React.useContext(ApiContext);
   const abortController = useAbortController();
   const [projectsList, setProjectsList] = React.useState([]);
   const [networkState, setNetworkState] = React.useState(null);
   const [currentPage, setCurrentPage] = useState(getCurrentPage());
-  const [totalItems, setTotalItems] = useState(1);
+  const [pageSize, setPageSize] = useState(getProjectsListPageSize);
+  const [totalItems, setTotalItems] = useState(0);
+  const [typeKey, setTypeKey] = useState(ALL_FILTER);
+  const [tagKey, setTagKey] = useState(ALL_FILTER);
+  const [appliedQuery, setAppliedQuery] = useState("");
   const setContextProps = useContextProps();
 
   useUpdatePageTitle("Projects");
-  const defaultPageSize = getProjectsListPageSize();
 
   const [modal, setModal] = React.useState(false);
 
@@ -50,7 +75,16 @@ export const ProjectsPage = () => {
 
   const closeModal = () => setModal(false);
 
-  const fetchProjects = async (page = currentPage, pageSize = defaultPageSize) => {
+  const listFilters = React.useMemo(
+    () => buildListFilters({ typeKey, tagKey, appliedQuery }),
+    [typeKey, tagKey, appliedQuery],
+  );
+
+  const fetchProjects = async ({
+    page = currentPage,
+    size = pageSize,
+    filters = listFilters,
+  } = {}) => {
     setNetworkState("loading");
     abortController.renew(); // Cancel any in flight requests
 
@@ -58,7 +92,8 @@ export const ProjectsPage = () => {
     const isAbortedError = (e) => e.error?.includes?.("aborted");
     const embedMode = isWujieEmbed();
 
-    const requestParams = { page, page_size: pageSize };
+    const requestParams = { page, page_size: size };
+    appendListFilterParams(requestParams, filters);
 
     requestParams.include = [
       "id",
@@ -103,12 +138,12 @@ export const ProjectsPage = () => {
     if (!data || data.error) {
       if (embedMode) await callProjects(false);
       setProjectsList([]);
-      setTotalItems(1);
+      setTotalItems(0);
       setNetworkState("loaded");
       return;
     }
 
-    setTotalItems(data.count ?? 1);
+    setTotalItems(data.count ?? 0);
     setProjectsList(data.results ?? []);
     setNetworkState("loaded");
 
@@ -132,7 +167,7 @@ export const ProjectsPage = () => {
             "template_group",
             "data_type_category",
           ].join(","),
-          page_size: pageSize,
+          page_size: size,
         },
         signal,
         errorFilter: isAbortedError,
@@ -153,13 +188,46 @@ export const ProjectsPage = () => {
     }
   };
 
-  const loadNextPage = async (page, pageSize) => {
+  const refetchFromPageOne = (nextFilters) => {
+    setCurrentPage(1);
+    return fetchProjects({ page: 1, filters: nextFilters });
+  };
+
+  const handleTypeChange = (key) => {
+    const nextFilters = buildListFilters({ typeKey: key, tagKey, appliedQuery });
+    setTypeKey(key);
+    refetchFromPageOne(nextFilters);
+  };
+
+  const handleTagChange = (key) => {
+    const nextFilters = buildListFilters({ typeKey, tagKey: key, appliedQuery });
+    setTagKey(key);
+    refetchFromPageOne(nextFilters);
+  };
+
+  const handleSearch = (query) => {
+    const nextFilters = buildListFilters({ typeKey, tagKey, appliedQuery: query });
+    setAppliedQuery(query);
+    refetchFromPageOne(nextFilters);
+  };
+
+  const handleResetFilters = () => {
+    const nextFilters = buildListFilters();
+    setTypeKey(ALL_FILTER);
+    setTagKey(ALL_FILTER);
+    setAppliedQuery("");
+    refetchFromPageOne(nextFilters);
+  };
+
+  const loadNextPage = async (page, nextPageSize) => {
+    const size = nextPageSize ?? pageSize;
     setCurrentPage(page);
-    await fetchProjects(page, pageSize);
+    if (nextPageSize && nextPageSize !== pageSize) setPageSize(nextPageSize);
+    await fetchProjects({ page, size });
   };
 
   React.useEffect(() => {
-    fetchProjects();
+    fetchProjects({ page: getCurrentPage(), size: pageSize });
   }, []);
 
   React.useEffect(() => {
@@ -168,6 +236,9 @@ export const ProjectsPage = () => {
     setContextProps({ openModal, showButton: projectsList.length > 0 });
   }, [projectsList.length]);
 
+  const showFilteredOrPopulatedList =
+    hasActiveListFilters(listFilters) || totalItems > 0 || projectsList.length > 0;
+
   return (
     <div className={cn("projects-page").toClassName()}>
       <Oneof value={networkState}>
@@ -175,14 +246,21 @@ export const ProjectsPage = () => {
           <Spinner size={32} />
         </div>
         <div className={cn("projects-page").elem("content").toClassName()} case="loaded">
-          {projectsList.length ? (
+          {showFilteredOrPopulatedList ? (
             <ProjectsList
               projects={projectsList}
               currentPage={currentPage}
               totalItems={totalItems}
               loadNextPage={loadNextPage}
-              pageSize={defaultPageSize}
+              pageSize={pageSize}
               onCreateProject={openModal}
+              typeKey={typeKey}
+              tagKey={tagKey}
+              appliedQuery={appliedQuery}
+              onTypeChange={handleTypeChange}
+              onTagChange={handleTagChange}
+              onSearch={handleSearch}
+              onResetFilters={handleResetFilters}
             />
           ) : (
             <EmptyProjectsList openModal={openModal} />

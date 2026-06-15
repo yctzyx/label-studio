@@ -59,16 +59,24 @@ export const ProjectsList = ({
   loadNextPage,
   pageSize,
   onCreateProject,
+  typeKey = "all",
+  tagKey = "all",
+  appliedQuery = "",
+  onTypeChange,
+  onTagChange,
+  onSearch,
+  onResetFilters,
 }) => {
   const { t } = useTranslation();
   const api = useAPI();
-  const [nameQuery, setNameQuery] = useState("");
-  const [appliedQuery, setAppliedQuery] = useState("");
-  const [typeKey, setTypeKey] = useState("all");
-  const [tagKey, setTagKey] = useState("all");
+  const [nameQuery, setNameQuery] = useState(appliedQuery);
   const [templateGroups, setTemplateGroups] = useState(() =>
     filterSidebarTemplateGroups([...DEFAULT_TEMPLATE_GROUPS]),
   );
+
+  useEffect(() => {
+    setNameQuery(appliedQuery);
+  }, [appliedQuery]);
 
   useEffect(() => {
     let cancelled = false;
@@ -86,8 +94,8 @@ export const ProjectsList = ({
 
   useEffect(() => {
     if (tagKey === "all") return;
-    if (!templateGroups.includes(tagKey)) setTagKey("all");
-  }, [templateGroups, tagKey]);
+    if (!templateGroups.includes(tagKey)) onTagChange?.("all");
+  }, [templateGroups, tagKey, onTagChange]);
 
   const tagFilters = useMemo(() => {
     return [
@@ -96,37 +104,14 @@ export const ProjectsList = ({
     ];
   }, [templateGroups]);
 
-  const filteredProjects = useMemo(() => {
-    return projects.filter((project) => {
-      if (
-        appliedQuery &&
-        !String(project.title ?? "")
-          .toLowerCase()
-          .includes(appliedQuery.toLowerCase())
-      ) {
-        return false;
-      }
-      if (typeKey !== "all" && resolveProjectDataTypeKey(project) !== typeKey) return false;
-      if (
-        tagKey !== "all" &&
-        String(project.template_group ?? "").trim() !== tagKey
-      ) {
-        return false;
-      }
-      return true;
-    });
-  }, [projects, appliedQuery, typeKey, tagKey]);
+  const handleSearch = useCallback(() => {
+    onSearch?.(nameQuery);
+  }, [nameQuery, onSearch]);
 
-  const onSearch = useCallback(() => {
-    setAppliedQuery(nameQuery);
-  }, [nameQuery]);
-
-  const onResetFilters = useCallback(() => {
+  const handleResetFilters = useCallback(() => {
     setNameQuery("");
-    setAppliedQuery("");
-    setTypeKey("all");
-    setTagKey("all");
-  }, []);
+    onResetFilters?.();
+  }, [onResetFilters]);
 
   return (
     <div className={cn("projects-page").elem("studio").toClassName()}>
@@ -158,7 +143,7 @@ export const ProjectsList = ({
                     .elem("chip")
                     .mod({ active: typeKey === key })
                     .toClassName()}
-                  onClick={() => setTypeKey(key)}
+                  onClick={() => onTypeChange?.(key)}
                 >
                   {t(labelKey)}
                 </button>
@@ -186,7 +171,7 @@ export const ProjectsList = ({
                     .elem("tag-pill")
                     .mod({ active: tagKey === key })
                     .toClassName()}
-                  onClick={() => setTagKey(key)}
+                  onClick={() => onTagChange?.(key)}
                 >
                   {t(labelKey, { defaultValue: labelKey })}
                 </button>
@@ -216,7 +201,7 @@ export const ProjectsList = ({
                   onChange={(e) => setNameQuery(e.target.value)}
                   placeholder={t("Search projects placeholder")}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") onSearch();
+                    if (e.key === "Enter") handleSearch();
                   }}
                 />
                 <div
@@ -228,7 +213,7 @@ export const ProjectsList = ({
                     type="button"
                     look="outlined"
                     variant="primary"
-                    onClick={onSearch}
+                    onClick={handleSearch}
                   >
                     {t("Search")}
                   </Button>
@@ -236,7 +221,7 @@ export const ProjectsList = ({
                     type="button"
                     look="outlined"
                     variant="neutral"
-                    onClick={onResetFilters}
+                    onClick={handleResetFilters}
                   >
                     {t("Reset")}
                   </Button>
@@ -257,7 +242,7 @@ export const ProjectsList = ({
           <div
             className={cn("projects-page").elem("studio-scroll").toClassName()}
           >
-            {filteredProjects.length === 0 ? (
+            {projects.length === 0 ? (
               <div
                 className={cn("projects-page")
                   .elem("empty-filter")
@@ -267,7 +252,7 @@ export const ProjectsList = ({
               </div>
             ) : (
               <div className={cn("projects-page").elem("grid").toClassName()}>
-                {filteredProjects.map((project) => (
+                {projects.map((project) => (
                   <ProjectCard
                     key={project.id}
                     project={project}

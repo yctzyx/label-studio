@@ -112,6 +112,8 @@ class ProjectListPagination(PageNumberPagination):
 class ProjectFilterSet(FilterSet):
     ids = ListFilter(field_name='id', lookup_expr='in')
     title = CharFilter(field_name='title', lookup_expr='icontains')
+    data_type_category = CharFilter(field_name='data_type_category', lookup_expr='exact')
+    template_group = CharFilter(field_name='template_group', lookup_expr='exact')
 
 
 @method_decorator(
