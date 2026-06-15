@@ -3,8 +3,6 @@ import { Button } from "@humansignal/ui";
 import { isStarterCloudPlan } from "@humansignal/core";
 import { cn } from "../../utils/bem";
 import { FF_BULK_ANNOTATION, isFF } from "../../utils/feature-flags";
-import { AutoAcceptToggle } from "../AnnotationTab/AutoAcceptToggle";
-import { DynamicPreannotationsToggle } from "../AnnotationTab/DynamicPreannotationsToggle";
 import { ManualPreannotationButton } from "../AnnotationTab/ManualPreannotationButton";
 import { GroundTruth } from "../CurrentEntity/GroundTruth";
 import { EditingHistory } from "./HistoryActions";
@@ -55,8 +53,6 @@ export const Actions = ({ store }) => {
       {!isViewAll && (
         <div className={cn("model-actions").toClassName()}>
           <ManualPreannotationButton />
-          <DynamicPreannotationsToggle />
-          <AutoAcceptToggle />
         </div>
       )}
     </div>

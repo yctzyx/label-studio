@@ -119,7 +119,7 @@ export const DataManagerPage = ({ ...props }) => {
       (await initializeDataManager(root.current, props, {
         ...params,
         project,
-        autoAnnotation: isDefined(interactiveBacked),
+        autoAnnotation: false,
       }, runtimeUser)));
 
     Object.assign(window, { dataManager });
@@ -195,7 +195,9 @@ export const DataManagerPage = ({ ...props }) => {
       dataManager.store?.closeLabeling({ pushState: false });
     });
 
-    if (interactiveBacked) {
+    // 交互式预标注（Auto-Annotation）已关闭，请使用底部「模型预标注」按钮
+    const enableInteractivePreannotation = false;
+    if (enableInteractivePreannotation && interactiveBacked) {
       dataManager.on("lsf:regionFinishedDrawing", (reg, group) => {
         const lsfWrapper = dataManager.lsf;
         if (!lsfWrapper?.lsf || !lsfWrapper.task) return;
