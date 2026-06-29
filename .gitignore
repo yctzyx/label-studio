@@ -87,3 +87,13 @@ web/libs/editor/tests/coverage
 
 # Local sibling / linked frontend checkout (not part of this repo)
 pidata-platform-frontend/
+
+# Local archives, Docker image exports, and ML model caches (do not commit)
+*.tar
+*.tar.gz
+*.zip
+huggingface-cache*
+label-studio-grounding-dino-backend-local*
+label_studio.zip
+web/dist.zip
+pic_tags_/
