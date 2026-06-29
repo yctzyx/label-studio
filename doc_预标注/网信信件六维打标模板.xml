@@ -1,0 +1,145 @@
+<!--
+  网信/信访信件六维结构化打标模板（适配 label-studio-llm-backend）
+
+  适用场景：
+  - 输入：网信件投诉正文（Excel C 列 tsnr），可附带问题属地 wtsd、信访编号 xfjbh
+  - 输出：按「人 / 事 / 对象 / 时间 / 地点 / 诉求治理」六维抽取结构化要点
+  - 预标注：大模型 JSON 输出 → 回填六个 TextArea（需 output_mode=petition_dimensions_json）
+
+  任务数据示例：
+  {
+    "xfjbh": "WX20260621145GWQH2",
+    "wtsd": "浙江省温州市鹿城区南汇街道",
+    "tsnr": "身份证补办，一直未收到原件身份证。请问什么情况",
+    "create_time": "2026-06-22 06:10:18.813827"
+  }
+
+  产品化约束：
+  1. 主文本对象 name 固定为 text，value 绑定 $tsnr（对应 Excel C 列）
+  2. 六个维度 TextArea 的 name 与后端 JSON 字段映射一致（见 doc 说明）
+  3. llm_prompt 用于交互式改写 Prompt（Shift+Enter 重新生成）
+  4. raw_json 仅供调试追溯，正式标注可折叠
+-->
+<View>
+  <Style>
+    .petition-layout {
+      display: grid;
+      grid-template-columns: minmax(360px, 1fr) minmax(420px, 1fr);
+      gap: 20px;
+      align-items: start;
+    }
+    .petition-panel {
+      border: 1px solid #e6e6e6;
+      border-radius: 6px;
+      padding: 14px;
+      background: #fff;
+    }
+    .petition-meta {
+      color: #666;
+      font-size: 13px;
+      line-height: 1.6;
+      margin-bottom: 10px;
+      padding: 8px 10px;
+      background: #f7f7f7;
+      border-radius: 4px;
+    }
+    .petition-field {
+      margin-top: 12px;
+    }
+    .petition-help {
+      color: #888;
+      font-size: 12px;
+      line-height: 1.5;
+      margin: 4px 0 8px;
+    }
+  </Style>
+
+  <Header value="网信件六维结构化打标" size="4"/>
+  <View className="petition-help">
+    依据「人、事、对象、时间、地点、诉求治理」六维，从投诉正文中抽取要点；大模型预标后请人工核对、补充证据原文。
+  </View>
+
+  <View className="petition-layout">
+    <!-- 左侧：信件原文与元数据 -->
+    <View className="petition-panel">
+      <Header value="信件信息" size="5"/>
+      <View className="petition-meta">
+        <Text name="xfjbh_line" value="信访编号：$xfjbh"/>
+        <Text name="wtsd_line" value="问题属地：$wtsd"/>
+        <Text name="create_time_line" value="登记时间：$create_time"/>
+      </View>
+
+      <Header value="投诉正文（待标注）" size="5"/>
+      <Text name="text" value="$tsnr"/>
+    </View>
+
+    <!-- 右侧：六维标注 + Prompt -->
+    <View className="petition-panel">
+      <Header value="大模型指令（可选）" size="5"/>
+      <View className="petition-help">
+        批量预标使用项目设置中的 Prompt；开启交互式预标后，可在此修改指令并按 Shift+Enter 重新生成。
+      </View>
+      <TextArea name="llm_prompt"
+                toName="text"
+                rows="3"
+                editable="true"
+                maxSubmissions="1"
+                showSubmitButton="false"
+                placeholder="留空则使用项目「大模型预标注」页配置的默认 Prompt。"/>
+
+      <View className="petition-field">
+        <Header value="人" size="5"/>
+        <View className="petition-help">谁反映、谁受影响、涉及哪类群体</View>
+        <TextArea name="dim_person" toName="text" rows="3"
+                  placeholder="例：反映主体：本人；受影响方：本人；涉及群体：无明确群体"/>
+      </View>
+
+      <View className="petition-field">
+        <Header value="事" size="5"/>
+        <View className="petition-help">发生了什么问题</View>
+        <TextArea name="dim_event" toName="text" rows="3"
+                  placeholder="例：身份证补办后长期未收到原件"/>
+      </View>
+
+      <View className="petition-field">
+        <Header value="对象" size="5"/>
+        <View className="petition-help">问题围绕什么载体、权益、设施、资金或组织对象</View>
+        <TextArea name="dim_object" toName="text" rows="3"
+                  placeholder="例：身份证（身份资格证件）；办理机关（如文中提及）"/>
+      </View>
+
+      <View className="petition-field">
+        <Header value="时间" size="5"/>
+        <View className="petition-help">何时发生、持续多久、何时办理</View>
+        <TextArea name="dim_time" toName="text" rows="3"
+                  placeholder="例：发生时间：未明确；持续：一直未收到；办理时限：未说明"/>
+      </View>
+
+      <View className="petition-field">
+        <Header value="地点" size="5"/>
+        <View className="petition-help">在哪里发生、由哪里管辖、影响范围是什么</View>
+        <TextArea name="dim_location" toName="text" rows="3"
+                  placeholder="例：事发/属地：浙江省温州市鹿城区南汇街道；管辖部门：未明确"/>
+      </View>
+
+      <View className="petition-field">
+        <Header value="诉求治理" size="5"/>
+        <View className="petition-help">群众要求怎么解决、当前办理和治理状态如何</View>
+        <TextArea name="dim_governance" toName="text" rows="4"
+                  placeholder="例：诉求：查询补办进度；办理状态：未收到证件，问题未解决"/>
+      </View>
+
+      <View className="petition-field">
+        <Header value="标注员备注（可选）" size="5"/>
+        <TextArea name="annotator_note" toName="text" rows="2"
+                  placeholder="记录歧义、证据不足或需复核的情况。"/>
+      </View>
+
+      <View className="petition-field">
+        <Header value="模型原始 JSON（调试）" size="5"/>
+        <TextArea name="raw_json" toName="text" rows="5"
+                  placeholder="由预标注后端写入，用于排查解析问题。"/>
+      </View>
+    </View>
+  </View>
+</View>

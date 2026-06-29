@@ -29,9 +29,19 @@ function humanizeUploadFilename(value) {
   let segment = value.trim();
 
   try {
-    if (/^https?:\/\//i.test(segment)) {
-      segment = new URL(segment).pathname;
+    const url = /^https?:\/\//i.test(segment)
+      ? new URL(segment)
+      : new URL(segment, "http://local");
+
+    const parentKey = url.searchParams.get("key");
+    if (parentKey) {
+      segment = decodeURIComponent(parentKey);
+    } else if (/^https?:\/\//i.test(segment)) {
+      segment = url.pathname;
+    } else {
+      segment = url.pathname || segment.split("?")[0].split("#")[0];
     }
+
     segment = segment.split("?")[0].split("#")[0];
     const parts = segment.split("/").filter(Boolean);
     segment = parts[parts.length - 1] ?? segment;
@@ -47,7 +57,15 @@ function humanizeUploadFilename(value) {
 }
 
 function taskDisplayName(task) {
-  const metaDesc = task?.meta?.description?.trim();
+  const rawDesc = task?.meta?.description;
+  const metaDesc =
+    typeof rawDesc === "string"
+      ? rawDesc.trim()
+      : rawDesc && typeof rawDesc === "object"
+        ? [rawDesc.text, rawDesc.title, rawDesc.name, rawDesc.description].find(
+            (v) => typeof v === "string" && v.trim(),
+          )?.trim()
+        : "";
   if (metaDesc) return metaDesc.slice(0, 64);
 
   const data = task?.data;
@@ -306,13 +324,10 @@ export const MyTasksPage = () => {
 
   const statusOptions = STAGE_STATUS_OPTIONS[stage] ?? STAGE_STATUS_OPTIONS.annotate;
 
-  const dataHref = (projectId, taskId, pageStage, workflowStage) => {
+  const dataHref = (projectId, taskId, pageStage) => {
     const base = `/projects/${projectId}/data`;
-    const ws = workflowStage ?? "";
-    if (pageStage === "annotate" && ws === "annotate") {
-      return `${base}?task=${taskId}`;
-    }
-    return `${base}?task=${taskId}`;
+    const queue = pageStage || "annotate";
+    return `${base}?task=${taskId}&workflow_queue=${encodeURIComponent(queue)}`;
   };
 
   useEffect(() => {
@@ -521,14 +536,13 @@ export const MyTasksPage = () => {
                     ) : (
                       pageSlice.map(({ task, projectId, projectTitle, taskWorkflowEnabled }) => {
                         const pipelineStatus = getMyTaskPipelineStatus(task, taskWorkflowEnabled);
-                        const wfStage = task.workflow?.stage;
                         const pipelineComplete = pipelineStatus === "done";
                         return (
                           <tr key={`${projectId}-${task.id}`}>
                             <td>
                               <Link
                                 className={root.elem("link-action").toClassName()}
-                                to={dataHref(projectId, task.id, stage, wfStage)}
+                                to={dataHref(projectId, task.id, stage)}
                                 data-external
                                 title={taskDisplayTitle(task)}
                               >
@@ -567,7 +581,7 @@ export const MyTasksPage = () => {
                             <td>
                               <Link
                                 className={root.elem("link-action").toClassName()}
-                                to={dataHref(projectId, task.id, stage, wfStage)}
+                                to={dataHref(projectId, task.id, stage)}
                                 data-external
                               >
                                 {actionLabel}

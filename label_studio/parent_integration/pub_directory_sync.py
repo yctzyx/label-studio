@@ -83,6 +83,31 @@ def _ensure_unique_email(want: str, user_pk: int | None) -> str:
     raise RuntimeError('无法生成唯一 email')
 
 
+def _pick_organization_owner(organization: Organization) -> User | None:
+    """First active org member, used when organization.created_by is unset."""
+    return (
+        User.objects.filter(
+            om_through__organization=organization,
+            om_through__deleted_at__isnull=True,
+            is_active=True,
+        )
+        .order_by('om_through__created_at', 'pk')
+        .first()
+    )
+
+
+def _backfill_organization_created_by(org_by_ext: dict[str, Organization], stats: dict[str, int]) -> None:
+    for org in org_by_ext.values():
+        if org.created_by_id:
+            continue
+        owner = _pick_organization_owner(org)
+        if not owner:
+            continue
+        org.created_by = owner
+        org.save(update_fields=['created_by', 'updated_at'])
+        stats['orgs_created_by_backfilled'] = stats.get('orgs_created_by_backfilled', 0) + 1
+
+
 def sync_pub_directory(
     *,
     dry_run: bool = False,
@@ -105,6 +130,7 @@ def sync_pub_directory(
         'members_created': 0,
         'members_revived': 0,
         'members_pruned': 0,
+        'orgs_created_by_backfilled': 0,
     }
 
     org_qs = PubOrg.objects.using(pdb).all()
@@ -134,7 +160,6 @@ def sync_pub_directory(
                 Organization.objects.create(
                     title=title,
                     external_org_id=oid,
-                    created_by=None,
                 )
                 stats['orgs_created'] += 1
 
@@ -197,6 +222,8 @@ def sync_pub_directory(
                 om.deleted_at = None
                 om.save(update_fields=['deleted_at', 'updated_at'])
                 stats['members_revived'] += 1
+
+        _backfill_organization_created_by(org_by_ext, stats)
 
         # 4) active_organization
         for u in user_by_ext.values():

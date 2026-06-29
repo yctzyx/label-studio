@@ -10,6 +10,7 @@
  */
 
 import { formDataToJPO, parseJson } from "../helpers";
+import { isGatewaySessionExpiredPayload } from "@humansignal/core/lib/utils/gatewayAuth";
 import statusCodes from "./status-codes.json";
 import { queryClient, shouldBypassCache } from "@humansignal/core/lib/utils/query-client";
 
@@ -22,6 +23,8 @@ import { queryClient, shouldBypassCache } from "@humansignal/core/lib/utils/quer
  * gateway: string | URL,
  * endpoints: Dict<EndpointConfig>,
  * commonHeaders: Dict<string>,
+ * getCommonHeaders: () => Dict<string>,
+ * retryOnUnauthorized: () => Promise<boolean>,
  * mockDelay: number,
  * mockDisabled: boolean,
  * sharedParams: Dict<any>,
@@ -38,6 +41,12 @@ export class APIProxy {
 
   /** @type {Dict<string>} */
   commonHeaders = {};
+
+  /** @type {(() => Dict<string>)|undefined} */
+  getCommonHeaders;
+
+  /** @type {(() => Promise<boolean>)|undefined} */
+  retryOnUnauthorized;
 
   /** @type {number} */
   mockDelay = 0;
@@ -57,6 +66,8 @@ export class APIProxy {
    */
   constructor(options) {
     this.commonHeaders = options.commonHeaders ?? {};
+    this.getCommonHeaders = options.getCommonHeaders;
+    this.retryOnUnauthorized = options.retryOnUnauthorized;
     this.gateway = this.resolveGateway(options.gateway);
     this.requestMode = this.detectMode();
     this.mockDelay = options.mockDelay ?? 0;
@@ -188,24 +199,24 @@ export class APIProxy {
 
         const requestMethod = method ?? (methodSettings.method ?? "get").toUpperCase();
 
-        const initialheaders = Object.assign(
-          this.getDefaultHeaders(requestMethod),
-          this.commonHeaders ?? {},
-          methodSettings.headers ?? {},
-          headers ?? {},
-        );
+        const buildRequestParams = () => {
+          const initialheaders = Object.assign(
+            this.getDefaultHeaders(requestMethod),
+            this.commonHeaders ?? {},
+            this.getCommonHeaders?.() ?? {},
+            methodSettings.headers ?? {},
+            headers ?? {},
+          );
 
-        const requestHeaders = new Headers(initialheaders);
+          const requestHeaders = new Headers(initialheaders);
 
-        const requestParams = {
-          method: requestMethod,
-          headers: requestHeaders,
-          mode: this.requestMode,
-          credentials: this.requestMode === "cors" ? "omit" : "same-origin",
-        };
+          const params = {
+            method: requestMethod,
+            headers: requestHeaders,
+            mode: this.requestMode,
+            credentials: this.requestMode === "cors" ? "omit" : "same-origin",
+          };
 
-        // Helper to perform the actual fetch (mock or real)
-        const doFetch = async () => {
           if (requestMethod !== "GET" && requestMethod !== "HEAD") {
             const contentType = requestHeaders.get("Content-Type");
             const { sharedParams } = this;
@@ -223,29 +234,57 @@ export class APIProxy {
             }
 
             if (extendedBody instanceof FormData) {
-              requestParams.body = extendedBody;
+              params.body = extendedBody;
             } else if (contentType === "multipart/form-data") {
-              requestParams.body = this.createRequestBody(extendedBody);
+              params.body = this.createRequestBody(extendedBody);
             } else if (contentType === "application/json") {
-              requestParams.body = this.bodyToJSON(extendedBody);
+              params.body = this.bodyToJSON(extendedBody);
             } else {
-              requestParams.body = extendedBody;
+              params.body = extendedBody;
             }
 
-            // @todo better check for files maybe?
             if (contentType === "multipart/form-data") {
-              // fetch will set correct header with boundaries
               requestHeaders.delete("Content-Type");
             }
           }
 
-          /** @type {Response} */
-          let rawResponse;
+          return params;
+        };
 
-          if (methodSettings.mock && process.env.NODE_ENV === "development" && !this.mockDisabled) {
-            rawResponse = await this.mockRequest(apiCallURL, urlParams, requestParams, methodSettings);
-          } else {
-            rawResponse = await fetch(apiCallURL, requestParams);
+        let requestParams = buildRequestParams();
+
+        // Helper to perform the actual fetch (mock or real)
+        const doFetch = async () => {
+          const useMock = methodSettings.mock && process.env.NODE_ENV === "development" && !this.mockDisabled;
+
+          const performFetch = async () => {
+            if (useMock) {
+              return this.mockRequest(apiCallURL, urlParams, requestParams, methodSettings);
+            }
+            return fetch(apiCallURL, requestParams);
+          };
+
+          /** @type {Response} */
+          let rawResponse = await performFetch();
+
+          const shouldRetryAuth = async (response) => {
+            if (response.status === 401) return true;
+            if (!response.ok) return false;
+            try {
+              const text = await response.clone().text();
+              const data = text ? JSON.parse(text) : null;
+              return isGatewaySessionExpiredPayload(data);
+            } catch {
+              return false;
+            }
+          };
+
+          if (this.retryOnUnauthorized && !useMock && (await shouldRetryAuth(rawResponse))) {
+            const shouldRetry = await this.retryOnUnauthorized();
+            if (shouldRetry) {
+              requestParams = buildRequestParams();
+              rawResponse = await performFetch();
+            }
           }
 
           if (raw || rawResponse.isCanceled) return rawResponse;

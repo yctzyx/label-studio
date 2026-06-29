@@ -158,6 +158,8 @@ export const ImportPage = ({
   onParentDatasetClear,
   pendingLocalFiles = [],
   onQueueLocalFiles,
+  prepareProjectForParentSync,
+  onParentDatasetSynced,
 }) => {
   const [error, setError] = useState();
   const [parentSyncing, setParentSyncing] = useState(false);
@@ -229,18 +231,19 @@ export const ImportPage = ({
   }, []);
 
   const handleParentDatasetSync = useCallback(async () => {
-    if (!project?.id) return;
+    if (!parentDatasetSelection) return;
+
     setParentSyncing(true);
     setParentSyncMsg(null);
     setParentSyncProgress({ percent: 0, phase: "preparing", message: t("import.parentDataset.syncStarting") });
     setError(undefined);
 
-    const pollJob = (jobId) =>
+    const pollJob = (projectId, jobId) =>
       new Promise((resolve, reject) => {
         const tick = async () => {
           try {
             const statusRes = await api.callApi("syncParentDatasetStatus", {
-              params: { pk: project.id, job_id: jobId },
+              params: { pk: projectId, job_id: jobId },
               errorFilter: () => true,
             });
             const status = statusRes?.response ?? statusRes;
@@ -263,17 +266,31 @@ export const ImportPage = ({
       });
 
     try {
-      const startRes = await api.callApi("syncParentDataset", { params: { pk: project.id }, body: {} });
+      let targetProject = project;
+
+      if (!targetProject?.id) {
+        if (!prepareProjectForParentSync) {
+          throw new Error("Project is not ready for sync");
+        }
+        targetProject = await prepareProjectForParentSync();
+      }
+
+      if (!targetProject?.id) {
+        throw new Error("Missing project id");
+      }
+
+      const startRes = await api.callApi("syncParentDataset", { params: { pk: targetProject.id }, body: {} });
       const jobId = startRes?.job_id ?? startRes?.response?.job_id;
       if (!jobId) {
         throw new Error("missing job_id");
       }
-      const finalStatus = await pollJob(jobId);
+      const finalStatus = await pollJob(targetProject.id, jobId);
       const created = finalStatus?.result?.created ?? finalStatus?.created ?? 0;
       setParentSyncProgress((prev) =>
         prev ? { ...prev, percent: 100, status: "done", message: t("import.parentDataset.syncDone", { count: created }) } : prev,
       );
       setParentSyncMsg(t("import.parentDataset.syncDone", { count: created }));
+      onParentDatasetSynced?.();
       setTimeout(() => setParentSyncProgress(null), 1200);
     } catch (e) {
       setError(e);
@@ -285,7 +302,7 @@ export const ImportPage = ({
       }
       setParentSyncing(false);
     }
-  }, [api, project?.id, t]);
+  }, [api, parentDatasetSelection, prepareProjectForParentSync, project, onParentDatasetSynced, t]);
 
   const loadFilesList = useCallback(
     async (file_upload_ids) => {
@@ -678,7 +695,7 @@ export const ImportPage = ({
                                       importClass.elem("parent-sync-btn").toClassName(),
                                     )}
                                     waiting={parentSyncing}
-                                    disabled={parentSyncing || !project?.id}
+                                    disabled={parentSyncing || !parentDatasetSelection}
                                     onClick={() => void handleParentDatasetSync()}
                                   >
                                     {t("import.parentDataset.sync")}

@@ -272,6 +272,19 @@ export const LLMPreannotationSettings = () => {
       </Typography>
 
       <SimpleCard title="模型连接" className="mb-wide p-base">
+        <Field
+          label="大模型预标注后端地址"
+          required
+          description="Label Studio 服务端连接 ML Backend 的地址。Docker 部署时请填宿主机 IP 或容器名（勿用 localhost），默认来自环境变量 LLM_ML_BACKEND_URL。"
+        >
+          <input
+            className={inputClass}
+            value={state.backendUrl}
+            placeholder={DEFAULT_BACKEND_URL}
+            onChange={(e) => update({ backendUrl: e.target.value })}
+          />
+        </Field>
+
         <Field label="厂商" required>
           <select className={inputClass} value={state.provider} onChange={(e) => onProviderChange(e.target.value)}>
             {LLM_PROVIDERS.map((p) => (

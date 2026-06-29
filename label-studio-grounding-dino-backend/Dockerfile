@@ -72,12 +72,23 @@ COPY dino.py _wsgi.py log_utils.py ./
 RUN mkdir -p /data/models
 
 # groundingdino pip install upgrades numpy/transformers; pin them back last.
+# Pre-cache bert-base-uncased for offline / air-gapped deploy (GroundingDINO text encoder).
 RUN pip install --no-cache-dir \
     "numpy>=1.23,<2" \
     "transformers==4.38.2" \
     "huggingface-hub>=0.16,<1" \
     "opencv-python<4.10" && \
+    python -c "from transformers import AutoTokenizer, AutoModel; \
+AutoTokenizer.from_pretrained('bert-base-uncased'); \
+AutoModel.from_pretrained('bert-base-uncased'); \
+print('bert-base-uncased cached ok')" && \
     python -c "import label_studio_ml, groundingdino, numpy, transformers, cv2; print('runtime imports ok', label_studio_ml.__version__, numpy.__version__, transformers.__version__, cv2.__version__)"
+
+# Runtime: do not contact huggingface.co (models must exist from build step above).
+ENV HF_HOME=/root/.cache/huggingface \
+    TRANSFORMERS_CACHE=/root/.cache/huggingface \
+    TRANSFORMERS_OFFLINE=1 \
+    HF_HUB_OFFLINE=1
 
 EXPOSE 9090
 

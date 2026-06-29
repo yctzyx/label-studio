@@ -67,6 +67,7 @@ const ImagePreview = observer(({ task, field }: ImagePreviewProps) => {
 
     const load = async () => {
       imageCache.evictExpired();
+      imageCache.forceRemove(src);
       await waitForAuthHeaders();
       if (cancelled) return;
 

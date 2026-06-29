@@ -242,10 +242,13 @@ class Task(TaskMixin, FsmHistoryStateModel):
                 # model version. In case it will return a model_version
                 # and we can grab predictions explicitly
                 if isinstance(new_predictions, str):
-                    model_version = new_predictions
+                    # Live backends may omit model_version in /setup; predictions are
+                    # stored with project.model_version (see MLBackend.get_prediction_model_version).
+                    model_version = (new_predictions or '').strip() or project.model_version
                     return predictions.filter(model_version=model_version)
-                else:
-                    return new_predictions
+                if new_predictions is None:
+                    return predictions.filter(model_version=project.model_version)
+                return new_predictions
             else:
                 return predictions.filter(model_version=project.model_version)
         else:

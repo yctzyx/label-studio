@@ -22,6 +22,7 @@ export const useImportPage = (project, sample) => {
   const [fileIds, setFileIds] = React.useState([]);
   const [pendingLocalFiles, setPendingLocalFiles] = React.useState([]);
   const [parentDatasetSelection, setParentDatasetSelection] = React.useState(null);
+  const [parentDatasetSynced, setParentDatasetSynced] = React.useState(false);
   const [_columns, _setColumns] = React.useState([]);
   const addColumns = (cols) => _setColumns((current) => unique(current.concat(cols)));
   const [csvHandling, setCsvHandling] = React.useState();
@@ -51,6 +52,7 @@ export const useImportPage = (project, sample) => {
 
   const onParentDatasetClear = React.useCallback(async () => {
     setParentDatasetSelection(null);
+    setParentDatasetSynced(false);
     if (!project?.id) return;
     await api.callApi("updateProject", {
       params: { pk: project.id },
@@ -106,6 +108,11 @@ export const useImportPage = (project, sample) => {
       }
 
       if (onlyParentDataset) {
+        if (parentDatasetSynced) {
+          setUploadingStatus(false);
+          return true;
+        }
+
         const startRes = await api.callApi("syncParentDataset", {
           params: { pk: targetProject.id },
           body: {},
@@ -115,6 +122,7 @@ export const useImportPage = (project, sample) => {
           setUploadingStatus(false);
           return false;
         }
+        setParentDatasetSynced(true);
         setUploadingStatus(false);
         return true;
       }
@@ -171,6 +179,7 @@ export const useImportPage = (project, sample) => {
     onParentDatasetClear,
     pendingLocalFiles,
     onQueueLocalFiles: queueLocalFiles,
+    onParentDatasetSynced: () => setParentDatasetSynced(true),
   };
 
   return {

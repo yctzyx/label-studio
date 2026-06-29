@@ -1,5 +1,13 @@
 type OnProgressCallback = (total: number, loaded: number, progress: number) => void;
 
+const MAX_AUTH_RETRIES = 4;
+
+declare global {
+  interface Window {
+    __LS_IMAGE_REQUEST_HEADERS__?: () => Record<string, string>;
+  }
+}
+
 /**
  * @class FileLoader
  * @description Allows to download any file from a given URL and provide a data URL for it
@@ -13,7 +21,7 @@ export class FileLoader {
    * @description Downloads a file from a given URL and returns a data URL for it
    * @description Progress event available to track download progress
    */
-  download(url: string, onProgress?: OnProgressCallback) {
+  download(url: string, onProgress?: OnProgressCallback, attempt = 0) {
     if (!url) throw new Error("No URL provided for download");
 
     return new Promise((resolve, reject) => {
@@ -21,7 +29,7 @@ export class FileLoader {
         resolve(this.fileCache.get(url));
         return;
       }
-      if (this.errorCache.has(url)) {
+      if (this.errorCache.has(url) && attempt === 0) {
         reject(this.errorCache.get(url));
         return;
       }
@@ -32,12 +40,29 @@ export class FileLoader {
 
       xhr.addEventListener("load", async () => {
         if (xhr.readyState === 4 && xhr.status === 200) {
-          const localURL = this.createDataURL(xhr.response);
+          const blob = xhr.response as Blob;
+          const { blobIndicatesGatewayAuthFailure } = await import("@humansignal/core");
+          const needsAuth =
+            typeof window !== "undefined" && Boolean(window.__LS_IMAGE_REQUEST_HEADERS__?.());
+
+          if (
+            needsAuth &&
+            ((await blobIndicatesGatewayAuthFailure(blob)) ||
+              Boolean(blob?.type && !blob.type.startsWith("image/"))) &&
+            attempt < MAX_AUTH_RETRIES
+          ) {
+            const { waitBeforeAuthRetry } = await import("@humansignal/core");
+            await waitBeforeAuthRetry(attempt);
+            this.errorCache.delete(url);
+            this.download(url, onProgress, attempt + 1).then(resolve).catch(reject);
+            return;
+          }
+
+          const localURL = this.createDataURL(blob);
 
           this.fileCache.set(url, localURL);
+          this.errorCache.delete(url);
 
-          // in case we're dealing with an image, let's cache it using default browser mechanisms
-          // this will allow instant rendering in the future
           if (xhr.getResponseHeader("content-type")?.match(/image/)) {
             try {
               await this.cacheImage(localURL);
@@ -48,6 +73,22 @@ export class FileLoader {
           }
 
           resolve(localURL);
+        } else if (
+          typeof window !== "undefined" &&
+          window.__LS_IMAGE_REQUEST_HEADERS__?.() &&
+          (xhr.status === 401 || xhr.status === 403) &&
+          attempt < MAX_AUTH_RETRIES
+        ) {
+          const { waitBeforeAuthRetry } = await import("@humansignal/core");
+          await waitBeforeAuthRetry(attempt);
+          this.errorCache.delete(url);
+          this.download(url, onProgress, attempt + 1).then(resolve).catch(reject);
+        } else if (xhr.readyState === 4) {
+          const error = new Error(`Failed to download file: ${xhr.status}`);
+
+          reject(error);
+
+          this.errorCache.set(url, error);
         }
       });
 
@@ -67,9 +108,8 @@ export class FileLoader {
       });
 
       xhr.open("GET", url);
-      // Attach auth headers when available (e.g. 无界 embed - gateway requires Authorization)
       const headers =
-        typeof window !== "undefined" && (window as any).__LS_IMAGE_REQUEST_HEADERS__?.();
+        typeof window !== "undefined" && window.__LS_IMAGE_REQUEST_HEADERS__?.();
       if (headers && typeof headers === "object") {
         for (const [key, value] of Object.entries(headers)) {
           if (value != null && value !== "") xhr.setRequestHeader(key, String(value));
@@ -93,6 +133,10 @@ export class FileLoader {
 
   getError(url: string) {
     return this.errorCache.get(url);
+  }
+
+  clearError(url: string) {
+    this.errorCache.delete(url);
   }
 
   private createDataURL(response: any) {

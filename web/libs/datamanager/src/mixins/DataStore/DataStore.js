@@ -1,5 +1,6 @@
 import { flow, getRoot, types } from "mobx-state-tree";
 import { guidGenerator } from "../../utils/random";
+import { History } from "../../utils/history";
 import { isDefined } from "../../utils/utils";
 import { DEFAULT_PAGE_SIZE, getStoredPageSize } from "../../components/Common/Pagination/Pagination";
 import { FF_LOPS_E_3, isFF } from "../../utils/feature-flags";
@@ -257,6 +258,11 @@ export const DataStore = (modelName, { listItemType, apiMethod, properties, asso
         }
 
         if (interaction) Object.assign(params, { interaction });
+
+        const { workflow_queue: workflowQueue } = History.getParams();
+        if (workflowQueue && root.mode !== "labelstream") {
+          params.workflow_queue = workflowQueue;
+        }
 
         const data = yield root.apiCall(apiMethod, params, {}, { allowToCancel: root.SDK.type === "DE" });
 

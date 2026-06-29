@@ -26,6 +26,7 @@ export function createApiInstance(config: ApiProviderConfig): APIProxy<Record<st
     sharedParams: config.sharedParams,
     mockDelay: config.mockDelay,
     mockDisabled: config.mockDisabled,
+    retryOnUnauthorized: config.retryOnUnauthorized,
   });
 
   return apiInstance;

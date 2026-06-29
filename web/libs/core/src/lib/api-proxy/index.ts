@@ -1,4 +1,5 @@
 import { formDataToJPO } from "../utils/helpers";
+import { isGatewaySessionExpiredPayload } from "../utils/gatewayAuth";
 import statusCodes from "./status-codes.json";
 import type {
   APIProxyOptions,
@@ -56,6 +57,8 @@ export class APIProxy<T extends {}> {
 
   onRequestFinished?: (res: Response) => void;
 
+  retryOnUnauthorized?: () => Promise<boolean>;
+
   constructor(options: APIProxyOptions<T>) {
     this.commonHeaders = options.commonHeaders ?? {};
     this.getCommonHeaders = options.getCommonHeaders;
@@ -66,6 +69,7 @@ export class APIProxy<T extends {}> {
     this.sharedParams = options.sharedParams ?? {};
     this.alwaysExpectJSON = options.alwaysExpectJSON ?? true;
     this.onRequestFinished = options.onRequestFinished;
+    this.retryOnUnauthorized = options.retryOnUnauthorized;
 
     this.resolveMethods(options.endpoints);
   }
@@ -174,57 +178,61 @@ export class APIProxy<T extends {}> {
 
         const requestMethod = method ?? (methodSettings.method ?? "get").toUpperCase();
 
-        const initialheaders = Object.assign(
-          this.getDefaultHeaders(requestMethod as RequestMethod),
-          this.commonHeaders ?? {},
-          this.getCommonHeaders?.() ?? {},
-          methodSettings.headers ?? {},
-          headers ?? {},
-        );
+        const buildRequestParams = (): RequestInit => {
+          const initialheaders = Object.assign(
+            this.getDefaultHeaders(requestMethod as RequestMethod),
+            this.commonHeaders ?? {},
+            this.getCommonHeaders?.() ?? {},
+            methodSettings.headers ?? {},
+            headers ?? {},
+          );
 
-        const requestHeaders = new Headers(initialheaders);
+          const requestHeaders = new Headers(initialheaders);
 
-        const requestParams: RequestInit = {
-          method: requestMethod,
-          headers: requestHeaders,
-          mode: this.requestMode,
-          credentials: this.requestMode === "cors" ? "omit" : "same-origin",
+          const params: RequestInit = {
+            method: requestMethod,
+            headers: requestHeaders,
+            mode: this.requestMode,
+            credentials: this.requestMode === "cors" ? "omit" : "same-origin",
+          };
+
+          if (signal) {
+            params.signal = signal;
+          }
+
+          if (requestMethod !== "GET") {
+            const contentType = requestHeaders.get("Content-Type");
+            const { sharedParams } = this;
+            const extendedBody = body ?? {};
+
+            if (extendedBody instanceof FormData) {
+              Object.entries(sharedParams ?? {}).forEach(([key, value]) => {
+                extendedBody.append(key, value);
+              });
+            } else {
+              Object.assign(extendedBody, {
+                ...(sharedParams ?? {}),
+                ...(body ?? {}),
+              });
+            }
+
+            if (extendedBody instanceof FormData || extendedBody instanceof URLSearchParams) {
+              params.body = extendedBody;
+            } else if (contentType === "multipart/form-data") {
+              params.body = this.createRequestBody(extendedBody);
+            } else if (contentType === "application/json") {
+              params.body = this.bodyToJSON(extendedBody);
+            }
+
+            if (contentType === "multipart/form-data") {
+              requestHeaders.delete("Content-Type");
+            }
+          }
+
+          return params;
         };
 
-        if (signal) {
-          requestParams.signal = signal;
-        }
-
-        if (requestMethod !== "GET") {
-          const contentType = requestHeaders.get("Content-Type");
-          const { sharedParams } = this;
-          const extendedBody = body ?? {};
-
-          if (extendedBody instanceof FormData) {
-            Object.entries(sharedParams ?? {}).forEach(([key, value]) => {
-              extendedBody.append(key, value);
-            });
-          } else {
-            Object.assign(extendedBody, {
-              ...(sharedParams ?? {}),
-              ...(body ?? {}),
-            });
-          }
-
-          if (extendedBody instanceof FormData || extendedBody instanceof URLSearchParams) {
-            requestParams.body = extendedBody;
-          } else if (contentType === "multipart/form-data") {
-            requestParams.body = this.createRequestBody(extendedBody);
-          } else if (contentType === "application/json") {
-            requestParams.body = this.bodyToJSON(extendedBody);
-          }
-
-          // @todo better check for files maybe?
-          if (contentType === "multipart/form-data") {
-            // fetch will set correct header with boundaries
-            requestHeaders.delete("Content-Type");
-          }
-        }
+        let requestParams = buildRequestParams();
 
         /** @type {Response} */
         let rawResponse: Response;
@@ -234,18 +242,18 @@ export class APIProxy<T extends {}> {
           methodSettings.mock instanceof Function &&
           (methodSettings.forceMock || (isDevelopment && this.mockDisabled !== true));
 
-        if (useMock) {
-          rawResponse = await this.mockRequest(apiCallURL, urlParams, requestParams, methodSettings);
-        } else {
+        const performFetch = async () => {
+          if (useMock) {
+            return this.mockRequest(apiCallURL, urlParams, requestParams, methodSettings);
+          }
+
           try {
-            rawResponse = await fetch(apiCallURL, requestParams);
+            return await fetch(apiCallURL, requestParams);
           } catch (err: unknown) {
             if (!(err instanceof Error)) {
               console.warn("Can't handle error", err);
               return null;
             }
-            // we don't want the user to see some of the errors
-            // so we fail silently
             if (err.message.match(IGNORED_ERRORS) !== null) {
               IGNORED_ERRORS.lastIndex = -1;
               return null;
@@ -255,7 +263,32 @@ export class APIProxy<T extends {}> {
             responseResult = this.generateException(error);
             return new Response(`${err.name}: ${err.message}`, { status: 500 });
           }
+        };
+
+        rawResponse = (await performFetch()) as Response;
+        if (rawResponse && this.retryOnUnauthorized && !useMock) {
+          const shouldRetryAuth = async (response: Response) => {
+            if (response.status === 401) return true;
+            if (!response.ok) return false;
+            try {
+              const text = await response.clone().text();
+              const data = text ? JSON.parse(text) : null;
+              return isGatewaySessionExpiredPayload(data);
+            } catch {
+              return false;
+            }
+          };
+
+          if (await shouldRetryAuth(rawResponse)) {
+            const shouldRetry = await this.retryOnUnauthorized();
+            if (shouldRetry) {
+              requestParams = buildRequestParams();
+              rawResponse = (await performFetch()) as Response;
+            }
+          }
         }
+
+        if (!rawResponse) return responseResult;
 
         this.onRequestFinished?.(rawResponse);
         if (raw) return rawResponse;

@@ -10,7 +10,7 @@ import { useProject } from "../../providers/ProjectProvider";
 import { useContextProps, useParams } from "../../providers/RoutesProvider";
 import { addCrumb, deleteCrumb } from "../../services/breadrumbs";
 import { cn } from "../../utils/bem";
-import { getMainPlatformAuthHeaders } from "../../utils/getMainPlatformToken";
+import { getMainPlatformAuthHeaders, retryEmbedAuth } from "../../utils/getMainPlatformToken";
 import { isDefined } from "../../utils/helpers";
 import { ImportModal } from "../CreateProject/Import/ImportModal";
 import { ExportPage } from "../ExportPage/ExportPage";
@@ -41,7 +41,8 @@ const initializeDataManager = async (root, props, params, runtimeUser) => {
     polling: window.APP_SETTINGS?.polling,
     showPreviews: false,
     apiEndpoints: APIConfig.endpoints,
-    apiHeaders: getMainPlatformAuthHeaders(),
+    getCommonHeaders: () => getMainPlatformAuthHeaders(),
+    retryOnUnauthorized: retryEmbedAuth,
     interfaces: {
       import: true,
       export: true,

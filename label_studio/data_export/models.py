@@ -20,8 +20,9 @@ from django.utils.translation import gettext_lazy as _
 from label_studio_sdk.converter import Converter
 from tasks.models import Annotation
 
-logger = logging.getLogger(__name__)
+from data_export.token_utils import get_export_access_token
 
+logger = logging.getLogger(__name__)
 
 ExportMixin = load_func(settings.EXPORT_MIXIN)
 
@@ -142,7 +143,7 @@ class DataExport(object):
         return sorted(formats, key=lambda f: f.get('disabled', False))
 
     @staticmethod
-    def generate_export_file(project, tasks, output_format, download_resources, get_args, hostname=None):
+    def generate_export_file(project, tasks, output_format, download_resources, get_args, hostname=None, user=None):
         """Generate export file and return it as an open file object.
 
         Be sure to close the file after using it, to avoid wasting disk space.
@@ -161,7 +162,7 @@ class DataExport(object):
             project_dir=None,
             upload_dir=os.path.join(settings.MEDIA_ROOT, settings.UPLOAD_DIR),
             download_resources=download_resources,
-            access_token=project.organization.created_by.auth_token.key,
+            access_token=get_export_access_token(project, user=user),
             hostname=hostname,
         )
         with get_temp_dir() as tmp_dir:

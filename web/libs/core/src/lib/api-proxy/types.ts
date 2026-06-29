@@ -32,6 +32,8 @@ export type APIProxyOptions<T extends {}> = {
   sharedParams?: Record<string, any>;
   alwaysExpectJSON?: boolean;
   onRequestFinished?: (res: Response) => void;
+  /** When set, called on 401 before a single retry with refreshed auth headers (e.g. embed token refresh). */
+  retryOnUnauthorized?: () => Promise<boolean>;
 };
 
 export type ResponseMeta = {

@@ -16,6 +16,7 @@ from core.utils.io import (
     get_all_files_from_dir,
     get_temp_dir,
 )
+from data_export.token_utils import get_export_access_token
 from data_manager.models import View
 from django.conf import settings
 from django.core.files import File
@@ -353,7 +354,7 @@ class ExportMixin:
                 upload_dir=out_dir,
                 download_resources=download_resources,
                 # for downloading resource we need access to the API
-                access_token=self.project.organization.created_by.auth_token.key,
+                access_token=get_export_access_token(self.project),
                 hostname=hostname,
             )
             input_name = pathlib.Path(self.file.name).name

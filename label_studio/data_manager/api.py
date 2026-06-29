@@ -340,7 +340,10 @@ class TaskListAPI(generics.ListCreateAPIView):
         }
 
     def get_task_queryset(self, request, prepare_params):
-        return Task.prepared.only_filtered(prepare_params=prepare_params)
+        from projects.workflow_services import apply_workflow_queue_filter
+
+        queryset = Task.prepared.only_filtered(prepare_params=prepare_params)
+        return apply_workflow_queue_filter(queryset, request, prepare_params)
 
     @staticmethod
     def prefetch(queryset):

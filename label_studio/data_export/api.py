@@ -246,7 +246,8 @@ class ExportAPI(generics.RetrieveAPIView):
         logger.debug('Prepare export files')
 
         export_file, content_type, filename = DataExport.generate_export_file(
-            project, tasks, export_type, download_resources, request.GET, hostname=request.build_absolute_uri('/')
+            project, tasks, export_type, download_resources, request.GET,
+            hostname=request.build_absolute_uri('/'), user=request.user,
         )
 
         r = FileResponse(export_file, as_attachment=True, content_type=content_type, filename=filename)

@@ -422,6 +422,39 @@ def queryset_my_tasks(project, user, stage: str, *, search: str | None = None, s
     return qs
 
 
+def apply_workflow_queue_filter(queryset, request, prepare_params):
+    """Restrict a DM task queryset to the current user's my-tasks queue when workflow_queue is set.
+
+    Used by Explorer/labeling sidebar so entries from /my-tasks only list the user's own tasks.
+    Without workflow_queue, the queryset is returned unchanged.
+    """
+    if prepare_params is None or getattr(prepare_params, 'is_multi_project', False):
+        return queryset
+
+    workflow_queue = request.GET.get('workflow_queue')
+    if not workflow_queue and hasattr(request, 'data'):
+        workflow_queue = request.data.get('workflow_queue')
+    if not workflow_queue or not str(workflow_queue).strip():
+        return queryset
+
+    stage = str(workflow_queue).strip()
+    if stage not in ('annotate', 'review', 'accept'):
+        return queryset.none()
+
+    project_id = prepare_params.project
+    project = project_id if hasattr(project_id, 'task_workflow_enabled') else None
+    if project is None:
+        from projects.models import Project
+
+        project = Project.objects.get(pk=project_id)
+
+    if not project.task_workflow_enabled:
+        return queryset
+
+    my_tasks = queryset_my_tasks(project, request.user, stage)
+    return queryset.filter(id__in=my_tasks.values('id'))
+
+
 def workflow_stream_next_task(project, user, stage: str):
     """Get the next task for workflow stream mode (one at a time, ordered by task id).
 

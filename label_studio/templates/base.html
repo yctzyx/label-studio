@@ -201,6 +201,8 @@
         allow_organization_webhooks: {{settings.ALLOW_ORGANIZATION_WEBHOOKS|yesno:"true,false"}},
         storage_persistence: {{ settings.STORAGE_PERSISTENCE|yesno:"true,false" }},
       },
+      llm_ml_backend_url: "{{ settings.LLM_ML_BACKEND_URL|escapejs }}",
+      grounding_dino_ml_backend_url: "{{ settings.GROUNDING_DINO_ML_BACKEND_URL|escapejs }}",
     {% endblock %}
 
   }, {% block frontend_settings %}{}{% endblock %});

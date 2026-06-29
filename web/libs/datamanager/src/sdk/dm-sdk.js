@@ -21,6 +21,8 @@
  * apiEndpoints: import("../utils/api-proxy").Endpoints,
  * apiMockDisabled: boolean,
  * apiHeaders?: Dict<string>,
+ * getCommonHeaders?: () => Dict<string>,
+ * retryOnUnauthorized?: () => Promise<boolean>,
  * settings: Dict<any>,
  * labelStudio: Dict<any>,
  * env: "development" | "production",
@@ -187,6 +189,8 @@ export class DataManager {
         apiMockDisabled: config.apiMockDisabled,
         apiSharedParams: config.apiSharedParams,
         apiHeaders: config.apiHeaders,
+        getCommonHeaders: config.getCommonHeaders,
+        retryOnUnauthorized: config.retryOnUnauthorized,
       }),
     );
 
@@ -215,12 +219,14 @@ export class DataManager {
     this._projectId = value;
   }
 
-  apiConfig({ apiGateway, apiEndpoints, apiMockDisabled, apiSharedParams, apiHeaders }) {
+  apiConfig({ apiGateway, apiEndpoints, apiMockDisabled, apiSharedParams, apiHeaders, getCommonHeaders, retryOnUnauthorized }) {
     const config = Object.assign({}, APIConfig);
 
     config.gateway = apiGateway ?? config.gateway;
     config.mockDisabled = apiMockDisabled;
     config.commonHeaders = apiHeaders;
+    config.getCommonHeaders = getCommonHeaders;
+    config.retryOnUnauthorized = retryOnUnauthorized;
 
     Object.assign(config.endpoints, apiEndpoints ?? {});
     const sharedParams = {};

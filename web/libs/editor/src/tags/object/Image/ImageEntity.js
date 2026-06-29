@@ -7,6 +7,7 @@ import { FF_IMAGE_MEMORY_USAGE, isFF } from "../../../utils/feature-flags";
 const fileLoader = new FileLoader();
 
 const resetStalePreloadState = (self) => {
+  fileLoader.clearError(self.src);
   self.releaseImage();
   self.setCurrentSrc(undefined);
   self.setDownloaded(false);

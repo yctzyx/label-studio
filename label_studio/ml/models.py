@@ -395,7 +395,7 @@ class MLBackend(models.Model):
         return tasks.annotate(predictions_count=Count('predictions')).filter(predictions_count=0)
 
     def predict_tasks(self, tasks):
-        model_version = self.update_state()
+        self.update_state()
         if self.not_ready:
             logger.info('ML backend %s is not ready, skip predict_tasks', self)
             return
@@ -410,7 +410,7 @@ class MLBackend(models.Model):
                 self,
                 self.get_prediction_model_version(),
             )
-            return model_version
+            return self.get_prediction_model_version()
 
         task_ids = list(tasks.values_list('id', flat=True))
         batch_size = max(1, int(get_env('ML_PREDICT_BATCH_SIZE', 1)))
@@ -422,7 +422,7 @@ class MLBackend(models.Model):
             predictions.extend(self._get_predictions_from_ml_backend(tasks_ser))
 
         if not predictions:
-            return model_version
+            return self.get_prediction_model_version()
 
         with conditional_atomic(predicate=db_is_not_sqlite):
             prediction_ser = PredictionSerializer(data=predictions, many=True)

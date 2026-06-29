@@ -39,4 +39,10 @@ export { ff };
 // Image cache for shared use across editor and datamanager
 export { imageCache } from "./lib/utils/ImageCache";
 export { needsImageAuthHeaders, waitForAuthHeaders, waitBeforeAuthRetry } from "./lib/utils/imageAuth";
+export {
+  GATEWAY_SESSION_EXPIRED_CODES,
+  isGatewaySessionExpiredPayload,
+  blobIndicatesGatewayAuthFailure,
+  requestParentTokenRefresh,
+} from "./lib/utils/gatewayAuth";
 export { getStaticOrigin, resolvePublicStaticUrl, trimStaticOrigin } from "./lib/utils/resolveStaticOrigin";

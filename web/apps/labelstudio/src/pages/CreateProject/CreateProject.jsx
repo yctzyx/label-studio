@@ -132,7 +132,8 @@ export const CreateProject = ({ onClose }) => {
   const [step, _setStep] = React.useState("name"); // name | import | config
   const [waiting, setWaitingStatus] = React.useState(false);
 
-  const { project, setProject: updateProject, resetProject } = useDraftProject();
+  const { project, setProject: updateProject, resetProject, ensureBackendDraft, discardBackendDraft } =
+    useDraftProject();
   const history = useHistory();
   const api = useAPI();
 
@@ -175,6 +176,44 @@ export const CreateProject = ({ onClose }) => {
 
   const { columns, uploading, uploadDisabled, hasImportData, finishUpload, pageProps, parentDatasetSelection } =
     useImportPage(project, sample);
+
+  const prepareProjectForParentSync = React.useCallback(async () => {
+    if (!parentDatasetSelection) {
+      throw new Error("No parent dataset selected");
+    }
+
+    const draft = await ensureBackendDraft({
+      title: name.trim() || undefined,
+      description,
+      label_config: project?.label_config ?? "<View></View>",
+      data_type_category: dataTypeCategory,
+      template_group: templateGroup,
+    });
+
+    const parentPayload = mapParentSelectionToPayload(parentDatasetSelection);
+    const updated = await api.callApi("updateProject", {
+      params: { pk: draft.id },
+      body: { parent_platform_dataset: parentPayload },
+      errorFilter: () => true,
+    });
+
+    if (!updated || updated.error) {
+      throw new Error(updated?.error || updated?.detail || "Failed to bind parent dataset");
+    }
+
+    updateProject(updated);
+    return updated;
+  }, [
+    api,
+    ensureBackendDraft,
+    parentDatasetSelection,
+    name,
+    description,
+    project?.label_config,
+    dataTypeCategory,
+    templateGroup,
+    updateProject,
+  ]);
 
   const rootClass = cn("create-project");
   const tabClass = rootClass.elem("tab");
@@ -233,7 +272,7 @@ export const CreateProject = ({ onClose }) => {
 
     setWaitingStatus(true);
 
-    const createBody = {
+    const saveBody = {
       ...projectBody,
       title: trimmedName,
       is_draft: false,
@@ -241,25 +280,40 @@ export const CreateProject = ({ onClose }) => {
 
     const parentPayload = mapParentSelectionToPayload(parentDatasetSelection);
     if (parentPayload) {
-      createBody.parent_platform_dataset = parentPayload;
+      saveBody.parent_platform_dataset = parentPayload;
     }
 
-    const response = await api.callApi("createProject", {
-      body: createBody,
-    });
+    let response;
+
+    if (project?.id) {
+      response = await api.callApi("updateProject", {
+        params: { pk: project.id },
+        body: saveBody,
+        errorFilter: () => true,
+      });
+    } else {
+      response = await api.callApi("createProject", {
+        body: saveBody,
+        errorFilter: () => true,
+      });
+    }
 
     if (!response || response.error) {
       setWaitingStatus(false);
       return;
     }
 
+    updateProject(response);
+
     const imported = await finishUpload(response);
 
     if (!imported) {
-      await api.callApi("deleteProject", {
-        params: { pk: response.id },
-        errorFilter: () => true,
-      });
+      if (response.id) {
+        await api.callApi("deleteProject", {
+          params: { pk: response.id },
+          errorFilter: () => true,
+        });
+      }
       setWaitingStatus(false);
       return;
     }
@@ -289,6 +343,8 @@ export const CreateProject = ({ onClose }) => {
     setStep,
     api,
     history,
+    project,
+    updateProject,
     resetProject,
   ]);
 
@@ -325,10 +381,10 @@ export const CreateProject = ({ onClose }) => {
     [persistProjectMeta],
   );
 
-  const onDelete = React.useCallback(() => {
-    resetProject();
+  const onDelete = React.useCallback(async () => {
+    await discardBackendDraft();
     onClose?.();
-  }, [onClose, resetProject]);
+  }, [onClose, discardBackendDraft]);
 
   return (
     <Modal onHide={onDelete} closeOnClickOutside={false} allowToInterceptEscape fullscreen visible bare>
@@ -384,6 +440,7 @@ export const CreateProject = ({ onClose }) => {
           sample={sample}
           onSampleDatasetSelect={setSample}
           openLabelingConfig={() => setStep("config")}
+          prepareProjectForParentSync={prepareProjectForParentSync}
           {...pageProps}
         />
         <ConfigPage

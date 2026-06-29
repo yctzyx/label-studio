@@ -33,6 +33,7 @@ export const AuthImage = ({ src, alt = "", ...props }: AuthImageProps) => {
 
     const load = async () => {
       imageCache.evictExpired();
+      imageCache.forceRemove(src);
       await waitForAuthHeaders();
       if (cancelled) return;
 

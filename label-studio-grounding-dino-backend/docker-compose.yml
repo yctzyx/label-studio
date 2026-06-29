@@ -25,6 +25,10 @@ services:
       - DEFAULT_PROMPT=${DEFAULT_PROMPT:-}
       - BOX_THRESHOLD=${BOX_THRESHOLD:-0.30}
       - TEXT_THRESHOLD=${TEXT_THRESHOLD:-0.25}
+      - HF_HOME=/root/.cache/huggingface
+      - TRANSFORMERS_CACHE=/root/.cache/huggingface
+      - TRANSFORMERS_OFFLINE=1
+      - HF_HUB_OFFLINE=1
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:

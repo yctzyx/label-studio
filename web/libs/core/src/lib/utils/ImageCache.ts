@@ -4,6 +4,7 @@
  */
 
 import { needsImageAuthHeaders, waitBeforeAuthRetry } from "./imageAuth";
+import { blobIndicatesGatewayAuthFailure, requestParentTokenRefresh } from "./gatewayAuth";
 
 /**
  * Custom error class for image cache errors that should not be sent to Sentry
@@ -189,13 +190,13 @@ class ImageCacheManager {
         if (xhr.readyState === 4 && xhr.status === 200) {
           const blob = xhr.response as Blob;
 
-          // Gateway may return HTML/JSON login page with 200 when session expired
-          if (
+          const authFailure =
             needsImageAuthHeaders() &&
-            blob?.type &&
-            !blob.type.startsWith("image/") &&
-            attempt < this.maxAuthRetries
-          ) {
+            ((await blobIndicatesGatewayAuthFailure(blob)) ||
+              Boolean(blob?.type && !blob.type.startsWith("image/")));
+
+          // Gateway may return JSON auth error with HTTP 200 when session expired
+          if (authFailure && attempt < this.maxAuthRetries) {
             await waitBeforeAuthRetry(attempt);
             this.loadImage(url, crossOrigin, onProgress, attempt + 1)
               .then(resolve)
@@ -205,6 +206,13 @@ class ImageCacheManager {
 
           // Validate blob size - reject empty or too small blobs
           if (!blob || blob.size < this.minBlobSize) {
+            if (needsImageAuthHeaders() && attempt < this.maxAuthRetries) {
+              await waitBeforeAuthRetry(attempt);
+              this.loadImage(url, crossOrigin, onProgress, attempt + 1)
+                .then(resolve)
+                .catch(reject);
+              return;
+            }
             reject(
               new ImageCacheError(`Empty or invalid image data received: ${url} (size: ${blob?.size ?? 0} bytes)`),
             );
@@ -213,6 +221,13 @@ class ImageCacheManager {
 
           // Validate content type is an image
           if (blob.type && !blob.type.startsWith("image/")) {
+            if (needsImageAuthHeaders() && attempt < this.maxAuthRetries) {
+              await waitBeforeAuthRetry(attempt);
+              this.loadImage(url, crossOrigin, onProgress, attempt + 1)
+                .then(resolve)
+                .catch(reject);
+              return;
+            }
             reject(new ImageCacheError(`Invalid content type for image: ${blob.type} (url: ${url})`));
             return;
           }
@@ -266,6 +281,9 @@ class ImageCacheManager {
             .then(resolve)
             .catch(reject);
         } else {
+          if (needsImageAuthHeaders() && attempt >= this.maxAuthRetries) {
+            requestParentTokenRefresh();
+          }
           reject(new ImageCacheError(`Failed to download image: ${xhr.status}`));
         }
       });

@@ -1,4 +1,5 @@
 import { flow, getRoot, getSnapshot, types } from "mobx-state-tree";
+import { isGatewaySessionExpiredPayload } from "@humansignal/core/lib/utils/gatewayAuth";
 import { DataStore, DataStoreItem } from "../../mixins/DataStore";
 import { getAnnotationSnapshot } from "../../sdk/lsf-utils";
 import { isDefined } from "../../utils/utils";
@@ -8,6 +9,15 @@ import { CustomJSON } from "../types";
 import { FF_DEV_2536, FF_DISABLE_GLOBAL_USER_FETCHING, FF_LOPS_E_3, isFF } from "../../utils/feature-flags";
 
 const SIMILARITY_UPPER_LIMIT_PRECISION = 1000;
+
+/** Gateway may return HTTP 200 + {code:400001004} instead of task JSON when token expires. */
+const isInvalidTaskResponse = (taskData) => {
+  if (!taskData || taskData.error) return true;
+  if (isGatewaySessionExpiredPayload(taskData)) return true;
+  if (!isDefined(taskData.id) && taskData.code != null) return true;
+  return false;
+};
+
 const fileAttributes = types.model({
   certainty: types.optional(types.maybeNull(types.number), 0),
   distance: types.optional(types.maybeNull(types.number), 0),
@@ -164,12 +174,19 @@ export const create = (columns) => {
 
         const taskData = yield self.root.apiCall("task", taskParams);
 
-        if (taskData.status === 404) {
+        if (taskData.status === 404 || isInvalidTaskResponse(taskData)) {
           self.finishLoading(taskID);
-          getRoot(self).SDK.invoke("crash", {
-            error: `Task ID: ${taskID} does not exist or is no longer available`,
-            redirect: true,
-          });
+          if (isInvalidTaskResponse(taskData)) {
+            getRoot(self).SDK.invoke("crash", {
+              error: "登录已过期，请刷新页面后重试",
+              redirect: false,
+            });
+          } else {
+            getRoot(self).SDK.invoke("crash", {
+              error: `Task ID: ${taskID} does not exist or is no longer available`,
+              redirect: true,
+            });
+          }
           return null;
         }
         const task = self.applyTaskSnapshot(taskData, taskID);
@@ -202,6 +219,14 @@ export const create = (columns) => {
           return null;
         }
 
+        if (isInvalidTaskResponse(taskData)) {
+          getRoot(self).SDK.invoke("crash", {
+            error: "登录已过期，请刷新页面后重试",
+            redirect: false,
+          });
+          return null;
+        }
+
         const labelStreamModeChanged =
           self.selected && self.selected.assigned_task !== taskData.assigned_task && taskData.assigned_task === false;
 
@@ -227,12 +252,14 @@ export const create = (columns) => {
       applyTaskSnapshot(taskData, taskID) {
         let task;
 
-        if (taskData && !taskData?.error) {
-          const id = taskID ?? taskData.id;
+        const id = taskID ?? taskData?.id;
+
+        if (taskData && !isInvalidTaskResponse(taskData) && isDefined(id)) {
           const snapshot = self.mergeSnapshot(id, taskData);
 
           task = self.updateItem(id, {
             ...snapshot,
+            id,
             source: JSON.stringify(taskData),
           });
         }

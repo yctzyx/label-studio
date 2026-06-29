@@ -9,7 +9,7 @@ import type { ApiResponse } from "@humansignal/core/lib/api-proxy/types";
 import { ErrorWrapper } from "../components/Error/Error";
 import { modal } from "../components/Modal/Modal";
 import { API_CONFIG } from "../config/ApiConfig";
-import { getMainPlatformAuthHeaders, isEmbeddedLayout, isWujieEmbed } from "../utils/getMainPlatformToken";
+import { getMainPlatformAuthHeaders, isEmbeddedLayout, isWujieEmbed, retryEmbedAuth } from "../utils/getMainPlatformToken";
 
 // Expose auth headers for image requests (ImageCache, FileLoader) when embedded - gateway requires token
 declare global {
@@ -36,6 +36,7 @@ export const IMPROVE_GLOBAL_ERROR_MESSAGES = isFF(FF_IMPROVE_GLOBAL_ERROR_MESSAG
 const apiInstance = createApiInstance({
   ...API_CONFIG,
   getCommonHeaders: () => getMainPlatformAuthHeaders(),
+  retryOnUnauthorized: retryEmbedAuth,
   onRequestFinished(res) {
     if (res.status === 401 && !isWujieEmbed()) {
       location.href = "/";
@@ -191,10 +192,22 @@ export const ApiProvider = forwardRef<ApiContextType, PropsWithChildren<Record<s
   // When embedded (无界 / iframe), provide auth headers for image requests (ImageCache, FileLoader)
   // so /data/upload/* and parent-dataset proxy requests include Authorization for the gateway
   useEffect(() => {
-    if (isEmbeddedLayout()) {
-      window.__LS_IMAGE_REQUEST_HEADERS__ = () => getMainPlatformAuthHeaders();
-    }
+    if (!isEmbeddedLayout()) return;
+
+    window.__LS_IMAGE_REQUEST_HEADERS__ = () => getMainPlatformAuthHeaders();
+
+    const onResume = async () => {
+      if (document.visibilityState === "hidden") return;
+      const { requestParentTokenRefresh } = await import("@humansignal/core/lib/utils/gatewayAuth");
+      await requestParentTokenRefresh();
+    };
+
+    document.addEventListener("visibilitychange", onResume);
+    window.addEventListener("focus", onResume);
+
     return () => {
+      document.removeEventListener("visibilitychange", onResume);
+      window.removeEventListener("focus", onResume);
       delete (window as any).__LS_IMAGE_REQUEST_HEADERS__;
     };
   }, []);

@@ -46,4 +46,6 @@ export interface ApiProviderConfig {
   sharedParams?: Record<string, unknown>;
   mockDelay?: number;
   mockDisabled?: boolean;
+  /** When set, called on 401 before a single retry with refreshed auth headers (e.g. embed token refresh). */
+  retryOnUnauthorized?: () => Promise<boolean>;
 }

@@ -32,9 +32,22 @@ export async function waitForAuthHeaders(timeoutMs = 5000, intervalMs = 100): Pr
 
 /**
  * Backoff + wait for a fresh token before retrying a failed authenticated image request.
+ * Polls until Authorization header changes (parent platform refreshed token) or timeout.
  */
 export async function waitBeforeAuthRetry(attempt: number): Promise<void> {
+  const { requestParentTokenRefresh } = await import("./gatewayAuth");
+  await requestParentTokenRefresh();
+
   const backoff = Math.min(300 * 2 ** attempt, 3000);
+  const previousAuth = window.__LS_IMAGE_REQUEST_HEADERS__?.()?.Authorization;
   await delay(backoff);
+
+  const deadline = Date.now() + 5000;
+  while (Date.now() < deadline) {
+    const currentAuth = window.__LS_IMAGE_REQUEST_HEADERS__?.()?.Authorization;
+    if (currentAuth && currentAuth !== previousAuth) return;
+    await delay(100);
+  }
+
   await waitForAuthHeaders(3000, 100);
 }

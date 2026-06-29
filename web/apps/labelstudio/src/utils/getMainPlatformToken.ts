@@ -10,9 +10,13 @@ declare global {
     $wujie?: {
       props?: {
         getUser?: () => { token?: string; [key: string]: unknown };
+        /** Parent may refresh token when sub-app reports session expiry */
+        refreshToken?: () => Promise<unknown>;
+        onTokenExpired?: () => void;
         /** Optional: platform origin for /static proxy (e.g. http://platform:5173). See getStaticOrigin in @humansignal/core. */
         getStaticOrigin?: () => string | null | undefined;
       };
+      bus?: { $emit?: (event: string, ...args: unknown[]) => void };
     };
   }
 }
@@ -99,4 +103,33 @@ export async function waitForMainPlatformToken(
   }
 
   return token;
+}
+
+/**
+ * Wait for a fresh platform token after 401 / idle session (embed only).
+ * Returns true when a token is available for retry.
+ */
+export async function retryEmbedAuth(
+  options: { timeoutMs?: number; intervalMs?: number } = {},
+): Promise<boolean> {
+  if (!isWujieEmbed()) return false;
+
+  const { requestParentTokenRefresh } = await import("@humansignal/core/lib/utils/gatewayAuth");
+  await requestParentTokenRefresh();
+
+  const { timeoutMs = 5000, intervalMs = 100 } = options;
+  const previousToken = getMainPlatformToken();
+
+  await delay(300);
+
+  const deadline = Date.now() + timeoutMs;
+  let token = getMainPlatformToken();
+
+  while (Date.now() < deadline) {
+    if (token && (!previousToken || token !== previousToken)) return true;
+    await delay(intervalMs);
+    token = getMainPlatformToken();
+  }
+
+  return Boolean(token);
 }
