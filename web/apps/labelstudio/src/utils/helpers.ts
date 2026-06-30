@@ -128,6 +128,22 @@ export const clamp = (value: number, min: number, max: number) => {
   return Math.max(min, Math.min(value, max));
 };
 
+/** 父平台同步：real_name → first_name/last_name，login_name → username（手机号） */
+export const formatUserNameWithPhone = (
+  user: { first_name?: string; last_name?: string; username?: string } = {},
+) => {
+  const name = [user.first_name, user.last_name]
+    .map((part) => String(part ?? "").trim())
+    .filter(Boolean)
+    .join("")
+    .trim();
+  const phone = String(user.username ?? "").trim();
+  if (name && phone) return `${name}(${phone})`;
+  if (name) return name;
+  if (phone) return phone;
+  return "—";
+};
+
 export const getLastTraceback = (traceback: string): string => {
   const lines = traceback.split("\n");
   let lastTraceIndex = -1;

@@ -361,6 +361,25 @@ $pi-bg-header: #fafafa;
     }
   }
 
+  &__status-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    max-width: 280px;
+  }
+
+  &__reject-reason {
+    font-size: 12px;
+    line-height: 1.4;
+    color: $pi-text-secondary;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    word-break: break-word;
+  }
+
   /* fast-pagination 风格 */
   &__pagination {
     display: flex;

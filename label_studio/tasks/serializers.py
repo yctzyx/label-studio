@@ -235,11 +235,9 @@ class BaseTaskSerializer(FlexFieldsModelSerializer):
             wf = obj.workflow
         except ObjectDoesNotExist:
             return None
-        return {
-            'stage': wf.stage,
-            'current_assignee_id': wf.current_assignee_id,
-            'returned_to_annotation': bool(getattr(wf, 'returned_to_annotation', False)),
-        }
+        from projects.workflow_services import serialize_workflow_for_api
+
+        return serialize_workflow_for_api(wf)
 
     def project(self, task=None):
         """Take the project from context"""

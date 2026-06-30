@@ -6,6 +6,7 @@ import { useUpdatePageTitle } from "@humansignal/core";
 import { useAPI } from "../../providers/ApiProvider";
 import { useParams } from "../../providers/RoutesProvider";
 import { cn } from "../../utils/bem";
+import { formatUserNameWithPhone } from "../../utils/helpers";
 import "./ProjectTeamWorkflowPage.scss";
 
 const ROLES = [
@@ -33,6 +34,7 @@ function teamRowsToMembersByRole(rows) {
       userId: row.user_id,
       allocationId: row.id,
       username: row.username ?? "",
+      displayLabel: formatUserNameWithPhone(row),
       displayName: row.email || row.username || String(row.user_id),
       teams: ["组织成员"],
       status: "enabled",
@@ -144,7 +146,7 @@ function OrgTreeUserList({
       .map((g) => ({
         ...g,
         users: g.users.filter((u) => {
-          const s = `${u.username} ${u.title} ${u.email ?? ""}`.toLowerCase();
+          const s = `${u.displayLabel} ${u.username} ${u.email ?? ""}`.toLowerCase();
           return s.includes(q);
         }),
       }))
@@ -198,7 +200,7 @@ function OrgTreeUserList({
                         id={rowId}
                         onClick={(e) => e.stopPropagation()}
                       />
-                      <label htmlFor={rowId}>{u.title}({u.username})</label>
+                      <label htmlFor={rowId}>{u.displayLabel}</label>
                     </div>
                   );
                 })}
@@ -309,12 +311,15 @@ export const ProjectTeamWorkflowPage = () => {
         for (const row of rows) {
           const u = row?.user;
           if (!u?.id) continue;
-          const displayTitle = [u.first_name, u.last_name].filter(Boolean).join(" ") || u.username;
+          const displayLabel = formatUserNameWithPhone(u);
           users.push({
             id: u.id,
             username: u.username,
             email: u.email,
-            title: displayTitle,
+            first_name: u.first_name,
+            last_name: u.last_name,
+            phone: u.phone,
+            displayLabel,
           });
         }
         users.sort((a, b) => String(a.username || "").localeCompare(String(b.username || ""), "zh-CN"));
@@ -362,7 +367,7 @@ export const ProjectTeamWorkflowPage = () => {
     }
     return orgGroups.reduce((sum, g) => {
       const n = g.users.filter((u) => {
-        const s = `${u.username} ${u.title} ${u.email ?? ""}`.toLowerCase();
+        const s = `${u.displayLabel} ${u.username} ${u.email ?? ""}`.toLowerCase();
         return s.includes(q);
       }).length;
       return sum + n;
@@ -724,7 +729,7 @@ export const ProjectTeamWorkflowPage = () => {
                     <tr key={`${m.userId}-${m.allocationId}`}>
                       <td>
                         <span className={root.elem("cell-username").toClassName()} title={m.displayName}>
-                          {m.username}
+                          {m.displayLabel}
                         </span>
                       </td>
                       <td>
@@ -873,7 +878,7 @@ export const ProjectTeamWorkflowPage = () => {
                     ) : (
                       allocSlice.map((m) => (
                         <tr key={`${m.userId}-${m.allocationId}`}>
-                          <td>{m.username}</td>
+                          <td>{m.displayLabel}</td>
                           <td>
                             <input
                               className={root.elem("ratio-input").toClassName()}
@@ -1089,9 +1094,7 @@ export const ProjectTeamWorkflowPage = () => {
                           onChange={() => toggleRight(p.id)}
                           id={`right-${p.id}`}
                         />
-                        <label htmlFor={`right-${p.id}`}>
-                          {p.title}({p.username})
-                        </label>
+                        <label htmlFor={`right-${p.id}`}>{p.displayLabel}</label>
                       </div>
                     ))
                   )}

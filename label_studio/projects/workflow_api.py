@@ -15,6 +15,7 @@ from projects.workflow_services import (
     queryset_my_tasks,
     release_workflows_after_team_allocation_removed,
     review_decision,
+    serialize_workflow_for_api,
     submit_annotation_after_labeling,
     workflow_stream_next_task,
 )
@@ -53,11 +54,24 @@ def _visible_org_task(request, pk):
 class TeamAllocationSerializer(serializers.ModelSerializer):
     user_id = serializers.IntegerField(read_only=True)
     username = serializers.CharField(source='user.username', read_only=True)
+    first_name = serializers.CharField(source='user.first_name', read_only=True)
+    last_name = serializers.CharField(source='user.last_name', read_only=True)
+    phone = serializers.CharField(source='user.phone', read_only=True)
     email = serializers.EmailField(source='user.email', read_only=True)
 
     class Meta:
         model = ProjectTeamAllocation
-        fields = ('id', 'user_id', 'username', 'email', 'role', 'allocation_percent')
+        fields = (
+            'id',
+            'user_id',
+            'username',
+            'first_name',
+            'last_name',
+            'phone',
+            'email',
+            'role',
+            'allocation_percent',
+        )
 
 
 class TeamAllocationWriteSerializer(serializers.Serializer):
@@ -252,17 +266,24 @@ class TaskWorkflowReviewAPI(APIView):
 
     class Body(serializers.Serializer):
         approve = serializers.BooleanField()
+        comment = serializers.CharField(required=False, allow_blank=True, max_length=500)
 
     def post(self, request, pk):
         _visible_org_task(request, pk)
         body = self.Body(data=request.data)
         body.is_valid(raise_exception=True)
-        wf = review_decision(pk, request.user, body.validated_data['approve'])
+        wf = review_decision(
+            pk,
+            request.user,
+            body.validated_data['approve'],
+            comment=body.validated_data.get('comment'),
+        )
         return Response(
             {
                 'task_id': wf.task_id,
                 'stage': wf.stage,
                 'current_assignee_id': wf.current_assignee_id,
+                'workflow': serialize_workflow_for_api(wf),
             }
         )
 
@@ -272,17 +293,24 @@ class TaskWorkflowAcceptAPI(APIView):
 
     class Body(serializers.Serializer):
         approve = serializers.BooleanField()
+        comment = serializers.CharField(required=False, allow_blank=True, max_length=500)
 
     def post(self, request, pk):
         _visible_org_task(request, pk)
         body = self.Body(data=request.data)
         body.is_valid(raise_exception=True)
-        wf = accept_decision(pk, request.user, body.validated_data['approve'])
+        wf = accept_decision(
+            pk,
+            request.user,
+            body.validated_data['approve'],
+            comment=body.validated_data.get('comment'),
+        )
         return Response(
             {
                 'task_id': wf.task_id,
                 'stage': wf.stage,
                 'current_assignee_id': wf.current_assignee_id,
+                'workflow': serialize_workflow_for_api(wf),
             }
         )
 
@@ -295,15 +323,7 @@ class TaskWorkflowDetailAPI(APIView):
         wf = getattr(task, 'workflow', None)
         if not wf:
             return Response({'workflow': None})
-        return Response(
-            {
-                'workflow': {
-                    'stage': wf.stage,
-                    'annotate_user_id': wf.annotate_user_id,
-                    'current_assignee_id': wf.current_assignee_id,
-                }
-            }
-        )
+        return Response({'workflow': serialize_workflow_for_api(wf)})
 
 
 class ProjectWorkflowStreamNextAPI(APIView):

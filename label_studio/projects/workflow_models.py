@@ -84,6 +84,24 @@ class TaskWorkflow(models.Model):
         default=False,
         help_text='True after review/accept rejection sent task back to annotator; cleared when annotator resubmits',
     )
+    last_reject_reason = models.TextField(
+        null=True,
+        blank=True,
+        help_text='Most recent review/accept rejection comment for the annotator',
+    )
+    last_rejected_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='When the task was last rejected back to annotate',
+    )
+    last_rejected_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='+',
+        help_text='User who last rejected the task to annotate',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

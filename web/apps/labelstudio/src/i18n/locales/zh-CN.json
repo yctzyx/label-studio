@@ -367,6 +367,7 @@
   "myTasks.statusInReview": "审核中",
   "myTasks.statusInAccept": "验收中",
   "myTasks.statusDone": "已完成",
+  "myTasks.rejectReasonPrefix": "驳回原因：",
   "myTasks.search": "查询",
   "myTasks.reset": "重置",
   "myTasks.col.taskName": "任务名称",

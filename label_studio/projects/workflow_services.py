@@ -10,6 +10,7 @@ from django.db import transaction
 from django.db.models import CharField, Q
 from django.db.models.functions import Cast
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from projects.workflow_models import (
@@ -141,9 +142,71 @@ def pick_next_round_robin(project, role: str) -> User:
 
 def get_task_workflow_or_404(task_id: int) -> TaskWorkflow:
     return get_object_or_404(
-        TaskWorkflow.objects.select_related('task', 'project', 'annotate_user', 'current_assignee'),
+        TaskWorkflow.objects.select_related(
+            'task', 'project', 'annotate_user', 'current_assignee', 'last_rejected_by'
+        ),
         task_id=task_id,
     )
+
+
+REJECT_COMMENT_MAX_LENGTH = 500
+
+
+def normalize_reject_comment(comment: str | None, *, required: bool) -> str | None:
+    """Strip and validate workflow rejection comment."""
+    text = (comment or '').strip()
+    if required and not text:
+        raise ValidationError('驳回时必须填写原因')
+    if text and len(text) > REJECT_COMMENT_MAX_LENGTH:
+        raise ValidationError(f'驳回原因不能超过{REJECT_COMMENT_MAX_LENGTH}字')
+    return text or None
+
+
+def serialize_workflow_for_api(wf: TaskWorkflow | None) -> dict | None:
+    """JSON snapshot of workflow row for task APIs and detail endpoints."""
+    if wf is None:
+        return None
+    payload = {
+        'stage': wf.stage,
+        'current_assignee_id': wf.current_assignee_id,
+        'annotate_user_id': wf.annotate_user_id,
+        'returned_to_annotation': bool(wf.returned_to_annotation),
+    }
+    if wf.returned_to_annotation:
+        payload['last_reject_reason'] = wf.last_reject_reason
+        if wf.last_rejected_at:
+            payload['last_rejected_at'] = wf.last_rejected_at.isoformat()
+        if wf.last_rejected_by_id:
+            payload['last_rejected_by'] = {
+                'id': wf.last_rejected_by_id,
+                'username': wf.last_rejected_by.username if wf.last_rejected_by else None,
+            }
+    return payload
+
+
+def _return_task_to_annotate(wf: TaskWorkflow, *, rejected_by, comment: str | None) -> TaskWorkflow:
+    wf.stage = TaskWorkflowStage.ANNOTATE
+    wf.current_assignee_id = wf.annotate_user_id
+    wf.returned_to_annotation = True
+    wf.last_reject_reason = comment
+    wf.last_rejected_at = timezone.now()
+    wf.last_rejected_by = rejected_by
+    wf.save(
+        update_fields=[
+            'stage',
+            'current_assignee_id',
+            'returned_to_annotation',
+            'last_reject_reason',
+            'last_rejected_at',
+            'last_rejected_by',
+            'updated_at',
+        ]
+    )
+    task = wf.task
+    if task and task.is_labeled:
+        task.is_labeled = False
+        task.save(update_fields=['is_labeled', 'updated_at'])
+    return wf
 
 
 def _mark_task_done(wf: TaskWorkflow) -> None:
@@ -199,7 +262,7 @@ def submit_annotation_after_labeling(task_id: int, user) -> TaskWorkflow:
     return wf
 
 
-def review_decision(task_id: int, user, approve: bool) -> TaskWorkflow:
+def review_decision(task_id: int, user, approve: bool, *, comment: str | None = None) -> TaskWorkflow:
     wf = get_task_workflow_or_404(task_id)
     project = wf.project
     if wf.stage != TaskWorkflowStage.REVIEW:
@@ -208,11 +271,8 @@ def review_decision(task_id: int, user, approve: bool) -> TaskWorkflow:
         raise ValidationError('Not the current reviewer')
 
     if not approve:
-        wf.stage = TaskWorkflowStage.ANNOTATE
-        wf.current_assignee_id = wf.annotate_user_id
-        wf.returned_to_annotation = True
-        wf.save(update_fields=['stage', 'current_assignee_id', 'returned_to_annotation', 'updated_at'])
-        return wf
+        normalized = normalize_reject_comment(comment, required=True)
+        return _return_task_to_annotate(wf, rejected_by=user, comment=normalized)
 
     if _accept_pool_ids(project):
         accepter = pick_next_round_robin(project, ProjectTeamRole.ACCEPT)
@@ -225,7 +285,7 @@ def review_decision(task_id: int, user, approve: bool) -> TaskWorkflow:
     return wf
 
 
-def accept_decision(task_id: int, user, approve: bool) -> TaskWorkflow:
+def accept_decision(task_id: int, user, approve: bool, *, comment: str | None = None) -> TaskWorkflow:
     wf = get_task_workflow_or_404(task_id)
     if wf.stage != TaskWorkflowStage.ACCEPT:
         raise ValidationError('Task is not in accept stage')
@@ -233,11 +293,8 @@ def accept_decision(task_id: int, user, approve: bool) -> TaskWorkflow:
         raise ValidationError('Not the current acceptor')
 
     if not approve:
-        wf.stage = TaskWorkflowStage.ANNOTATE
-        wf.current_assignee_id = wf.annotate_user_id
-        wf.returned_to_annotation = True
-        wf.save(update_fields=['stage', 'current_assignee_id', 'returned_to_annotation', 'updated_at'])
-        return wf
+        normalized = normalize_reject_comment(comment, required=True)
+        return _return_task_to_annotate(wf, rejected_by=user, comment=normalized)
 
     _mark_task_done(wf)
     return wf
@@ -393,7 +450,7 @@ def queryset_my_tasks(project, user, stage: str, *, search: str | None = None, s
                 Q(~Q(workflow__stage=TaskWorkflowStage.ANNOTATE))
                 | Q(workflow__current_assignee_id=user.id)
             )
-            .select_related('workflow', 'project')
+            .select_related('workflow', 'workflow__last_rejected_by', 'project')
         )
     else:
         qs = Task.objects.filter(

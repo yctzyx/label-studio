@@ -11,6 +11,7 @@ import {
 import { isActive, FF_FIT_720_LAZY_LOAD_ANNOTATIONS } from "@humansignal/core/lib/utils/feature-flags";
 import { isDefined } from "../utils/utils";
 import { Modal } from "../components/Common/Modal/Modal";
+import { promptWorkflowRejectComment } from "../components/WorkflowRejectDialog";
 import { CommentsSdk } from "./comments-sdk";
 // import { LSFHistory } from "./lsf-history";
 import { annotationToServer, taskToLSFormat } from "./lsf-utils";
@@ -578,6 +579,29 @@ export class LSFWrapper {
     }
 
     applyWorkflowEditorInterfaces(this.lsf, workflow, uid);
+    this.maybeShowWorkflowRejectBanner(workflow, uid);
+  }
+
+  /**
+   * Inform the assigned annotator why the task was sent back from review/accept.
+   * @private
+   */
+  maybeShowWorkflowRejectBanner(workflow, currentUserId) {
+    if (!workflow?.returned_to_annotation || !workflow?.last_reject_reason) return;
+    if (workflow.stage !== "annotate") return;
+    const annotatorId = workflow.annotate_user_id;
+    if (annotatorId == null || currentUserId == null) return;
+    if (Number(annotatorId) !== Number(currentUserId)) return;
+
+    const by = workflow.last_rejected_by?.username;
+    const reason = workflow.last_reject_reason;
+    const message = by ? `该任务已被 ${by} 驳回。原因：${reason}` : `该任务已被驳回。原因：${reason}`;
+
+    this.datamanager.invoke("toast", {
+      message,
+      type: "warning",
+      duration: 10000,
+    });
   }
 
   /**
@@ -947,7 +971,7 @@ export class LSFWrapper {
     return isTaskWorkflowEnabledForProject(dm?.store?.project) || isTaskWorkflowEnabledForProject(dm?.project);
   }
 
-  maybeAdvanceTaskWorkflowAfterReviewDecision = async (taskId, approve) => {
+  maybeAdvanceTaskWorkflowAfterReviewDecision = async (taskId, approve, comment) => {
     const dm = this.datamanager;
     if (!this.isTaskWorkflowProjectEnabled()) return { ok: true, skipped: true };
 
@@ -961,19 +985,23 @@ export class LSFWrapper {
     if (detail?.error || detail?.workflow == null) return { ok: true, skipped: true };
 
     const stage = detail.workflow.stage;
+    const body = { approve };
+    if (!approve && comment != null) {
+      body.comment = comment;
+    }
     let res;
     if (stage === "review") {
       res = await dm.apiCall(
         "taskWorkflowReview",
         { taskID: taskId },
-        { body: { approve } },
+        { body },
         { errorHandler: errorHandlerSwallowWorkflow },
       );
     } else if (stage === "accept") {
       res = await dm.apiCall(
         "taskWorkflowAccept",
         { taskID: taskId },
-        { body: { approve } },
+        { body },
         { errorHandler: errorHandlerSwallowWorkflow },
       );
     } else {
@@ -1053,13 +1081,30 @@ export class LSFWrapper {
   };
 
   /** @private */
+  resolveWorkflowRejectCommentPrefill = (entity) => {
+    const cs = this.lsf?.commentStore;
+    if (!cs || !entity?.id) return "";
+    const raw = cs.currentComment?.[entity.id];
+    if (typeof raw === "string") return raw.trim();
+    if (raw && typeof raw.text === "string") return raw.text.trim();
+    return "";
+  };
+
+  /** @private */
   onRejectAnnotation = async (ls, { entity, isDirty } = {}) => {
     const taskId = this.task?.id;
     if (taskId == null) return;
 
     if (!(await this.persistReviewEditsIfDirty(ls, entity, isDirty))) return;
 
-    const wfOutcome = await this.maybeAdvanceTaskWorkflowAfterReviewDecision(taskId, false);
+    let rejectComment;
+    if (this.isTaskWorkflowProjectEnabled()) {
+      const prefill = this.resolveWorkflowRejectCommentPrefill(entity);
+      rejectComment = await promptWorkflowRejectComment({ initialValue: prefill });
+      if (rejectComment === null) return;
+    }
+
+    const wfOutcome = await this.maybeAdvanceTaskWorkflowAfterReviewDecision(taskId, false, rejectComment);
     if (!wfOutcome.ok) {
       const detail =
         wfOutcome.response?.response?.detail ??

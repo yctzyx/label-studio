@@ -563,20 +563,31 @@ export const MyTasksPage = () => {
                             ) : null}
                             <td>{formatDate(task.created_at)}</td>
                             <td>
-                              <span
-                                className={root
-                                  .elem("status")
-                                  .mod({
-                                    annotating: pipelineStatus === "annotating",
-                                    rejected: pipelineStatus === "rejected",
-                                    in_review: pipelineStatus === "in_review",
-                                    in_accept: pipelineStatus === "in_accept",
-                                    done: pipelineStatus === "done",
-                                  })
-                                  .toClassName()}
-                              >
-                                {t(PIPELINE_STATUS_I18N[pipelineStatus] ?? PIPELINE_STATUS_I18N.annotating)}
-                              </span>
+                              <div className={root.elem("status-cell").toClassName()}>
+                                <span
+                                  className={root
+                                    .elem("status")
+                                    .mod({
+                                      annotating: pipelineStatus === "annotating",
+                                      rejected: pipelineStatus === "rejected",
+                                      in_review: pipelineStatus === "in_review",
+                                      in_accept: pipelineStatus === "in_accept",
+                                      done: pipelineStatus === "done",
+                                    })
+                                    .toClassName()}
+                                >
+                                  {t(PIPELINE_STATUS_I18N[pipelineStatus] ?? PIPELINE_STATUS_I18N.annotating)}
+                                </span>
+                                {pipelineStatus === "rejected" && task.workflow?.last_reject_reason ? (
+                                  <div
+                                    className={root.elem("reject-reason").toClassName()}
+                                    title={task.workflow.last_reject_reason}
+                                  >
+                                    {t("myTasks.rejectReasonPrefix")}
+                                    {task.workflow.last_reject_reason}
+                                  </div>
+                                ) : null}
+                              </div>
                             </td>
                             <td>
                               <Link
