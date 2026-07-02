@@ -11,7 +11,9 @@ from projects.models import Project
 from projects.workflow_models import ProjectTeamAllocation, ProjectTeamRole, TaskWorkflow, TaskWorkflowStage
 from projects.workflow_services import (
     accept_decision,
+    default_annotation_id_for_stream,
     distribute_tasks_for_project,
+    get_workflow_progress_detail,
     queryset_my_tasks,
     release_workflows_after_team_allocation_removed,
     review_decision,
@@ -133,6 +135,21 @@ class ProjectTeamAllocationListCreateAPI(APIView):
             .annotate(c=Count('task_id'))
             if row['annotate_user_id'] is not None
         }
+        review_completed_counts = {
+            row['reviewed_by_id']: row['c']
+            for row in TaskWorkflow.objects.filter(project=project, reviewed_by_id__isnull=False)
+            .values('reviewed_by_id')
+            .annotate(c=Count('task_id'))
+            if row['reviewed_by_id'] is not None
+        }
+        accept_completed_counts = {
+            row['accepted_by_id']: row['c']
+            for row in TaskWorkflow.objects.filter(project=project, accepted_by_id__isnull=False)
+            .values('accepted_by_id')
+            .annotate(c=Count('task_id'))
+            if row['accepted_by_id'] is not None
+        }
+
         project_annotation_completed_count = TaskWorkflow.objects.filter(project=project).exclude(
             stage=TaskWorkflowStage.ANNOTATE
         ).count()
@@ -145,10 +162,10 @@ class ProjectTeamAllocationListCreateAPI(APIView):
                 row['completed_task_count'] = label_completed_counts.get(uid, 0)
             elif role == ProjectTeamRole.REVIEW:
                 row['assigned_task_count'] = review_counts.get(uid, 0)
-                row['completed_task_count'] = 0
+                row['completed_task_count'] = review_completed_counts.get(uid, 0)
             elif role == ProjectTeamRole.ACCEPT:
                 row['assigned_task_count'] = accept_counts.get(uid, 0)
-                row['completed_task_count'] = 0
+                row['completed_task_count'] = accept_completed_counts.get(uid, 0)
             else:
                 row['assigned_task_count'] = 0
                 row['completed_task_count'] = 0
@@ -203,6 +220,28 @@ class ProjectWorkflowDistributeAPI(APIView):
         _ensure_project_manager(request, project)
         n = distribute_tasks_for_project(project)
         return Response({'created': n})
+
+
+class ProjectWorkflowProgressAPI(APIView):
+    """Per-person label / review / accept progress for project cards."""
+
+    permission_required = ViewClassPermission(GET=all_permissions.projects_view)
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(name='stage', required=True, enum=['label', 'review', 'accept']),
+        ],
+    )
+    def get(self, request, pk):
+        project = _visible_org_project(request, pk)
+        stage = (request.query_params.get('stage') or '').strip()
+        if not stage:
+            return Response({'detail': 'stage is required (label|review|accept)'}, status=400)
+        try:
+            payload = get_workflow_progress_detail(project, stage)
+        except ValidationError as err:
+            return Response({'detail': err.detail}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(payload)
 
 
 class ProjectWorkflowMyTasksAPI(APIView):
@@ -360,8 +399,13 @@ class ProjectWorkflowStreamNextAPI(APIView):
             # Reviewers / accepters need to see the annotator's submitted annotations
             data = TaskWithAnnotationsAndPredictionsAndDraftsSerializer(task, context=context).data
         else:
-            context['annotations'] = False
+            # Annotate stream: return the assignee's own annotation(s) so rework resumes instead of blank create
+            context['annotations'] = True
+            context['drafts'] = True
             data = NextTaskSerializer(task, context=context).data
+            wf = getattr(task, 'workflow', None)
+            data['workflow'] = serialize_workflow_for_api(wf)
+            data['default_selected_annotation'] = default_annotation_id_for_stream(task, request.user)
 
         data['queue'] = f'workflow_stream_{stage}'
         return Response(data)

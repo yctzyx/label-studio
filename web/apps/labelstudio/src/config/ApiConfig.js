@@ -41,6 +41,7 @@ export const API_CONFIG = {
     createProjectWorkflowTeam: "POST:/projects/:pk/workflow/team",
     deleteProjectWorkflowTeam: "DELETE:/projects/:pk/workflow/team/:allocation_id",
     projectWorkflowDistribute: "POST:/projects/:pk/workflow/distribute",
+    projectWorkflowProgress: "GET:/projects/:pk/workflow/progress",
     /** 当前用户在项目内的 workflow 任务（annotate / review / accept） */
     projectWorkflowMyTasks: "/projects/:pk/workflow/my-tasks",
 

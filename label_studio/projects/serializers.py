@@ -128,6 +128,10 @@ class ProjectSerializer(FlexFieldsModelSerializer):
         read_only=True,
         help_text='Per-stage counters for task workflow projects (annotate/review/accept/done).',
     )
+    workflow_pipeline = serializers.SerializerMethodField(
+        read_only=True,
+        help_text='Which downstream workflow stages are configured (review/accept personnel pools).',
+    )
 
     @property
     def user_id(self):
@@ -174,6 +178,20 @@ class ProjectSerializer(FlexFieldsModelSerializer):
             if stage in zeros:
                 zeros[stage] = int(row.get('n') or 0)
         return zeros
+
+    @extend_schema_field(
+        {
+            'type': 'object',
+            'properties': {
+                'has_review': {'type': 'boolean'},
+                'has_accept': {'type': 'boolean'},
+            },
+        }
+    )
+    def get_workflow_pipeline(self, obj):
+        from projects.workflow_services import get_workflow_pipeline_config
+
+        return get_workflow_pipeline_config(obj)
 
     @staticmethod
     def get_config_has_control_tags(project) -> bool:
@@ -327,6 +345,7 @@ class ProjectSerializer(FlexFieldsModelSerializer):
             'state',
             'can_manage_team',
             'workflow_stage_counts',
+            'workflow_pipeline',
         ]
 
     def validate_label_config(self, value):

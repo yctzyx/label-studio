@@ -73,6 +73,11 @@ _api_urlpatterns = [
         name='project-workflow-distribute',
     ),
     path(
+        '<int:pk>/workflow/progress/',
+        workflow_api.ProjectWorkflowProgressAPI.as_view(),
+        name='project-workflow-progress',
+    ),
+    path(
         '<int:pk>/workflow/my-tasks/',
         workflow_api.ProjectWorkflowMyTasksAPI.as_view(),
         name='project-workflow-my-tasks',

@@ -673,6 +673,31 @@ html.ls-embed main.main .projects-page {
     font-variant-numeric: tabular-nums;
   }
 
+  &__progress-link-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    width: 100%;
+    border: none;
+    padding: 0;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+    line-height: 1.4;
+
+    &:hover &__progress-link-value {
+      color: #0958d9;
+    }
+  }
+
+  &__progress-link-value {
+    font-weight: 600;
+    color: #1677ff;
+    font-variant-numeric: tabular-nums;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
   &__detail {
     display: grid;
     grid-auto-flow: column;

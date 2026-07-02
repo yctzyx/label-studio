@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from typing import Dict, List, Sequence
+from typing import Dict, List, Optional, Sequence
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
@@ -113,8 +113,138 @@ def _accept_pool_ids(project) -> List[int]:
     )
 
 
-def pick_next_round_robin(project, role: str) -> User:
-    """role is 'review' or 'accept'."""
+def get_workflow_pipeline_config(project) -> Dict[str, bool]:
+    """Whether review / accept stages are active (personnel configured for the project)."""
+    if not getattr(project, 'task_workflow_enabled', False):
+        return {'has_review': False, 'has_accept': False}
+
+    roles = set(
+        ProjectTeamAllocation.objects.filter(
+            project=project,
+            role__in=(ProjectTeamRole.REVIEW, ProjectTeamRole.ACCEPT),
+        ).values_list('role', flat=True)
+    )
+    return {
+        'has_review': ProjectTeamRole.REVIEW in roles,
+        'has_accept': ProjectTeamRole.ACCEPT in roles,
+    }
+
+
+def _user_progress_row(user) -> Dict:
+    return {
+        'user_id': user.id,
+        'username': user.username,
+        'first_name': user.first_name or '',
+        'last_name': user.last_name or '',
+        'phone': getattr(user, 'phone', None) or '',
+        'email': user.email or '',
+    }
+
+
+def _counts_by_field(qs, field: str) -> Dict[int, int]:
+    from django.db.models import Count
+
+    return {
+        row[field]: int(row['c'])
+        for row in qs.values(field).annotate(c=Count('task_id'))
+        if row.get(field) is not None
+    }
+
+
+def get_workflow_progress_detail(project, stage: str) -> Dict:
+    """Per-person workflow progress for label / review / accept stages."""
+    from tasks.models import Task
+
+    if stage not in ('label', 'review', 'accept'):
+        raise ValidationError('Invalid stage (label|review|accept)')
+    if not getattr(project, 'task_workflow_enabled', False):
+        raise ValidationError('Workflow not enabled for this project')
+
+    project_task_count = Task.objects.filter(project=project).count()
+    wf_qs = TaskWorkflow.objects.filter(project=project)
+
+    role_by_stage = {
+        'label': ProjectTeamRole.LABEL,
+        'review': ProjectTeamRole.REVIEW,
+        'accept': ProjectTeamRole.ACCEPT,
+    }
+    role = role_by_stage[stage]
+    allocations = list(
+        ProjectTeamAllocation.objects.filter(project=project, role=role).select_related('user').order_by('user_id')
+    )
+
+    members = []
+    if stage == 'label':
+        assigned = _counts_by_field(wf_qs, 'annotate_user_id')
+        completed = _counts_by_field(wf_qs.exclude(stage=TaskWorkflowStage.ANNOTATE), 'annotate_user_id')
+        pending = _counts_by_field(wf_qs.filter(stage=TaskWorkflowStage.ANNOTATE), 'annotate_user_id')
+        stage_completed_count = wf_qs.exclude(stage=TaskWorkflowStage.ANNOTATE).count()
+        for alloc in allocations:
+            uid = alloc.user_id
+            row = _user_progress_row(alloc.user)
+            row['assigned_task_count'] = assigned.get(uid, 0)
+            row['completed_task_count'] = completed.get(uid, 0)
+            row['pending_task_count'] = pending.get(uid, 0)
+            members.append(row)
+    elif stage == 'review':
+        pending = _counts_by_field(
+            wf_qs.filter(stage=TaskWorkflowStage.REVIEW, current_assignee_id__isnull=False),
+            'current_assignee_id',
+        )
+        completed = _counts_by_field(wf_qs.filter(reviewed_by_id__isnull=False), 'reviewed_by_id')
+        stage_completed_count = wf_qs.filter(stage__in=(TaskWorkflowStage.ACCEPT, TaskWorkflowStage.DONE)).count()
+        for alloc in allocations:
+            uid = alloc.user_id
+            row = _user_progress_row(alloc.user)
+            row['pending_task_count'] = pending.get(uid, 0)
+            row['completed_task_count'] = completed.get(uid, 0)
+            row['assigned_task_count'] = row['pending_task_count'] + row['completed_task_count']
+            members.append(row)
+    else:
+        pending = _counts_by_field(
+            wf_qs.filter(stage=TaskWorkflowStage.ACCEPT, current_assignee_id__isnull=False),
+            'current_assignee_id',
+        )
+        completed = _counts_by_field(wf_qs.filter(accepted_by_id__isnull=False), 'accepted_by_id')
+        stage_completed_count = wf_qs.filter(stage=TaskWorkflowStage.DONE).count()
+        for alloc in allocations:
+            uid = alloc.user_id
+            row = _user_progress_row(alloc.user)
+            row['pending_task_count'] = pending.get(uid, 0)
+            row['completed_task_count'] = completed.get(uid, 0)
+            row['assigned_task_count'] = row['pending_task_count'] + row['completed_task_count']
+            members.append(row)
+
+    return {
+        'stage': stage,
+        'project_task_count': project_task_count,
+        'stage_completed_count': stage_completed_count,
+        'members': members,
+    }
+
+
+def _cross_review_exclude_ids(wf: TaskWorkflow, role: str) -> List[int]:
+    """Prefer excluding annotator (and reviewer for accept) from downstream assignment."""
+    exclude: List[int] = []
+    if wf.annotate_user_id:
+        exclude.append(wf.annotate_user_id)
+    if role == ProjectTeamRole.ACCEPT and wf.reviewed_by_id:
+        exclude.append(wf.reviewed_by_id)
+    return exclude
+
+
+def pick_next_round_robin(
+    project,
+    role: str,
+    *,
+    exclude_user_ids: Optional[Sequence[int]] = None,
+) -> User:
+    """Pick the next user from the review or accept pool (round-robin).
+
+    When ``exclude_user_ids`` is set (cross-review), skip those users while scanning the pool.
+    If every pool member would be excluded — e.g. the only reviewer is also the annotator —
+    fall back to the plain round-robin pick so the task still enters review/accept.
+    """
     if role == ProjectTeamRole.REVIEW:
         pool = _review_pool_ids(project)
         field = 'rr_review_index'
@@ -127,17 +257,35 @@ def pick_next_round_robin(project, role: str) -> User:
     if not pool:
         raise ValidationError(f'No users in {role} pool for this project')
 
+    exclude = {uid for uid in (exclude_user_ids or []) if uid is not None}
+
     with transaction.atomic():
         settings, _ = ProjectWorkflowSettings.objects.select_for_update().get_or_create(
             project=project,
             defaults={'rr_review_index': 0, 'rr_accept_index': 0},
         )
         idx = getattr(settings, field)
-        uid = pool[idx % len(pool)]
-        setattr(settings, field, idx + 1)
+        n = len(pool)
+        chosen_uid = None
+        next_idx = idx
+
+        for offset in range(n):
+            pos = (idx + offset) % n
+            candidate = pool[pos]
+            if candidate not in exclude:
+                chosen_uid = candidate
+                next_idx = (pos + 1) % n
+                break
+
+        if chosen_uid is None:
+            # Cross-review impossible: allow self-review / self-accept so workflow does not stall.
+            chosen_uid = pool[idx % n]
+            next_idx = (idx + 1) % n
+
+        setattr(settings, field, next_idx)
         settings.save(update_fields=[field])
 
-    return User.objects.get(pk=uid)
+    return User.objects.get(pk=chosen_uid)
 
 
 def get_task_workflow_or_404(task_id: int) -> TaskWorkflow:
@@ -245,14 +393,22 @@ def submit_annotation_after_labeling(task_id: int, user) -> TaskWorkflow:
     wf.returned_to_annotation = False
 
     if _review_pool_ids(project):
-        reviewer = pick_next_round_robin(project, ProjectTeamRole.REVIEW)
+        reviewer = pick_next_round_robin(
+            project,
+            ProjectTeamRole.REVIEW,
+            exclude_user_ids=_cross_review_exclude_ids(wf, ProjectTeamRole.REVIEW),
+        )
         wf.stage = TaskWorkflowStage.REVIEW
         wf.current_assignee = reviewer
         wf.save(update_fields=['stage', 'current_assignee', 'returned_to_annotation', 'updated_at'])
         return wf
 
     if _accept_pool_ids(project):
-        accepter = pick_next_round_robin(project, ProjectTeamRole.ACCEPT)
+        accepter = pick_next_round_robin(
+            project,
+            ProjectTeamRole.ACCEPT,
+            exclude_user_ids=_cross_review_exclude_ids(wf, ProjectTeamRole.ACCEPT),
+        )
         wf.stage = TaskWorkflowStage.ACCEPT
         wf.current_assignee = accepter
         wf.save(update_fields=['stage', 'current_assignee', 'returned_to_annotation', 'updated_at'])
@@ -274,13 +430,19 @@ def review_decision(task_id: int, user, approve: bool, *, comment: str | None = 
         normalized = normalize_reject_comment(comment, required=True)
         return _return_task_to_annotate(wf, rejected_by=user, comment=normalized)
 
+    wf.reviewed_by = user
     if _accept_pool_ids(project):
-        accepter = pick_next_round_robin(project, ProjectTeamRole.ACCEPT)
+        accepter = pick_next_round_robin(
+            project,
+            ProjectTeamRole.ACCEPT,
+            exclude_user_ids=_cross_review_exclude_ids(wf, ProjectTeamRole.ACCEPT),
+        )
         wf.stage = TaskWorkflowStage.ACCEPT
         wf.current_assignee = accepter
-        wf.save(update_fields=['stage', 'current_assignee', 'updated_at'])
+        wf.save(update_fields=['stage', 'current_assignee', 'reviewed_by', 'updated_at'])
         return wf
 
+    wf.save(update_fields=['reviewed_by', 'updated_at'])
     _mark_task_done(wf)
     return wf
 
@@ -296,6 +458,8 @@ def accept_decision(task_id: int, user, approve: bool, *, comment: str | None = 
         normalized = normalize_reject_comment(comment, required=True)
         return _return_task_to_annotate(wf, rejected_by=user, comment=normalized)
 
+    wf.accepted_by = user
+    wf.save(update_fields=['accepted_by', 'updated_at'])
     _mark_task_done(wf)
     return wf
 
@@ -339,7 +503,11 @@ def release_workflows_after_team_allocation_removed(project, removed_user_id: in
             pool = _review_pool_ids(project)
             if pool:
                 for wf in workflows:
-                    next_u = pick_next_round_robin(project, ProjectTeamRole.REVIEW)
+                    next_u = pick_next_round_robin(
+                        project,
+                        ProjectTeamRole.REVIEW,
+                        exclude_user_ids=_cross_review_exclude_ids(wf, ProjectTeamRole.REVIEW),
+                    )
                     wf.current_assignee_id = next_u.id
                     wf.save(update_fields=['current_assignee_id', 'updated_at'])
                     stats['review_reassigned'] += 1
@@ -365,14 +533,22 @@ def release_workflows_after_team_allocation_removed(project, removed_user_id: in
             review_pool = _review_pool_ids(project)
             if accept_pool:
                 for wf in workflows:
-                    next_u = pick_next_round_robin(project, ProjectTeamRole.ACCEPT)
+                    next_u = pick_next_round_robin(
+                        project,
+                        ProjectTeamRole.ACCEPT,
+                        exclude_user_ids=_cross_review_exclude_ids(wf, ProjectTeamRole.ACCEPT),
+                    )
                     wf.current_assignee_id = next_u.id
                     wf.save(update_fields=['current_assignee_id', 'updated_at'])
                     stats['accept_reassigned'] += 1
             elif review_pool:
                 for wf in workflows:
                     wf.stage = TaskWorkflowStage.REVIEW
-                    next_u = pick_next_round_robin(project, ProjectTeamRole.REVIEW)
+                    next_u = pick_next_round_robin(
+                        project,
+                        ProjectTeamRole.REVIEW,
+                        exclude_user_ids=_cross_review_exclude_ids(wf, ProjectTeamRole.REVIEW),
+                    )
                     wf.current_assignee_id = next_u.id
                     wf.save(update_fields=['stage', 'current_assignee_id', 'updated_at'])
                     stats['accept_reassigned'] += 1
@@ -510,6 +686,17 @@ def apply_workflow_queue_filter(queryset, request, prepare_params):
 
     my_tasks = queryset_my_tasks(project, request.user, stage)
     return queryset.filter(id__in=my_tasks.values('id'))
+
+
+def default_annotation_id_for_stream(task, user) -> int | None:
+    """Latest non-cancelled annotation by ``user`` on ``task`` for workflow annotate stream resume."""
+    ann = (
+        Annotation.objects.filter(task=task, completed_by=user, was_cancelled=False)
+        .order_by('-updated_at', '-id')
+        .values_list('id', flat=True)
+        .first()
+    )
+    return ann
 
 
 def workflow_stream_next_task(project, user, stage: str):

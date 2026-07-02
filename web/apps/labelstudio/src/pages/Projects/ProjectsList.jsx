@@ -19,6 +19,7 @@ import {
   filterSidebarTemplateGroups,
   resolveProjectDataTypeKey,
 } from "./projectTaxonomy";
+import { WorkflowProgressModal } from "./WorkflowProgressModal";
 
 const TYPE_FILTERS = [{ key: "all", labelKey: "All types" }, ...PROJECT_TYPE_FILTERS];
 
@@ -315,10 +316,39 @@ export const EmptyProjectsList = ({ openModal }) => {
   );
 };
 
+const ProgressRow = ({ label, done, total, clickable, onOpen }) => {
+  const pc = cn("project-card");
+  const value = `${done} / ${total}`;
+
+  if (!clickable) {
+    return (
+      <div className={pc.elem("progress-row").toClassName()}>
+        <span className={pc.elem("progress-label").toClassName()}>{label}</span>
+        <span className={pc.elem("progress-value").toClassName()}>{value}</span>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className={pc.elem("progress-link-row").toClassName()}
+      onClick={(e) => {
+        e.stopPropagation();
+        onOpen?.();
+      }}
+    >
+      <span className={pc.elem("progress-label").toClassName()}>{label}</span>
+      <span className={pc.elem("progress-link-value").toClassName()}>{value}</span>
+    </button>
+  );
+};
+
 const ProjectCard = ({ project, typeLabel }) => {
   const { t } = useTranslation();
   const history = useHistory();
   const pc = cn("project-card");
+  const [progressStage, setProgressStage] = useState(null);
 
   const createdByLabel = creatorDisplayLabel(
     project.created_by,
@@ -333,6 +363,11 @@ const ProjectCard = ({ project, typeLabel }) => {
 
   const stageCounts =
     project.workflow_stage_counts ?? project.workflowStageCounts ?? {};
+  const pipeline = project.workflow_pipeline ?? project.workflowPipeline ?? {};
+  const hasReviewPool =
+    pipeline.has_review === true || pipeline.hasReview === true;
+  const hasAcceptPool =
+    pipeline.has_accept === true || pipeline.hasAccept === true;
   const reviewCount = Number(stageCounts.review ?? 0);
   const acceptCount = Number(stageCounts.accept ?? 0);
   const doneCount = Number(stageCounts.done ?? 0);
@@ -342,6 +377,7 @@ const ProjectCard = ({ project, typeLabel }) => {
     ? reviewCount + acceptCount + doneCount
     : Number(project.finished_task_number ?? 0);
   const reviewedCount = acceptCount + doneCount;
+  const acceptedCount = doneCount;
 
   const openProjectData = () => {
     if (isManager) {
@@ -357,6 +393,14 @@ const ProjectCard = ({ project, typeLabel }) => {
 
   return (
     <div className={cn("projects-page").elem("link").toClassName()}>
+      {progressStage ? (
+        <WorkflowProgressModal
+          projectId={project.id}
+          projectTitle={project.title ?? t("New project")}
+          stage={progressStage}
+          onClose={() => setProgressStage(null)}
+        />
+      ) : null}
       <article
         className={cn("project-card").mod({ studio: true }).toClassName()}
         onClick={(e) => {
@@ -469,46 +513,31 @@ const ProjectCard = ({ project, typeLabel }) => {
           <div
             className={cn("project-card").elem("progress-list").toClassName()}
           >
-            <div
-              className={cn("project-card").elem("progress-row").toClassName()}
-            >
-              <span
-                className={cn("project-card")
-                  .elem("progress-label")
-                  .toClassName()}
-              >
-                {t("Labeling progress")}
-              </span>
-              <span
-                className={cn("project-card")
-                  .elem("progress-value")
-                  .toClassName()}
-              >
-                {labeledCount} / {totalTasks}
-              </span>
-            </div>
-            {isWorkflow && (
-              <div
-                className={cn("project-card")
-                  .elem("progress-row")
-                  .toClassName()}
-              >
-                <span
-                  className={cn("project-card")
-                    .elem("progress-label")
-                    .toClassName()}
-                >
-                  {t("Review progress")}
-                </span>
-                <span
-                  className={cn("project-card")
-                    .elem("progress-value")
-                    .toClassName()}
-                >
-                  {reviewedCount} / {totalTasks}
-                </span>
-              </div>
-            )}
+            <ProgressRow
+              label={t("Labeling progress")}
+              done={labeledCount}
+              total={totalTasks}
+              clickable={isWorkflow}
+              onOpen={() => setProgressStage("label")}
+            />
+            {isWorkflow && hasReviewPool ? (
+              <ProgressRow
+                label={t("Review progress")}
+                done={reviewedCount}
+                total={totalTasks}
+                clickable
+                onOpen={() => setProgressStage("review")}
+              />
+            ) : null}
+            {isWorkflow && hasAcceptPool ? (
+              <ProgressRow
+                label={t("Accept progress")}
+                done={acceptedCount}
+                total={totalTasks}
+                clickable
+                onOpen={() => setProgressStage("accept")}
+              />
+            ) : null}
           </div>
           <div className={cn("project-card").elem("detail").toClassName()}>
             <div

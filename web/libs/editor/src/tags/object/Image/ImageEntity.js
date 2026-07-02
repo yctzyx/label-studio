@@ -6,17 +6,6 @@ import { FF_IMAGE_MEMORY_USAGE, isFF } from "../../../utils/feature-flags";
 
 const fileLoader = new FileLoader();
 
-const resetStalePreloadState = (self) => {
-  fileLoader.clearError(self.src);
-  self.releaseImage();
-  self.setCurrentSrc(undefined);
-  self.setDownloaded(false);
-  self.setImageLoaded(false);
-  self.setDownloading(false);
-  self.error = false;
-  self._retryAttempted = false;
-};
-
 export const ImageEntity = types
   .model("ImageEntity", {
     id: types.identifier,
@@ -184,7 +173,7 @@ export const ImageEntity = types
           (imageCache.isRevokedBlobUrl(self.currentSrc) || !imageCache.get(self.src));
 
         if (isStaleBlob) {
-          resetStalePreloadState(self);
+          self.resetStalePreloadState();
           return false;
         }
 
@@ -200,6 +189,22 @@ export const ImageEntity = types
         return true;
       }
       return false;
+    },
+
+    /**
+     * Reset preload state after a stale blob URL or failed auth load.
+     * Must be an MST action (also invoked from window/document event handlers).
+     */
+    resetStalePreloadState() {
+      if (!isAlive(self)) return;
+      fileLoader.clearError(self.src);
+      self.releaseImage();
+      self.setCurrentSrc(undefined);
+      self.setDownloaded(false);
+      self.setImageLoaded(false);
+      self.setDownloading(false);
+      self.setError(false);
+      self._retryAttempted = false;
     },
 
     /**
@@ -395,7 +400,7 @@ export const ImageEntity = types
 
           if (!staleBlob && !authLoadFailed) return;
 
-          resetStalePreloadState(self);
+          self.resetStalePreloadState();
           self.preload();
         };
 

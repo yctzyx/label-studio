@@ -495,7 +495,12 @@ export class LSFWrapper {
       taskHistory.push({ taskId: task.id, annotationId: null });
     }
 
-    if (isRejectedQueue && !annotationID) {
+    const isWorkflowAnnotateStream =
+      this.labelStream && this.datamanager?.workflowStreamStage === "annotate";
+    const shouldResumeExistingAnnotation =
+      isRejectedQueue || (isWorkflowAnnotateStream && isDefined(task.default_selected_annotation));
+
+    if (shouldResumeExistingAnnotation && !annotationID) {
       annotationID = task.default_selected_annotation;
     }
 
@@ -537,7 +542,7 @@ export class LSFWrapper {
     this.lsf.initializeStore(lsfTask);
 
     const finishSetTask = () => {
-      this.setAnnotation(annotationID, fromHistory || isRejectedQueue, selectPrediction);
+      this.setAnnotation(annotationID, fromHistory || shouldResumeExistingAnnotation, selectPrediction);
       this.setLoading(false);
 
       if (isFF(FF_FIT_1304_STRICT_OVERLAP) && this.overlapReached) {
@@ -699,13 +704,19 @@ export class LSFWrapper {
     if (this.labelStream) {
       const wfStreamStage = this.datamanager?.workflowStreamStage;
       const isReviewStream = wfStreamStage === "review" || wfStreamStage === "accept";
+      const isWorkflowAnnotateStream = wfStreamStage === "annotate";
 
       if (first?.draftId) {
         annotation = first;
       } else if (isDefined(annotationID) && selectAnnotation) {
-        annotation = this.annotations.find(({ pk }) => pk === annotationID);
-      } else if (isReviewStream && this.annotations.length > 0) {
-        // In review/accept stream, select the annotator's existing annotation for review
+        annotation = this.annotations.find(
+          ({ pk }) => pk != null && String(pk) === String(annotationID),
+        );
+      } else if (
+        (isReviewStream || isWorkflowAnnotateStream) &&
+        this.annotations.length > 0
+      ) {
+        // Review/accept: annotator's submission; annotate stream: resume own annotation (incl. rework)
         annotation = first;
       } else if (showPredictions && this.predictions.length > 0) {
         annotation = cs.addAnnotationFromPrediction(this.predictions[0]);
@@ -1189,13 +1200,14 @@ export class LSFWrapper {
 
     this.datamanager.invoke("updateAnnotation", ls, annotation, result);
 
-    if (exitStream) return this.exitStream();
-
     if (status >= 400) {
+      if (exitStream) return this.exitStream();
       return;
     }
 
     await this.maybeAdvanceTaskWorkflowAfterLabeling(task.id);
+
+    if (exitStream) return this.exitStream();
 
     const isRejectedQueue = isDefined(task.default_selected_annotation);
 

@@ -164,6 +164,7 @@ export const ProjectsPage = () => {
             "can_manage_team",
             "task_workflow_enabled",
             "workflow_stage_counts",
+            "workflow_pipeline",
             "template_group",
             "data_type_category",
           ].join(","),
